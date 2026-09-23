@@ -51,5 +51,5 @@ test('un FlightModel es pot instanciar i avancar sense petar', () => {
   for (let i = 0; i < 120; i++) f.step(core.PHYS_DT, ctl, core.FLAT_ENV);
 
   assert.ok(isFinite(f.out.ias), 'IAS no finita despres d un segon de simulacio');
-  assert.ok(f.out.alt !== undefined || f.out.h !== undefined, 'sense altitud a out');
+  assert.ok(isFinite(f.out.altFt), 'sense altitud a out');
 });
