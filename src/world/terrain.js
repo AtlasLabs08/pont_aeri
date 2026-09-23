@@ -12,6 +12,19 @@ import { vnoise, fbm, ridged } from '../core/noise.js';
 import { SURF } from '../core/flight-model.js';
 import { ll, COAST, RIDGES, VALLEYS, URBAN, ROADS } from './geo.js';
 import { AIRPORTS, AIRPORT_ORDER, airportPavedAt } from './airports.js';
+
+/* ---------------------------------------------------------------------------
+ * Photo (escenari fotografic) es queda a index.html perque depen de THREE,
+ * de fetch i de location, i per tant no pot viure en aquesta capa headless.
+ * El terreny nomes necessita saber si esta actiu i consultar-ne l alcada.
+ *
+ * Injeccio de dependencia: index.html crida setPhoto(Photo) despres de
+ * definir-lo. Sense escenari fotografic, el marcador de posicio amb on:false
+ * dona exactament el comportament procedimental de sempre, que es el que
+ * feia el codi original quan la carpeta scenery/ no hi era.
+ * ------------------------------------------------------------------------- */
+let Photo = { on: false };
+export function setPhoto(p) { Photo = p; }
 export const World = {
   G: { e0: -160000, n0: -300000, cell: 250, nx: 1640, ny: 1840, data: null },
   ready: false,
