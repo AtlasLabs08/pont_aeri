@@ -16,8 +16,8 @@ a `dev`) i l'ordre de feina per construir el mode Airline.
 
 Llegeix aquesta secció abans de tocar res. Són obligatòries.
 
-1. **`npm test` ha d'estar en verd abans i després de cada canvi.** Són 224
-   proves. Si en trenques una, el canvi no està acabat.
+1. **`npm test` ha d'estar en verd abans i després de cada canvi.**
+   Si en trenques una, el canvi no està acabat.
 2. **Mai regeneris `test/snapshot.json`** (`node test/snapshot.test.js --update`)
    si la tasca no diu explícitament que canvia la física. Fer passar la prova
    canviant la referència és l'única trampa que invalida tot el sistema.
@@ -29,7 +29,8 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
 8. **Si una tasca sembla exigir trencar un contracte d'aquest document,
    atura't i explica-ho** en comptes de decidir-ho tu.
-9. **No facis push.** Deixa els commits fets; l'humà revisa i puja.
+9. **Puja nomes la teva branca i obre un PR contra `dev`.** Mai facis
+   push a `dev` ni a `main`: GitHub ho bloqueja igualment.
 
 ---
 
