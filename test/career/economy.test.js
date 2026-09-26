@@ -97,11 +97,14 @@ describe('computeFlightResult: mode own', () => {
     assert.equal(own({ arrivalDeltaMin: -11 }).revenue.punctuality, 0);
   });
 
-  test('eficiencia: nomes a partir del 3 % d estalvi', () => {
-    // 2600 * 0.97 = 2522 kg: estalvi 78 kg = 3 % -> 0.35 * 78 * 0.9 = 24.57 -> 25
-    assert.equal(own({ fuelBurntKg: 2522 }).revenue.fuelSaving, 25);
-    // 2530 kg: estalvi 70 kg = 2.7 % -> 0
-    assert.equal(own({ fuelBurntKg: 2530 }).revenue.fuelSaving, 0);
+  test('eficiencia: clarament per sobre del 3 % (3.1 %) cobra', () => {
+    // 2519.4 kg, estalvi 80.6 kg = 3.1 % -> 0.35 * 80.6 * 0.9 = 25.389 -> 25
+    assert.equal(own({ fuelBurntKg: 2519.4 }).revenue.fuelSaving, 25);
+  });
+
+  test('eficiencia: clarament per sota del 3 % (2.9 %) no cobra', () => {
+    // 2524.6 kg, estalvi 75.4 kg = 2.9 % -> 0
+    assert.equal(own({ fuelBurntKg: 2524.6 }).revenue.fuelSaving, 0);
     // mes combustible que el previst -> 0
     assert.equal(own({ fuelBurntKg: 2800 }).revenue.fuelSaving, 0);
   });
@@ -125,6 +128,14 @@ describe('computeFlightResult: mode own', () => {
       crewCount: 1, weatherBonus: 0.10, exclusive: true, financePerFlight: 1000 });
     assert.equal(r.costs.fuel, 1620);
     assert.equal(r.revenue.fuelSaving, 252);
+  });
+
+  test('paxOnBoard del record quan no ve a l entrada', () => {
+    // 120 pax del record, r = 1, m_ruta = 1: bitllets 210 * 120 * 1.08 = 27216
+    // taxes 2 * (12 * 78 + 1.8 * 120) = 2 * 1152 = 2304
+    const r = computeFlightResult({ record: record({ paxOnBoard: 120 }), mode: 'own', ticketPrice: 210 });
+    assert.equal(r.revenue.tickets, 27216);
+    assert.equal(r.costs.fees, 2304);
   });
 
   test('rotacio: tope per classe', () => {
@@ -153,12 +164,15 @@ describe('computeFlightResult: mode own', () => {
     assert.equal(r.revenue.tickets, 37422);
   });
 
-  test('accident: ingressos 0, els costos es paguen', () => {
+  test('accident: ingressos 0, els costos es paguen i tram de nota 0', () => {
     // net = 3.9 * -6772 = -26410.8 -> -26411
-    const r = own({ crashCause: 'terrain' });
+    // nota 95 (flawless, +40 XP) pero accident: tram de nota 0, inspection, -35 XP
+    const r = own({ crashCause: 'terrain', ...withScore(95) });
     assert.deepEqual(r.revenue, { tickets: 0, contract: 0, punctuality: 0, fuelSaving: 0 });
     assert.deepEqual(r.costs, COSTS);
     assert.equal(r.net, -26411);
+    assert.equal(r.landing.key, 'landing.inspection');
+    assert.equal(r.landing.xp, -35);
   });
 
   test('sense aterratge: ingressos 0, costos pagats i tram de nota 0', () => {
@@ -201,15 +215,23 @@ describe('computeFlightResult: mode contract', () => {
     });
   });
 
-  test('turbohelix, rang d estudiant per defecte', () => {
+  test('turbohelix, rang d estudiant', () => {
     // 6000 * 1.00 * 0.85 (nota 75) = 5100
-    const r = computeFlightResult({ record: record({ aircraftTypeId: 'tp', ...withScore(75) }), mode: 'contract' });
+    const r = computeFlightResult({ record: record({ aircraftTypeId: 'tp', ...withScore(75) }), mode: 'contract', rankPayMult: 1 });
     assert.equal(r.net, 5100);
   });
 
   test('amb accident o sense aterratge: 0', () => {
     assert.equal(computeFlightResult({ record: record({ crashCause: 'hardImpact' }), mode: 'contract', rankPayMult: 2.2 }).net, 0);
     assert.equal(computeFlightResult({ record: record({ touchdown: null }), mode: 'contract', rankPayMult: 2.2 }).net, 0);
+  });
+
+  test('accident amb nota alta: pagament 0 i tram de nota 0', () => {
+    // nota 95 (flawless) pero accident: inspection, -35 XP, sense pagament
+    const r = computeFlightResult({ record: record({ crashCause: 'terrain', ...withScore(95) }), mode: 'contract', rankPayMult: 1.55 });
+    assert.equal(r.revenue.contract, 0);
+    assert.equal(r.net, 0);
+    assert.deepEqual(r.landing, { key: 'landing.inspection', mult: 0, xp: -35 });
   });
 });
 
@@ -227,5 +249,36 @@ describe('computeFlightResult: errors', () => {
 
   test('mode own sense preu', () => {
     assert.throws(() => computeFlightResult({ record: record(), mode: 'own' }), /ticketPrice/);
+  });
+
+  test('mode own: preu negatiu o no finit', () => {
+    for (const ticketPrice of [-50, -0.01, Infinity, NaN, '210']) {
+      assert.throws(() => own({}, { ticketPrice }), /ticketPrice/, String(ticketPrice));
+    }
+  });
+
+  test('mode own: preu 0 es valid', () => {
+    assert.equal(own({}, { ticketPrice: 0 }).revenue.tickets, 0);
+  });
+
+  test('mode own: paxOnBoard fora de 0..seients o no enter', () => {
+    // nb: 180 seients
+    for (const paxOnBoard of [181, 999, -1, 150.5, NaN, '150']) {
+      assert.throws(() => own({}, { paxOnBoard }), /paxOnBoard/, String(paxOnBoard));
+    }
+    // el del record tambe es valida
+    assert.throws(() => own({ paxOnBoard: 181 }, { paxOnBoard: undefined }), /paxOnBoard/);
+  });
+
+  test('mode own: 0 i seients son valids', () => {
+    assert.equal(own({}, { paxOnBoard: 0 }).revenue.tickets, 0);
+    // 210 * 180 * 1.35 * 1.08 = 55112.4 -> 55112
+    assert.equal(own({}, { paxOnBoard: 180 }).revenue.tickets, 55112);
+  });
+
+  test('mode contract: rankPayMult obligatori, finit i positiu', () => {
+    for (const rankPayMult of [undefined, null, 0, -1.55, NaN, Infinity, '1.55']) {
+      assert.throws(() => computeFlightResult({ record: record(), mode: 'contract', rankPayMult }), /rankPayMult/, String(rankPayMult));
+    }
   });
 });

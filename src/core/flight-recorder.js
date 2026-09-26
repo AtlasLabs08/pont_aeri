@@ -14,7 +14,9 @@
  *   r.setTimeAccel(k)           cada cop que canvia l acceleracio de temps
  *   r.cruiseSkip(fuelKg)        el jugador ha saltat el creuer; fuelKg (opcional)
  *                               es el combustible del tram saltat, que s acumula
- *                               a skippedCruiseFuelKg sense cap penalitzacio
+ *                               a skippedCruiseFuelKg sense cap penalitzacio. Si
+ *                               no es un numero finit >= 0 s ignora (no llanca:
+ *                               es crida dins del bucle del joc)
  *   r.event(type)               esdeveniment puntual, un de EVENT_TYPES
  *   r.touchdown(report, score)  quan Game calcula la nota (report.shown), NO a
  *                               onTouchdown: el pic de g i els rebots encara
@@ -84,7 +86,7 @@ export class FlightRecorder {
   }
 
   setTimeAccel(k) { if (k > this.accelMax) this.accelMax = k; }
-  cruiseSkip(fuelKg) { this.skipped = true; if (fuelKg !== undefined) this.skippedFuel += fuelKg; }
+  cruiseSkip(fuelKg) { this.skipped = true; if (Number.isFinite(fuelKg) && fuelKg >= 0) this.skippedFuel += fuelKg; }
   event(type) { this.events.push({ type, atSecond: this.block }); }
   rollout(metres) { this.rollM = metres; }
   tailStrike() { this.tail = true; }

@@ -109,7 +109,9 @@ describe('BALANCE', () => {
 
   test('airportSize, routeExceptions i airportDifficulty coherents', () => {
     const w = BALANCE.demand.sizeWeight;
-    assert.ok('small' in w);
+    assert.ok(BALANCE.demand.defaultSize in w, 'demand.defaultSize');
+    assert.ok(BALANCE.demand.defaultKind in BALANCE.demand.elasticity, 'demand.defaultKind');
+    assert.ok(Number.isInteger(BALANCE.fees.airportsPerLeg) && BALANCE.fees.airportsPerLeg > 0, 'fees.airportsPerLeg');
     for (const [icao, size] of Object.entries(BALANCE.airportSize)) {
       assert.match(icao, /^[A-Z0-9]{4}$/); assert.ok(size in w, icao);
     }

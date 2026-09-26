@@ -20,11 +20,14 @@
  *                           valor calculat
  *   routeFor(from, to)   -> el mateix per a dos ICAO de world/, o null si
  *                           algun no hi es. Simetric
- *   hourFactor(minuteOfDay)     -> peak, off o 1 (minut 0..1439, intervals [inici, fi))
+ *   hourFactor(minute)          -> peak, off o 1 (intervals [inici, fi)). Accepta
+ *                                  minuts absoluts (E1), tambe negatius: modul 1440.
+ *                                  Llanca un Error si minute no es un numero finit
  *   weatherFactor(severity)     -> 1 a severity 0, weatherFactorMin a severity 1
- *   demandPax({ route, price, seats, minuteOfDay, weatherSeverity, reputation })
+ *   demandPax({ route, price, seats, minute, weatherSeverity, reputation })
  *                        -> passatgers, enter entre 0 i seats. 0 si price <= 0
- *                           o no es finit
+ *                           o no es finit. Llanca un Error si minute no es un
+ *                           numero finit (via hourFactor)
  */
 
 import { clamp } from '../core/index.js';
@@ -32,8 +35,7 @@ import { AIRPORT_DEFS, distanceKm } from '../world/index.js';
 import { BALANCE } from './balance.js';
 
 const REPUTATION_SCALE = 100;   // la reputacio va de 0 a 100 (esquema, state.js)
-const DEFAULT_KIND = 'leisure';
-const DEFAULT_SIZE = 'small';
+const MINUTES_PER_DAY = 1440;
 
 /** 'AAAA-BBBB' amb els dos ICAO en ordre alfabetic. */
 export function routeKey(a, b) {
@@ -52,7 +54,7 @@ export function routeModel({ distanceKm: km, sizeA, sizeB, exception = null }) {
   const model = {
     pRef: d.pRef.base + d.pRef.perKm * km,
     dBase: d.dBase.scale * Math.sqrt(sizeWeight(sizeA) * sizeWeight(sizeB)) * (1 + km / d.dBase.distanceKm),
-    kind: DEFAULT_KIND
+    kind: d.defaultKind
   };
   if (exception) {
     for (const k of ['pRef', 'dBase', 'kind']) if (exception[k] !== undefined) model[k] = exception[k];
@@ -66,7 +68,7 @@ export function routeFor(from, to) {
   const A = Object.hasOwn(AIRPORT_DEFS, a) ? AIRPORT_DEFS[a] : null;
   const B = Object.hasOwn(AIRPORT_DEFS, b) ? AIRPORT_DEFS[b] : null;
   if (!A || !B) return null;
-  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : DEFAULT_SIZE;
+  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : BALANCE.demand.defaultSize;
   const key = routeKey(a, b);
   return routeModel({
     distanceKm: distanceKm(A.lat, A.lon, B.lat, B.lon),
@@ -77,11 +79,13 @@ export function routeFor(from, to) {
 
 const inAny = (m, intervals) => intervals.some(([from, to]) => m >= from && m < to);
 
-/** Factor horari: punta, matinada o 1. */
-export function hourFactor(minuteOfDay) {
+/** Factor horari: punta, matinada o 1. minute es redueix al dia (modul 1440). */
+export function hourFactor(minute) {
+  if (!Number.isFinite(minute)) throw new Error('hourFactor: minute ha de ser un numero finit: ' + minute);
+  const m = ((minute % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const { hours, hourFactor: f } = BALANCE.demand;
-  if (inAny(minuteOfDay, hours.peak)) return f.peak;
-  if (inAny(minuteOfDay, hours.off)) return f.off;
+  if (inAny(m, hours.peak)) return f.peak;
+  if (inAny(m, hours.off)) return f.off;
   return 1;
 }
 
@@ -92,7 +96,7 @@ export function weatherFactor(severity) {
 }
 
 /** Passatgers que compren bitllet, amb el tope de seients. */
-export function demandPax({ route, price, seats, minuteOfDay, weatherSeverity = 0,
+export function demandPax({ route, price, seats, minute, weatherSeverity = 0,
                             reputation = BALANCE.reputation.start }) {
   if (!Number.isFinite(seats)) throw new Error('demandPax: seats ha de ser un numero');
   if (!Number.isFinite(price) || price <= 0) return 0;
@@ -100,6 +104,6 @@ export function demandPax({ route, price, seats, minuteOfDay, weatherSeverity = 
   const e = d.elasticity[route.kind];
   if (e === undefined) throw new Error('demandPax: tipus de ruta desconegut: ' + route.kind);
   const fRep = d.reputation.base + d.reputation.span * reputation / REPUTATION_SCALE;
-  const n = route.dBase * (route.pRef / price) ** e * hourFactor(minuteOfDay) * weatherFactor(weatherSeverity) * fRep;
+  const n = route.dBase * (route.pRef / price) ** e * hourFactor(minute) * weatherFactor(weatherSeverity) * fRep;
   return Math.max(0, Math.min(seats, Math.floor(n)));
 }

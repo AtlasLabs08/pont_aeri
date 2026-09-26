@@ -341,7 +341,7 @@ export const BALANCE = {
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
-  fees: { perTonneMTOW: 12, perPax: 1.8 },
+  fees: { perTonneMTOW: 12, perPax: 1.8, airportsPerLeg: 2 },   // es paga a l origen i al desti
   crewRatePerBlockHour: { commuter: 250, turboprop: 450, narrowbody: 900, widebody: 1800 },
   maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
 
@@ -396,11 +396,13 @@ export const BALANCE = {
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
             reputation: { base: 0.6, span: 0.8 },
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
-            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA ~203 km -> ~212 EUR
+            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA 201,97 km -> 211,18 EUR
             dBase: { scale: 260, distanceKm: 3000 },
-            sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 } },
+            sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 },
+            defaultKind: 'leisure',               // tipus de les rutes sense excepcio
+            defaultSize: 'small' },               // mida dels aeroports que no son a airportSize
 
-  airportSize: {                            // ICAO -> categoria; si no hi es, 'small'
+  airportSize: {                            // ICAO -> categoria; si no hi es, demand.defaultSize
     LEBL: 'hub', LEMD: 'hub', LIRF: 'hub', EGLL: 'hub', EDDF: 'hub', KJFK: 'hub', SBGR: 'hub',
     LEPA: 'major', LEIB: 'major', LEVC: 'major', LEAL: 'major', LEZL: 'major',
     LEMG: 'major', LFMN: 'major', LFPO: 'major', GCLP: 'major',
@@ -560,8 +562,8 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
-| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 65 proves, 373 en total |
-| B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta |
+| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
+| B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta. Inclou el cost per cicle del manteniment (DESIGN.md, Els costos) |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 
