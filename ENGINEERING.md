@@ -380,11 +380,13 @@ export const BALANCE = {
   crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
 
   // B3 (wear.js): valors provisionals, es calibren a B5
-  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 } },
+  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
+                minLegHours: { commuter: 0.5, turboprop: 0.6, narrowbody: 0.75, widebody: 1.5 } },
   wear: {                                   // punts de condicio (0..100) que es perden
     enginesPerHour: 0.0075, avionicsPerHour: 0.05,
     airframePerCycle: 0.005, gearPerCycle: 0.02,
-    gearFreeFpm: 300, gearPerExtraFpm: 0.01   // desgast extra de l aterratge del jugador
+    gearFreeFpm: 300, gearPerExtraFpm: 0.01,  // desgast extra de l aterratge del jugador
+    gearFreeG: 1.6, gearPerExtraG: 5
   },
   maintCostPerCycle: { commuter: 40, turboprop: 60, narrowbody: 120, widebody: 300 },
   checks: {
@@ -581,7 +583,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
-| B3 | `wear.js`, `damage.js` | B2 | **Fet.** Una nota de 20 punts amb 850 fpm en un avio de 8.000.000 EUR dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 45 proves, 434 en total |
+| B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 

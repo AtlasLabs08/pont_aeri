@@ -41,3 +41,6 @@ Cada vol pilotat en un avio propi compta com un dia d'operacio per al desgast (d
 
 ## 2026-09-26 - B3: l engine overhaul no te comptador propi
 L'engine overhaul no te comptador propi: es una accio que el jugador fa quan vol.
+
+## 2026-09-26 - B3: cicles del dia d operacio i factor de rotacio
+Els cicles del dia d'operacio (fins a ~15) i el factor de rotacio de l'economia (fins a 2,7) no es corresponen; es revisa al B5.
