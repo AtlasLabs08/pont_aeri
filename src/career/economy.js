@@ -19,7 +19,8 @@
  *                    sense costos; rotation i K valen 1 (no s apliquen)
  *   Sense aterratge (touchdown null) o amb accident: ingressos 0. En mode
  *   'own' els costos es paguen igualment. landing es el tram de la nota, o el
- *   de nota 0 si no hi ha touchdown.
+ *   de nota 0 si no hi ha touchdown o si hi ha accident (sigui quina sigui la
+ *   nota). La perdua d XP de l accident en si (BALANCE.crash) no es aqui: B4.
  *   Cada partida en euros, sense K ni r, amb Math.round. net es Math.round del
  *   calcul sencer, una sola vegada al final (invariant de la seccio 5): la
  *   suma de partides arrodonides pot diferir de net en uns quants euros.
@@ -53,8 +54,9 @@ export function computeFlightResult(input) {
   const { record, mode } = input;
   const { cls, mtowT } = aircraftInfo(record.aircraftTypeId);
   const td = record.touchdown;
-  const failed = !td || record.crashCause != null;
-  const band = landingBand(td ? td.score : 0);
+  const crashed = record.crashCause != null;
+  const failed = !td || crashed;
+  const band = landingBand(td && !crashed ? td.score : 0);
   const landing = { key: band.key, mult: band.mult, xp: band.xp };
 
   if (mode === 'contract') {

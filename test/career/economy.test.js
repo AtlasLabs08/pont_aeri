@@ -153,12 +153,15 @@ describe('computeFlightResult: mode own', () => {
     assert.equal(r.revenue.tickets, 37422);
   });
 
-  test('accident: ingressos 0, els costos es paguen', () => {
+  test('accident: ingressos 0, els costos es paguen i tram de nota 0', () => {
     // net = 3.9 * -6772 = -26410.8 -> -26411
-    const r = own({ crashCause: 'terrain' });
+    // nota 95 (flawless, +40 XP) pero accident: tram de nota 0, inspection, -35 XP
+    const r = own({ crashCause: 'terrain', ...withScore(95) });
     assert.deepEqual(r.revenue, { tickets: 0, contract: 0, punctuality: 0, fuelSaving: 0 });
     assert.deepEqual(r.costs, COSTS);
     assert.equal(r.net, -26411);
+    assert.equal(r.landing.key, 'landing.inspection');
+    assert.equal(r.landing.xp, -35);
   });
 
   test('sense aterratge: ingressos 0, costos pagats i tram de nota 0', () => {
