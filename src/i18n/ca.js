@@ -19,5 +19,17 @@ export default {
   'flight.count.other': '{count} vols',
   'duration.hm': '{h} h {m} min',
   'duration.h': '{h} h',
-  'duration.m': '{m} min'
+  'duration.m': '{m} min',
+  'aircraft.commuter.name': 'Migjorn Mi-9',
+  'aircraft.commuter.category': 'Commuter turbohèlix bimotor',
+  'aircraft.rj.name': 'Xaloc X-90',
+  'aircraft.rj.category': 'Bireactor regional',
+  'aircraft.tpShort.name': 'Garbí G-42',
+  'aircraft.tpShort.category': 'Turbohèlix regional curt',
+  'aircraft.nbShort.name': 'Mestral M-100',
+  'aircraft.nbShort.category': 'Bireactor de fuselatge estret, curt',
+  'aircraft.nbStretch.name': 'Mestral M-300',
+  'aircraft.nbStretch.category': 'Bireactor de fuselatge estret, allargat',
+  'aircraft.wbEr.name': 'Llevant L-900ER',
+  'aircraft.wbEr.category': 'Bireactor de fuselatge ample, llarg abast'
 };

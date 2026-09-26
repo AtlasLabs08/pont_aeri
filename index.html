@@ -141,6 +141,7 @@ import {
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
+import { t } from './src/i18n/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -1295,6 +1296,15 @@ const MODEL_GEOM = {   // visual proportions per category (metres / degrees)
   wb:    { taper: 0.20, dihedral: 6,   wingZ: 1.55,  hSpan: 21.5, hChord: 7.0, finH: 9.4,  finChord: 9.5, finSweep: 42, nacR: 1.95, nacL: 7.3, wheelR: 0.67, noseWheelR: 0.52, bogie: 3, winglet: 0 },
   jumbo: { taper: 0.27, dihedral: 7,   wingZ: 1.60,  hSpan: 22.2, hChord: 8.0, finH: 10.2, finChord: 11,  finSweep: 45, nacR: 1.35, nacL: 5.6, wheelR: 0.62, noseWheelR: 0.55, bogie: 2, winglet: 1.8 }
 };
+// F4/F5: els avions nous reaprofiten la geometria del seu avio base, escalada a la seva mida (geometria propia a F6).
+// Empenatge amb la longitud, gondoles, rodes i posicio de l ala amb el radi del fuselatge, winglet amb l envergadura.
+const MODEL_BASE = { commuter: 'tp', tpShort: 'tp', rj: 'nb', nbShort: 'nb', nbStretch: 'nb', wbEr: 'wb' };
+for (const [id, base] of Object.entries(MODEL_BASE)) {
+  const G = MODEL_GEOM[base], m = AIRCRAFT[id].model, mb = AIRCRAFT[base].model;
+  const kL = m.length / mb.length, kR = m.fuseR / mb.fuseR, kB = AIRCRAFT[id].geom.b / AIRCRAFT[base].geom.b;
+  MODEL_GEOM[id] = { ...G, wingZ: G.wingZ * kR, hSpan: G.hSpan * kL, hChord: G.hChord * kL, finH: G.finH * kL, finChord: G.finChord * kL,
+    nacR: G.nacR * kR, nacL: G.nacL * kR, wheelR: G.wheelR * kR, noseWheelR: G.noseWheelR * kR, winglet: G.winglet * kB };
+}
 
 const AircraftModel = {
   /** livery texture wrapped around the fuselage: u = nose->tail, v = around (0 belly, .25 right, .5 crown, .75 left) */
@@ -2534,7 +2544,8 @@ const UI = {
     for (const id of ['loading', 'loadbar', 'loadtxt', 'menu', 'hud', 'toast', 'help', 'pause', 'crash', 'report', 'debug', 'yoke', 'yokedot', 'warn', 'topright', 'replaybar', 'replaytime', 'mixer']) this.el[id] = this.$(id);
     const O = Game.opts;
     // aircraft cards
-    this.$('acList').innerHTML = AIRCRAFT_ORDER.map(id => { const a = AIRCRAFT[id]; return `<label class="ac"><input type="radio" name="ac" value="${id}" ${id === O.aircraft ? 'checked' : ''}><span class="acname">${a.name}</span><span class="accat">${a.category}</span><span class="acdata">${Math.round(a.mass.mtow / 1000)} t max, ${a.geom.b.toFixed(0)} m span, ${a.engines.n} ${a.type === 'jet' ? 'turbofans' : 'turboprops'}</span></label>`; }).join('');
+    const acText = (id, k) => { const key = 'aircraft.' + id + '.' + k, s = t(key); return s === key ? AIRCRAFT[id][k] : s; };   // els avions nous, per i18n; els quatre originals es migren al bloc M
+    this.$('acList').innerHTML = AIRCRAFT_ORDER.map(id => { const a = AIRCRAFT[id]; return `<label class="ac"><input type="radio" name="ac" value="${id}" ${id === O.aircraft ? 'checked' : ''}><span class="acname">${acText(id, 'name')}</span><span class="accat">${acText(id, 'category')}</span><span class="acdata">${Math.round(a.mass.mtow / 1000)} t max, ${a.geom.b.toFixed(0)} m span, ${a.engines.n} ${a.type === 'jet' ? 'turbofans' : 'turboprops'}</span></label>`; }).join('');
     document.querySelectorAll('input[name=ac]').forEach(r => r.addEventListener('change', () => { O.aircraft = r.value; Game.setAircraft(r.value); Game.spawn(); Cameras.mode = 'orbit'; this.bestText(); }));
     const fillRw = () => { const A = AIRPORTS[O.airport]; this.$('optRunway').innerHTML = A.allEnds.map((e, i) => `<option value="${i}">Runway ${e.id} (${('00' + Math.round(e.hdg) % 360).slice(-3)}\u00b0, ${e.rw.len} m)</option>`).join(''); O.runway = Math.min(O.runway, A.allEnds.length - 1); this.$('optRunway').value = O.runway; };
     this.$('optAirport').innerHTML = AIRPORT_ORDER.map(id => `<option value="${id}">${AIRPORTS[id].name} (${id})</option>`).join(''); fillRw();
