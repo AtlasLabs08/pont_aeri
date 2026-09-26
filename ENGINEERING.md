@@ -161,7 +161,7 @@ src/
 | `app/` | `career/`, `platform/`, `i18n/`, `core/`, `world/` |
 | `ui/` | tot menys `render/` |
 | `index.html` | tot |
-| `test/`, `tools/` | tot menys `ui/`, `platform/`, `render/` |
+| `test/`, `tools/` | tot menys `ui/` i `render/`. `platform/` només es prova amb dobles injectats a `globalThis` |
 
 `career/` ha de poder córrer sencer a Node sense cap mock del navegador.
 
@@ -499,7 +499,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
 | A1 | `src/i18n/`: `t`, formatadors, `en.json`, `ca.json` | — | Proves de `t`, reserva a `en` i formats |
-| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | `Storage` no llança mai |
+| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
 | A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
 | A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
 | A5 | `src/career/state.js` i `types.js` | A1 | Proves de creació, migració, validació, export i import |
