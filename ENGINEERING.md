@@ -326,7 +326,7 @@ que no sigui 0, 1 o un índex. Quan canviï qualsevol valor, s'incrementa
 ```js
 export const BALANCE = {
   version: 1,
-  K: 2.6,                                   // factor global: l'unica palanca de ritme
+  K: 2.6,                                   // factor global: l unica palanca de ritme
 
   startingCash: 400000,
   startingLoan: { principal: 250000, ratePerFlight: 0.004 },
@@ -336,6 +336,14 @@ export const BALANCE = {
   fees: { perTonneMTOW: 12, perPax: 1.8 },
   crewRatePerBlockHour: { commuter: 250, turboprop: 450, narrowbody: 900, widebody: 1800 },
   maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
+
+  fleetTypes: {                             // clau = aircraftTypeId del FlightRecord
+    tp:    { cls: 'turboprop',  seats: 70  },
+    nb:    { cls: 'narrowbody', seats: 180 },
+    wb:    { cls: 'widebody',   seats: 300 },
+    jumbo: { cls: 'widebody',   seats: 400 }
+  },
+  contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
     { min: 99, mult: 1.35, xp: 55,  key: 'landing.textbook' },
@@ -378,7 +386,24 @@ export const BALANCE = {
 
   demand: { elasticity: { leisure: 1.6, business: 1.1 },
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
-            reputation: { base: 0.6, span: 0.8 } },
+            reputation: { base: 0.6, span: 0.8 },
+            hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
+            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA ~203 km -> ~212 EUR
+            dBase: { scale: 260, distanceKm: 3000 },
+            sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 } },
+
+  airportSize: {                            // ICAO -> categoria; si no hi es, 'small'
+    LEBL: 'hub', LEMD: 'hub', LIRF: 'hub', EGLL: 'hub', EDDF: 'hub', KJFK: 'hub', SBGR: 'hub',
+    LEPA: 'major', LEIB: 'major', LEVC: 'major', LEAL: 'major', LEZL: 'major',
+    LEMG: 'major', LFMN: 'major', LFPO: 'major', GCLP: 'major',
+    LEGE: 'regional', LERS: 'regional', LEMH: 'regional', LFMP: 'regional',
+    LELL: 'small', LEDA: 'small', LESU: 'small', LECH: 'small'
+  },
+  routeExceptions: {                        // clau 'AAAA-BBBB' en ordre alfabetic; camps opcionals
+    'LEBL-LEMD': { kind: 'business' }       // el pont aeri
+  },
+  airportDifficulty: { LESU: 0.50, LELL: 0.30, LEMH: 0.10 },   // la resta, 0
+  exclusivityBonus: 0.25,
 
   cruiseSkipFuelPenalty: 0.08,
   xpMultipliers: { turbulence: 1.3, hardWeather: 1.4 },
