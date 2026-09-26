@@ -25,7 +25,10 @@
  *   calcul sencer, una sola vegada al final (invariant de la seccio 5): la
  *   suma de partides arrodonides pot diferir de net en uns quants euros.
  *   Llanca un Error si l avio no es a BALANCE.fleetTypes o a AIRCRAFT, si el
- *   mode es desconegut o si en mode 'own' falta ticketPrice.
+ *   mode es desconegut; en mode 'own', si ticketPrice no es finit o es
+ *   negatiu, o si paxOnBoard (de l entrada o, si no hi es, del record) no es
+ *   un enter entre 0 i fleetTypes[..].seats; en mode 'contract', si
+ *   rankPayMult falta o no es un numero finit positiu.
  */
 
 import { AIRCRAFT } from '../core/index.js';
@@ -46,13 +49,13 @@ function aircraftInfo(typeId) {
   if (!ft) throw new Error('computeFlightResult: aircraftTypeId desconegut a BALANCE.fleetTypes: ' + typeId);
   const cfg = lookup(AIRCRAFT, typeId, null);
   if (!cfg || !Number.isFinite(cfg.mass?.mtow)) throw new Error('computeFlightResult: sense MTOW a AIRCRAFT per a ' + typeId);
-  return { cls: ft.cls, mtowT: cfg.mass.mtow / KG_PER_TONNE };
+  return { cls: ft.cls, seats: ft.seats, mtowT: cfg.mass.mtow / KG_PER_TONNE };
 }
 
 /** Resultat economic d un tram. Vegeu la capcalera. */
 export function computeFlightResult(input) {
   const { record, mode } = input;
-  const { cls, mtowT } = aircraftInfo(record.aircraftTypeId);
+  const { cls, seats, mtowT } = aircraftInfo(record.aircraftTypeId);
   const td = record.touchdown;
   const crashed = record.crashCause != null;
   const failed = !td || crashed;
@@ -60,7 +63,10 @@ export function computeFlightResult(input) {
   const landing = { key: band.key, mult: band.mult, xp: band.xp };
 
   if (mode === 'contract') {
-    const rankPayMult = input.rankPayMult ?? BALANCE.ranks[0].payMult;
+    const { rankPayMult } = input;
+    if (!Number.isFinite(rankPayMult) || rankPayMult <= 0) {
+      throw new Error('computeFlightResult: en mode contract cal rankPayMult, un numero finit positiu');
+    }
     const pay = failed ? 0 : BALANCE.contractFeePerLeg[cls] * rankPayMult * band.mult;
     return {
       mode, landing,
@@ -72,8 +78,13 @@ export function computeFlightResult(input) {
   if (mode !== 'own') throw new Error('computeFlightResult: mode desconegut: ' + mode);
 
   const { ticketPrice, crewCount = 0, weatherBonus = 0, exclusive = false, financePerFlight = 0 } = input;
-  if (!Number.isFinite(ticketPrice)) throw new Error('computeFlightResult: en mode own cal ticketPrice');
+  if (!Number.isFinite(ticketPrice) || ticketPrice < 0) {
+    throw new Error('computeFlightResult: en mode own cal ticketPrice, finit i no negatiu');
+  }
   const pax = input.paxOnBoard ?? record.paxOnBoard ?? 0;
+  if (!Number.isInteger(pax) || pax < 0 || pax > seats) {
+    throw new Error('computeFlightResult: paxOnBoard ha de ser un enter entre 0 i ' + seats + ': ' + pax);
+  }
   const B = BALANCE, bon = B.bonuses;
 
   const rotation = Math.min(1 + B.rotation.perCrew * crewCount, B.rotation.cap[cls]);

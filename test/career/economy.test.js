@@ -204,9 +204,9 @@ describe('computeFlightResult: mode contract', () => {
     });
   });
 
-  test('turbohelix, rang d estudiant per defecte', () => {
+  test('turbohelix, rang d estudiant', () => {
     // 6000 * 1.00 * 0.85 (nota 75) = 5100
-    const r = computeFlightResult({ record: record({ aircraftTypeId: 'tp', ...withScore(75) }), mode: 'contract' });
+    const r = computeFlightResult({ record: record({ aircraftTypeId: 'tp', ...withScore(75) }), mode: 'contract', rankPayMult: 1 });
     assert.equal(r.net, 5100);
   });
 
@@ -230,5 +230,36 @@ describe('computeFlightResult: errors', () => {
 
   test('mode own sense preu', () => {
     assert.throws(() => computeFlightResult({ record: record(), mode: 'own' }), /ticketPrice/);
+  });
+
+  test('mode own: preu negatiu o no finit', () => {
+    for (const ticketPrice of [-50, -0.01, Infinity, NaN, '210']) {
+      assert.throws(() => own({}, { ticketPrice }), /ticketPrice/, String(ticketPrice));
+    }
+  });
+
+  test('mode own: preu 0 es valid', () => {
+    assert.equal(own({}, { ticketPrice: 0 }).revenue.tickets, 0);
+  });
+
+  test('mode own: paxOnBoard fora de 0..seients o no enter', () => {
+    // nb: 180 seients
+    for (const paxOnBoard of [181, 999, -1, 150.5, NaN, '150']) {
+      assert.throws(() => own({}, { paxOnBoard }), /paxOnBoard/, String(paxOnBoard));
+    }
+    // el del record tambe es valida
+    assert.throws(() => own({ paxOnBoard: 181 }, { paxOnBoard: undefined }), /paxOnBoard/);
+  });
+
+  test('mode own: 0 i seients son valids', () => {
+    assert.equal(own({}, { paxOnBoard: 0 }).revenue.tickets, 0);
+    // 210 * 180 * 1.35 * 1.08 = 55112.4 -> 55112
+    assert.equal(own({}, { paxOnBoard: 180 }).revenue.tickets, 55112);
+  });
+
+  test('mode contract: rankPayMult obligatori, finit i positiu', () => {
+    for (const rankPayMult of [undefined, null, 0, -1.55, NaN, Infinity, '1.55']) {
+      assert.throws(() => computeFlightResult({ record: record(), mode: 'contract', rankPayMult }), /rankPayMult/, String(rankPayMult));
+    }
   });
 });

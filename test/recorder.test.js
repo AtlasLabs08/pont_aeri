@@ -193,6 +193,18 @@ describe('FlightRecorder: casos puntuals', () => {
     assert.deepEqual({ ...rb, usedCruiseSkip: false }, ra);
   });
 
+  /** cruiseSkip(100) valid i despres cruiseSkip(bad): el segon no suma ni llanca */
+  const skipBad = bad => {
+    const rec = new FlightRecorder(); rec.start(META); rec.cruiseSkip(100);
+    assert.doesNotThrow(() => rec.cruiseSkip(bad));
+    const r = rec.finish();
+    assert.equal(r.skippedCruiseFuelKg, 100); assert.equal(r.usedCruiseSkip, true);
+  };
+  test("cruiseSkip('500'): una cadena s ignora", () => skipBad('500'));
+  test('cruiseSkip(NaN) s ignora', () => skipBad(NaN));
+  test('cruiseSkip(-10) s ignora', () => skipBad(-10));
+  test('cruiseSkip(Infinity) s ignora', () => skipBad(Infinity));
+
   test('start() torna skippedCruiseFuelKg a 0', () => {
     const rec = new FlightRecorder(); rec.start(META); rec.cruiseSkip(500);
     rec.start(META);
