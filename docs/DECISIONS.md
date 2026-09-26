@@ -44,3 +44,6 @@ L'engine overhaul no te comptador propi: es una accio que el jugador fa quan vol
 
 ## 2026-09-26 - B3: cicles del dia d operacio i factor de rotacio
 Els cicles del dia d'operacio (fins a ~15) i el factor de rotacio de l'economia (fins a 2,7) no es corresponen; es revisa al B5.
+
+## 2026-09-26 - Els agents pugen la seva branca i obren el PR (PR #6)
+L'agent puja la seva branca (git push -u origin <branca>) i obre el PR contra dev. Mai fa push a dev ni a main. Ho diuen CLAUDE.md, AGENTS.md i la regla 9 de la seccio 0 d'ENGINEERING.md.

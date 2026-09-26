@@ -31,8 +31,8 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
 8. **Si una tasca sembla exigir trencar un contracte d'aquest document,
    atura't i explica-ho** en comptes de decidir-ho tu.
-9. **Puja nomes la teva branca i obre un PR contra `dev`.** Mai facis
-   push a `dev` ni a `main`: GitHub ho bloqueja igualment.
+9. **Puja la teva branca (`git push -u origin <branca>`) i obre el PR contra
+   `dev`.** Mai facis push a `dev` ni a `main`: GitHub ho bloqueja igualment.
 
 ---
 
