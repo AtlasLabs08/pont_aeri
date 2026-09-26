@@ -1,0 +1,182 @@
+/* Proves de career/wear.js (tasca B3): dia d operacio, desgast per vol,
+ * probabilitat d avaria i revisions. Els valors esperats son literals
+ * calculats a ma a partir de BALANCE, amb el calcul al comentari.
+ *
+ * Correr:  npm test
+ */
+
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { flightDay, applyFlightWear, failureChance, checksDue, performCheck } from '../../src/career/index.js';
+
+/** Avio de proves: widebody de 8.000.000 EUR amb tot a 100. */
+function airframe(over = {}) {
+  return {
+    reg: 'EC-AAA', typeId: 'wb', yearBuilt: 2010, hours: 1000, cycles: 500,
+    condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
+    location: 'LEBL', status: 'ready', groundedUntilMinute: 0,
+    maintenance: { nextAHours: 1500, nextCHours: 6000, deferred: [] },
+    finance: { purchasePrice: 8000000, loanId: null, leaseId: null },
+    value: 8000000,
+    ...over
+  };
+}
+
+/** Vol de 45 min (2700 s) amb aterratge a fpm. */
+const record = (fpm, over = {}) => ({
+  aircraftTypeId: 'wb', blockSeconds: 2700,
+  touchdown: { fpm, g: 1.3, onRunway: true }, ...over
+});
+
+/** abs(a - b) < 1e-12 */
+const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-12, a + ' != ' + b);
+
+describe('flightDay', () => {
+  test('vol nb de 45 min: un dia de 11 h i 15 cicles', () => {
+    // hours = max(11, 2700 / 3600 = 0.75) = 11; cycles = round(11 / 0.75 = 14.67) = 15
+    assert.deepEqual(flightDay({ blockSeconds: 2700 }, 'narrowbody'), { hours: 11, cycles: 15 });
+  });
+
+  test('vol mes llarg que el dia: les hores de bloc i 1 cicle', () => {
+    // wb, 15 h: hours = max(14, 15) = 15; cycles = max(1, round(15 / 15)) = 1
+    assert.deepEqual(flightDay({ blockSeconds: 54000 }, 'widebody'), { hours: 15, cycles: 1 });
+  });
+
+  test('blockSeconds 0: el dia de la classe i 1 cicle', () => {
+    assert.deepEqual(flightDay({ blockSeconds: 0 }, 'turboprop'), { hours: 9, cycles: 1 });
+  });
+
+  test('classe desconeguda: Error', () => {
+    assert.throws(() => flightDay({ blockSeconds: 2700 }, 'zeppelin'), Error);
+  });
+});
+
+describe('applyFlightWear', () => {
+  test('vol wb de 45 min amb aterratge de 300 fpm: sense extra de tren', () => {
+    // flightDay: hours = 14, cycles = round(14 / 0.75 = 18.67) = 19
+    // engines  100 - 0.0075 * 14 = 99.895 -> 99.9
+    // avionics 100 - 0.05 * 14   = 99.3
+    // airframe 100 - 0.005 * 19  = 99.905 -> 99.9
+    // gear     100 - 0.02 * 19   = 99.62  -> 99.6   (300 fpm = gearFreeFpm, extra 0)
+    // cycleCost = 19 * 300 = 5700
+    const { airframe: a, cycleCost } = applyFlightWear(airframe(), record(300));
+    assert.deepEqual(a.condition, { engines: 99.9, gear: 99.6, airframe: 99.9, avionics: 99.3 });
+    assert.equal(a.hours, 1014);     // 1000 + 14
+    assert.equal(a.cycles, 519);     // 500 + 19
+    assert.equal(cycleCost, 5700);
+  });
+
+  test('aterratge de 500 fpm: el tren perd 2 punts mes; el signe de fpm no compta', () => {
+    // gear 100 - 0.02 * 19 - 0.01 * (500 - 300) = 100 - 0.38 - 2 = 97.62 -> 97.6
+    assert.equal(applyFlightWear(airframe(), record(500)).airframe.condition.gear, 97.6);
+    assert.equal(applyFlightWear(airframe(), record(-500)).airframe.condition.gear, 97.6);
+  });
+
+  test('sense touchdown: nomes el desgast per cicle', () => {
+    assert.equal(applyFlightWear(airframe(), record(0, { touchdown: null })).airframe.condition.gear, 99.6);
+  });
+
+  test('no modifica l objecte d entrada', () => {
+    const input = airframe();
+    const before = structuredClone(input);
+    const { airframe: a } = applyFlightWear(input, record(900));
+    assert.deepEqual(input, before);
+    assert.notEqual(a, input);
+    assert.notEqual(a.condition, input.condition);
+    assert.notEqual(a.maintenance, input.maintenance);
+  });
+
+  test('condicions retallades a 0', () => {
+    // tot a 0.01; el desgast de cada sistema es mes gran que 0.01
+    const low = airframe({ condition: { engines: 0.01, gear: 0.01, airframe: 0.01, avionics: 0.01 } });
+    const { airframe: a } = applyFlightWear(low, record(2000));
+    assert.deepEqual(a.condition, { engines: 0, gear: 0, airframe: 0, avionics: 0 });
+  });
+
+  test('typeId desconegut: Error', () => {
+    assert.throws(() => applyFlightWear(airframe({ typeId: 'zeppelin' }), record(300)), Error);
+  });
+});
+
+describe('failureChance', () => {
+  test('70: 0', () => assert.equal(failureChance(70), 0));
+
+  test('69: gairebe pAtThreshold', () => {
+    // x = (70 - 69) / (70 - 20) = 0.02; 0.002 + 0.078 * 0.0004 = 0.0020312
+    near(failureChance(69), 0.0020312);
+  });
+
+  test('20: pAtRef', () => {
+    // x = 1; 0.002 + 0.078 = 0.08
+    near(failureChance(20), 0.08);
+  });
+
+  test('10: la corba continua per sota de refCondition', () => {
+    // x = 60 / 50 = 1.2; 0.002 + 0.078 * 1.44 = 0.11432
+    near(failureChance(10), 0.11432);
+  });
+
+  test('per sobre del llindar: 0', () => assert.equal(failureChance(100), 0));
+});
+
+describe('checksDue', () => {
+  const at = (hours, nextAHours, nextCHours) =>
+    checksDue(airframe({ hours, maintenance: { nextAHours, nextCHours, deferred: [] } }));
+
+  test('limits: just per sota, just al punt', () => {
+    assert.deepEqual(at(499.9, 500, 6000), []);
+    assert.deepEqual(at(500, 500, 6000), ['A']);
+    assert.deepEqual(at(5999.9, 6500, 6000), []);
+    assert.deepEqual(at(6000, 6500, 6000), ['C']);
+    assert.deepEqual(at(6000, 6000, 6000), ['A', 'C']);
+  });
+});
+
+describe('performCheck', () => {
+  const worn = () => airframe({
+    hours: 500,
+    condition: { engines: 60, gear: 90, airframe: 70, avionics: 50 },
+    maintenance: { nextAHours: 500, nextCHours: 6000, deferred: [] }
+  });
+
+  test('A amb el tren a 90: queda a 100, no 110', () => {
+    // restore avionics 100; boost gear 90 + 20 = 110 -> 100
+    // cost = 0.008 * 8.000.000 = 64.000; nextAHours = 500 + 500 = 1000
+    const input = worn();
+    const before = structuredClone(input);
+    const r = performCheck(input, 'A');
+    assert.deepEqual(r.airframe.condition, { engines: 60, gear: 100, airframe: 70, avionics: 100 });
+    assert.equal(r.cost, 64000);
+    assert.equal(r.groundedDays, 1);
+    assert.deepEqual(r.airframe.maintenance, { nextAHours: 1000, nextCHours: 6000, deferred: [] });
+    assert.deepEqual(input, before);
+  });
+
+  test('A amb el tren a 70.3: boost de 20 fins a 90.3', () => {
+    const r = performCheck(airframe({ condition: { engines: 60, gear: 70.3, airframe: 70, avionics: 50 } }), 'A');
+    assert.equal(r.airframe.condition.gear, 90.3);
+  });
+
+  test('C: cellula, tren i avionica a 100; motors intactes', () => {
+    // cost = 0.04 * 8.000.000 = 320.000; nextCHours = 500 + 6000 = 6500
+    const r = performCheck(worn(), 'C');
+    assert.deepEqual(r.airframe.condition, { engines: 60, gear: 100, airframe: 100, avionics: 100 });
+    assert.equal(r.cost, 320000);
+    assert.equal(r.groundedDays, 10);
+    assert.deepEqual(r.airframe.maintenance, { nextAHours: 500, nextCHours: 6500, deferred: [] });
+  });
+
+  test('engine: motors a 100, sense comptador', () => {
+    // cost = 0.03 * 8.000.000 = 240.000
+    const r = performCheck(worn(), 'engine');
+    assert.deepEqual(r.airframe.condition, { engines: 100, gear: 90, airframe: 70, avionics: 50 });
+    assert.equal(r.cost, 240000);
+    assert.equal(r.groundedDays, 5);
+    assert.deepEqual(r.airframe.maintenance, worn().maintenance);
+  });
+
+  test('revisio desconeguda: Error', () => {
+    assert.throws(() => performCheck(worn(), 'B'), Error);
+  });
+});
