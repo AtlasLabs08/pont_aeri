@@ -379,6 +379,26 @@ export const BALANCE = {
   // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
   crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
 
+  // B3 (wear.js): valors provisionals, es calibren a B5
+  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
+                minLegHours: { commuter: 0.5, turboprop: 0.6, narrowbody: 0.75, widebody: 1.5 } },
+  wear: {                                   // punts de condicio (0..100) que es perden
+    enginesPerHour: 0.0075, avionicsPerHour: 0.05,
+    airframePerCycle: 0.005, gearPerCycle: 0.02,
+    gearFreeFpm: 300, gearPerExtraFpm: 0.01,  // desgast extra de l aterratge del jugador
+    gearFreeG: 1.6, gearPerExtraG: 5
+  },
+  maintCostPerCycle: { commuter: 40, turboprop: 60, narrowbody: 120, widebody: 300 },
+  checks: {
+    A:      { intervalHours: 500,  pctOfValue: 0.008, groundedDays: 1,
+              restore: { avionics: 100 }, boost: { gear: 20 } },
+    C:      { intervalHours: 6000, pctOfValue: 0.04,  groundedDays: 10,
+              restore: { airframe: 100, gear: 100, avionics: 100 } },
+    engine: {                     pctOfValue: 0.03,  groundedDays: 5,
+              restore: { engines: 100 } }
+  },
+  failure: { threshold: 70, pAtThreshold: 0.002, refCondition: 20, pAtRef: 0.08 },
+
   insurance: { premiumPctPerFlight: 0.0012, excessOptions: [0.05, 0.10, 0.25] },
 
   ranks: [
@@ -563,7 +583,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
-| B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta. Inclou el cost per cicle del manteniment (DESIGN.md, Els costos) |
+| B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 
@@ -596,10 +616,10 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | Id | Tasca | Depèn de | Nota |
 | --- | --- | --- | --- |
 | E1 | `career/clock.js` i posició de la flota | D4 | L'avió queda on aterra |
-| E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel` |
+| E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel`. Tira les avaries amb failureChance de wear.js i draw(state). Desgast extra de motors per TOGA prolongat: cal una dada nova al FlightRecord. |
 | E3 | Detector de creuer estable i ×32 | A4 | **Estén** `Game.cycleAccel`, no el substitueix. El bucle de `Game` limita a `16 * 12` passos per frame: a ×32 cal mesurar el temps de frame |
 | E4 | Salt de creuer | E3 | +8 % de combustible, condicions revelades en sortir. Omple skippedCruiseFuelKg amb cruiseSkip(fuelKg): el combustible que s'hauria cremat al tram saltat, sense penalitzacio. La penalitzacio del 8 % l'aplica economy.js. |
-| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada |
+| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada. Cada vol despatxat aplica applyFlightWear. |
 
 ### Bloc F — Contingut (paral·lel, delegable)
 

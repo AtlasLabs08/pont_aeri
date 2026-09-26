@@ -10,3 +10,4 @@ Idees aparcades. No es toca res d aqui fins que el bucle economic hagi demostrat
 | Perdre l avio per accident | Mata la retencio. Asseguranca amb franquicia. |
 | Passatgers pujant i baixant renderitzats | Car i aporta poc. Barra d embarcament que consumeix temps real. |
 | Suport per comandament | Mes endavant. |
+| Unificar la funcio eur (duplicada a economy.js, wear.js i damage.js) en un modul compartit de career/ | Refactor, no es funcionalitat: va en un PR a part. |

@@ -35,3 +35,12 @@ BALANCE.version es queda a 1 fins que el mode Airline arribi a main. Mentre no h
 - El cost per cicle del manteniment no es a economy.js: el calcula wear.js a B3.
 - Als vols de contracte, el pagament es contractFeePerLeg[cls] * rankPayMult * m_aterratge. Decisio d'en Marc: la nota tambe compta quan l'avio no es teu.
 - Un accident fixa el tram d'aterratge al de nota 0.
+
+## 2026-09-26 - B3: desgast per dia d operacio
+Cada vol pilotat en un avio propi compta com un dia d'operacio per al desgast (dayHours per classe). Els vols despatxats (E5) tambe.
+
+## 2026-09-26 - B3: l engine overhaul no te comptador propi
+L'engine overhaul no te comptador propi: es una accio que el jugador fa quan vol.
+
+## 2026-09-26 - B3: cicles del dia d operacio i factor de rotacio
+Els cicles del dia d'operacio (fins a ~15) i el factor de rotacio de l'economia (fins a 2,7) no es corresponen; es revisa al B5.
