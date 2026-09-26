@@ -26,7 +26,7 @@ test('core exporta el que ha d exportar', () => {
 });
 
 test('world exporta el que ha d exportar', () => {
-  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS']) {
+  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm']) {
     assert.ok(name in world, `falta l export: ${name}`);
   }
 });

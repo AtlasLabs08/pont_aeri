@@ -16,6 +16,7 @@ import {
 } from '../src/i18n/index.js';
 import en from '../src/i18n/en.js';
 import ca from '../src/i18n/ca.js';
+import { BALANCE } from '../src/career/index.js';
 
 /** qualsevol espai (normal o no separable) -> espai normal */
 const sp = (s) => s.replace(/\s/g, ' ');
@@ -30,7 +31,7 @@ describe('idioma', () => {
   test('setLang canvia l idioma actiu', () => {
     setLang('ca');
     assert.equal(getLang(), 'ca');
-    assert.equal(t('landing.solid'), 'Aterratge sòlid');
+    assert.equal(t('landing.solid'), 'Un aterratge bo i sòlid.');
   });
 
   test('idioma desconegut: queda en', () => {
@@ -42,7 +43,7 @@ describe('idioma', () => {
 
 describe('t', () => {
   test('text simple', () => {
-    assert.equal(t('landing.solid'), 'Solid landing');
+    assert.equal(t('landing.solid'), 'A good, solid landing.');
   });
 
   test('interpola {nom} amb params', () => {
@@ -79,6 +80,13 @@ describe('t', () => {
 
   test('ca no te cap clau que no sigui a en', () => {
     for (const k of Object.keys(ca)) assert.ok(Object.hasOwn(en, k), k);
+  });
+
+  test('cada clau de BALANCE.landingBands existeix en tots dos idiomes', () => {
+    for (const { key } of BALANCE.landingBands) {
+      assert.ok(Object.hasOwn(en, key), 'en: ' + key);
+      assert.ok(Object.hasOwn(ca, key), 'ca: ' + key);
+    }
   });
 });
 

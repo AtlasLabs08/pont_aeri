@@ -4,7 +4,16 @@
  * EXPORTA: default, objecte pla amb les mateixes claus que en.js.
  */
 export default {
-  'landing.solid': 'Aterratge sòlid',
+  'landing.textbook': 'Aterratge de manual. Res a afegir.',
+  'landing.flawless': 'Impecable. Els passatgers ni se n\'han adonat.',
+  'landing.excellent': 'Aterratge excel·lent, just a la zona.',
+  'landing.solid': 'Un aterratge bo i sòlid.',
+  'landing.safe': 'Sòlid i segur. Cal polir una mica l\'arrodoniment i l\'eix.',
+  'landing.firm': 'Ferm. La tripulació de cabina te\'n dirà quatre.',
+  'landing.rough': 'Arribada brusca: vigila la velocitat de descens i apunta a les marques.',
+  'landing.veryHard': 'Molt fort. Manteniment inspeccionarà el tren d\'aterratge.',
+  'landing.incident': 'Això ha fregat l\'incident. Cal una inspecció completa.',
+  'landing.inspection': 'Ha faltat poc per a un accident. L\'avió queda a terra per a una revisió completa.',
   'flight.route': 'De {from} a {to}',
   'flight.count.one': '{count} vol',
   'flight.count.other': '{count} vols',

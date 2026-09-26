@@ -1,12 +1,20 @@
 /* Geografia: projeccio lat/lon, costa, serralades, valls, urbanitzacio, vies.
  * ORIGEN: linies 1272-1368 de l'original (SECTION 8).
  *
- * EXPORTA: GEO ll COAST RIDGES VALLEYS URBAN ROADS
+ * EXPORTA: GEO ll distanceKm COAST RIDGES VALLEYS URBAN ROADS
  *
  * IMPORTA: res de core. Son dades geografiques pures.
  */
 export const GEO = { lat0: 41.2971, lon0: 2.0785, kE: 84775, kN: 111200, lat: 40.4 };
 export const ll = (lon, lat) => [(lon - GEO.lon0) * GEO.kE, (lat - GEO.lat0) * GEO.kN];
+
+const EARTH_RADIUS_KM = 6371;   // radi mitja
+/** distancia ortodromica (haversine) en km entre dos punts en graus decimals */
+export function distanceKm(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 /* ---- coastlines as (lon, lat) polygons ---- */
 export const COAST = {

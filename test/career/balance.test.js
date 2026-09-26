@@ -9,6 +9,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BALANCE, createCareer } from '../../src/career/index.js';
+import { AIRCRAFT_ORDER } from '../../src/core/index.js';
 
 /** Parelles [cami, valor] de totes les fulles de obj. */
 function leaves(obj, at = 'BALANCE') {
@@ -87,6 +88,37 @@ describe('BALANCE', () => {
   test('insurance: excessOptions en ordre creixent', () => {
     pairs(BALANCE.insurance.excessOptions, (a, b, i) =>
       assert.ok(b > a, 'excessOptions[' + i + ']'));
+  });
+
+  test('fleetTypes: un per avio, amb classe coneguda i seients enters', () => {
+    assert.deepEqual(Object.keys(BALANCE.fleetTypes).sort(), [...AIRCRAFT_ORDER].sort());
+    for (const [id, ft] of Object.entries(BALANCE.fleetTypes)) {
+      for (const table of ['crewRatePerBlockHour', 'maintAccrualPerHour', 'contractFeePerLeg']) {
+        assert.ok(ft.cls in BALANCE[table], id + ' -> ' + table + '.' + ft.cls);
+      }
+      assert.ok(ft.cls in BALANCE.rotation.cap, id + ' -> rotation.cap.' + ft.cls);
+      assert.ok(Number.isInteger(ft.seats) && ft.seats > 0, id + '.seats');
+    }
+  });
+
+  test('demand.hours: intervals [inici, fi) dins del dia i sense solapar-se', () => {
+    const all = [...BALANCE.demand.hours.peak, ...BALANCE.demand.hours.off].sort((a, b) => a[0] - b[0]);
+    for (const [a, b] of all) assert.ok(a >= 0 && a < b && b <= 24 * 60, a + '-' + b);
+    pairs(all, (lo, hi, i) => assert.ok(hi[0] >= lo[1], 'interval ' + i));
+  });
+
+  test('airportSize, routeExceptions i airportDifficulty coherents', () => {
+    const w = BALANCE.demand.sizeWeight;
+    assert.ok('small' in w);
+    for (const [icao, size] of Object.entries(BALANCE.airportSize)) {
+      assert.match(icao, /^[A-Z0-9]{4}$/); assert.ok(size in w, icao);
+    }
+    for (const [key, ex] of Object.entries(BALANCE.routeExceptions)) {
+      const m = key.match(/^([A-Z0-9]{4})-([A-Z0-9]{4})$/);
+      assert.ok(m && m[1] < m[2], key + ': ordre alfabetic');
+      if ('kind' in ex) assert.ok(ex.kind in BALANCE.demand.elasticity, key + '.kind');
+    }
+    for (const [icao, d] of Object.entries(BALANCE.airportDifficulty)) assert.ok(d >= 0, icao);
   });
 
   test('BALANCE i tots els seus objectes i llistes estan congelats', () => {
