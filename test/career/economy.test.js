@@ -225,6 +225,14 @@ describe('computeFlightResult: mode contract', () => {
     assert.equal(computeFlightResult({ record: record({ crashCause: 'hardImpact' }), mode: 'contract', rankPayMult: 2.2 }).net, 0);
     assert.equal(computeFlightResult({ record: record({ touchdown: null }), mode: 'contract', rankPayMult: 2.2 }).net, 0);
   });
+
+  test('accident amb nota alta: pagament 0 i tram de nota 0', () => {
+    // nota 95 (flawless) pero accident: inspection, -35 XP, sense pagament
+    const r = computeFlightResult({ record: record({ crashCause: 'terrain', ...withScore(95) }), mode: 'contract', rankPayMult: 1.55 });
+    assert.equal(r.revenue.contract, 0);
+    assert.equal(r.net, 0);
+    assert.deepEqual(r.landing, { key: 'landing.inspection', mult: 0, xp: -35 });
+  });
 });
 
 describe('computeFlightResult: errors', () => {
