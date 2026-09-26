@@ -5,8 +5,11 @@
  * EXPORTA: BALANCE
  *
  * INTERFICIE (no la canviis, state.js i els tests en depenen):
- *   BALANCE.version   s incrementa cada cop que canvia qualsevol valor, i
- *                     state.js ho detecta amb needsBalanceUpdate()
+ *   BALANCE.version   es queda a 1 fins que el mode Airline arribi a main;
+ *                     a partir d aleshores, cada canvi de valor la puja i
+ *                     porta la seva migracio a state.js, que ho detecta amb
+ *                     needsBalanceUpdate() (seccio 6 d ENGINEERING.md i
+ *                     docs/DECISIONS.md, 26/09/2026)
  *   BALANCE.reputation.start   reputacio de la companyia en crear la partida
  *   La resta de claus, tal com les descriu la seccio 6.
  */
@@ -83,7 +86,7 @@ export const BALANCE = deepFreeze({
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
             reputation: { base: 0.6, span: 0.8 },
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
-            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA ~203 km -> ~212 EUR
+            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA 201,97 km -> 211,18 EUR
             dBase: { scale: 260, distanceKm: 3000 },
             sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 } },
 

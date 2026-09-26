@@ -396,7 +396,7 @@ export const BALANCE = {
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
             reputation: { base: 0.6, span: 0.8 },
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
-            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA ~203 km -> ~212 EUR
+            pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA 201,97 km -> 211,18 EUR
             dBase: { scale: 260, distanceKm: 3000 },
             sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 } },
 
