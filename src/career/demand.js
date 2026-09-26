@@ -20,7 +20,8 @@
  *                           valor calculat
  *   routeFor(from, to)   -> el mateix per a dos ICAO de world/, o null si
  *                           algun no hi es. Simetric
- *   hourFactor(minuteOfDay)     -> peak, off o 1 (minut 0..1439, intervals [inici, fi))
+ *   hourFactor(minute)          -> peak, off o 1 (intervals [inici, fi)). Accepta
+ *                                  minuts absoluts (E1), tambe negatius: modul 1440
  *   weatherFactor(severity)     -> 1 a severity 0, weatherFactorMin a severity 1
  *   demandPax({ route, price, seats, minuteOfDay, weatherSeverity, reputation })
  *                        -> passatgers, enter entre 0 i seats. 0 si price <= 0
@@ -32,6 +33,7 @@ import { AIRPORT_DEFS, distanceKm } from '../world/index.js';
 import { BALANCE } from './balance.js';
 
 const REPUTATION_SCALE = 100;   // la reputacio va de 0 a 100 (esquema, state.js)
+const MINUTES_PER_DAY = 1440;
 
 /** 'AAAA-BBBB' amb els dos ICAO en ordre alfabetic. */
 export function routeKey(a, b) {
@@ -75,11 +77,12 @@ export function routeFor(from, to) {
 
 const inAny = (m, intervals) => intervals.some(([from, to]) => m >= from && m < to);
 
-/** Factor horari: punta, matinada o 1. */
-export function hourFactor(minuteOfDay) {
+/** Factor horari: punta, matinada o 1. minute es redueix al dia (modul 1440). */
+export function hourFactor(minute) {
+  const m = ((minute % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const { hours, hourFactor: f } = BALANCE.demand;
-  if (inAny(minuteOfDay, hours.peak)) return f.peak;
-  if (inAny(minuteOfDay, hours.off)) return f.off;
+  if (inAny(m, hours.peak)) return f.peak;
+  if (inAny(m, hours.off)) return f.off;
   return 1;
 }
 

@@ -92,6 +92,12 @@ describe('hourFactor', () => {
     assert.equal(hourFactor(1260), 1);
   });
 
+  test('minuts fora de 0..1439: modul 1440, tambe negatius', () => {
+    assert.equal(hourFactor(1440), 0.7);    // 1440 -> 0, matinada
+    assert.equal(hourFactor(1860), 1.15);   // 1860 -> 420, punta del mati
+    assert.equal(hourFactor(-60), 1);       // -60 -> 1380, fora de punta i de matinada
+  });
+
   test('matinada [0, 360)', () => {
     assert.equal(hourFactor(0), 0.7);
     assert.equal(hourFactor(359), 0.7);
