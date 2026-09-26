@@ -276,7 +276,11 @@ export const AIRCRAFT = {
     },
     eye: [6.20, -0.40, -0.40],
     model: { length: 17.6, noseX: 7.5, fuseR: 0.95, wing: 'high', sweep: 2, tail: 'T' },
-    test: { toMass: 9000, ldgMass: 8800, rotPitch: 8, climbPitchMax: 14 }
+    test: { toMass: 9000, ldgMass: 8800, rotPitch: 8, climbPitchMax: 14 },
+    expect: {
+      vr: [95, 112], toRoll: [550, 1000], to35: [800, 1350], climb: [1500, 2800],
+      vsClean: [96, 106], vsFull: [78, 88], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 700], ldgDist: [700, 1200]
+    }
   },
 
   /* ------------------------------------------------------------------ 6 -- */
@@ -322,7 +326,11 @@ export const AIRCRAFT = {
     },
     eye: [18.3, -0.50, -0.90],
     model: { length: 39.1, noseX: 19.9, fuseR: 1.35, wing: 'low', sweep: 26, tail: 'T' },
-    test: { toMass: 39000, ldgMass: 36000, rotPitch: 9, climbPitchMax: 17 }
+    test: { toMass: 39000, ldgMass: 36000, rotPitch: 9, climbPitchMax: 17 },
+    expect: {
+      vr: [135, 155], toRoll: [1200, 2000], to35: [1600, 2500], climb: [2000, 3800],
+      vsClean: [140, 152], vsFull: [105, 115], vapp: [132, 146], appPitch: [2.5, 4], ldgRoll: [600, 1200], ldgDist: [1000, 1800]
+    }
   }
 };
 /* F5: variants. Mateixa aerodinamica, inercies (escalades amb la massa), flaps i limits que la base;
@@ -338,7 +346,11 @@ AIRCRAFT.tpShort = variant('tp', {
   contact: { ...tp.contact, tailStrikeDeg: 10.0, tailX: -10.4, nose: [8.8, 0, 0.9] },
   eye: [7.55, -0.48, -0.55],
   model: { ...tp.model, length: 22.7, noseX: 9.6 },
-  test: { toMass: 18600, ldgMass: 18300, rotPitch: 8, climbPitchMax: 14 }
+  test: { toMass: 18600, ldgMass: 18300, rotPitch: 8, climbPitchMax: 14 },
+  expect: {
+    vr: [95, 112], toRoll: [600, 1100], to35: [850, 1450], climb: [1200, 2300],
+    vsClean: [97, 108], vsFull: [79, 89], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 750], ldgDist: [750, 1250]
+  }
 });
 
 AIRCRAFT.nbShort = variant('nb', {
@@ -349,7 +361,11 @@ AIRCRAFT.nbShort = variant('nb', {
   contact: { ...nb.contact, tailStrikeDeg: 13.5, tailX: -14.8, nose: [14.6, 0, 1.2] },
   eye: [13.35, -0.53, -1.15],
   model: { ...nb.model, length: 33.8, noseX: 15.8 },
-  test: { toMass: 66000, ldgMass: 59500, rotPitch: 10, climbPitchMax: 18 }
+  test: { toMass: 66000, ldgMass: 59500, rotPitch: 10, climbPitchMax: 18 },
+  expect: {
+    vr: [130, 150], toRoll: [1100, 1900], to35: [1500, 2400], climb: [2200, 3800],
+    vsClean: [141, 152], vsFull: [103, 112], vapp: [128, 142], appPitch: [2.5, 3.5], ldgRoll: [600, 1200], ldgDist: [1000, 1800]
+  }
 });
 
 AIRCRAFT.nbStretch = variant('nb', {
@@ -360,7 +376,11 @@ AIRCRAFT.nbStretch = variant('nb', {
   contact: { ...nb.contact, tailStrikeDeg: 9.7, tailX: -20.0, nose: [20.1, 0, 1.2] },
   eye: [18.85, -0.53, -1.15],
   model: { ...nb.model, length: 44.5, noseX: 21.3 },
-  test: { toMass: 80000, ldgMass: 66000, rotPitch: 8.5, climbPitchMax: 16 }
+  test: { toMass: 80000, ldgMass: 66000, rotPitch: 8.5, climbPitchMax: 16 },
+  expect: {
+    vr: [145, 165], toRoll: [1300, 2200], to35: [1800, 2800], climb: [2000, 3800],
+    vsClean: [148, 160], vsFull: [107, 116], vapp: [135, 150], appPitch: [2.5, 3.5], ldgRoll: [700, 1300], ldgDist: [1100, 1900]
+  }
 });
 
 AIRCRAFT.wbEr = variant('wb', {
@@ -371,7 +391,11 @@ AIRCRAFT.wbEr = variant('wb', {
   contact: { ...wb.contact, tailStrikeDeg: 11.0, tailX: -29.2, nose: [27.2, 0, 1.6] },
   eye: [25.6, -0.55, -0.85],
   model: { ...wb.model, length: 63.7, noseX: 29.1 },
-  test: { toMass: 300000, ldgMass: 223000, rotPitch: 8, climbPitchMax: 16 }
+  test: { toMass: 300000, ldgMass: 223000, rotPitch: 8, climbPitchMax: 16 },
+  expect: {
+    vr: [150, 175], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
+    vsClean: [150, 162], vsFull: [110, 119], vapp: [138, 152], appPitch: [2, 3], ldgRoll: [800, 1600], ldgDist: [1250, 2200]
+  }
 });
 
 export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo'];
