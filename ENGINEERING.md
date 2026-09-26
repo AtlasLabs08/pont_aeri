@@ -23,7 +23,9 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
    canviant la referència és l'única trampa que invalida tot el sistema.
 3. **Refactor i funcionalitat mai al mateix commit.** Si mous codi, només el
    mous. Si veus una millora, apunta-la a `docs/BACKLOG.md` i segueix.
-4. **Cap constant econòmica fora de `src/career/balance.js`.**
+4. **Cap constant econòmica fora de `src/career/balance.js`.** A la resta de
+   `career/` només es permeten constants d'unitats amb nom
+   (`SECONDS_PER_HOUR`, `KG_PER_TONNE`, escales 0–100), mai valors econòmics.
 5. **Cap `Math.random()` a `src/career/`.** Vegeu §7.
 6. **Respecta la taula de dependències de §3.** `career/` no toca el navegador.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
@@ -321,8 +323,13 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
 ## 6. `src/career/balance.js`
 
 Un sol objecte exportat. Cap altre fitxer de `career/` pot contenir un número
-que no sigui 0, 1 o un índex. Quan canviï qualsevol valor, s'incrementa
-`version` i s'afegeix la migració a `career/state.js`.
+que no sigui 0, 1, un índex o una constant d'unitats amb nom
+(`SECONDS_PER_HOUR`, `KG_PER_TONNE`, escales 0–100); mai un valor econòmic.
+`version` es queda a 1 fins que el mode Airline arribi a `main`: mentre no hi
+hagi partides reals de jugadors, afegir o canviar valors no puja `version` ni
+afegeix migració. A partir del primer merge d'Airline a `main`, qualsevol canvi
+de valor puja `version` i porta la seva migració a `career/state.js` (vegeu
+`docs/DECISIONS.md`, 26/09/2026).
 
 ```js
 export const BALANCE = {
