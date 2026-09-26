@@ -15,7 +15,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  routeKey, routeModel, routeFor, hourFactor, weatherFactor, demandPax
+  routeKey, routeModel, routeFor, hourFactor, weatherFactor, demandPax, BALANCE
 } from '../../src/career/index.js';
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
@@ -50,6 +50,14 @@ describe('routeModel', () => {
   test('una excepcio que porta pRef substitueix nomes pRef', () => {
     const m = routeModel({ distanceKm: 1500, sizeA: 'major', sizeB: 'major', exception: { pRef: 150 } });
     assert.equal(m.pRef, 150); near(m.dBase, 273); assert.equal(m.kind, 'leisure');
+  });
+
+  test('excepcio real LEBL-LEMD (pont aeri): business', () => {
+    // LEMD encara no es a world/: routeFor no la pot fer, es prova amb routeModel
+    const m = routeModel({ distanceKm: 483, sizeA: 'hub', sizeB: 'hub', exception: BALANCE.routeExceptions['LEBL-LEMD'] });
+    assert.equal(m.kind, 'business');
+    // pRef = 90 + 0.6 * 483 = 379.8; dBase = 260 * 1 * (1 + 483 / 3000) = 301.86
+    near(m.pRef, 379.8); near(m.dBase, 301.86);
   });
 
   test('mida desconeguda: error clar', () => {

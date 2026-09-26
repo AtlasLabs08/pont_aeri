@@ -97,11 +97,14 @@ describe('computeFlightResult: mode own', () => {
     assert.equal(own({ arrivalDeltaMin: -11 }).revenue.punctuality, 0);
   });
 
-  test('eficiencia: nomes a partir del 3 % d estalvi', () => {
-    // 2600 * 0.97 = 2522 kg: estalvi 78 kg = 3 % -> 0.35 * 78 * 0.9 = 24.57 -> 25
-    assert.equal(own({ fuelBurntKg: 2522 }).revenue.fuelSaving, 25);
-    // 2530 kg: estalvi 70 kg = 2.7 % -> 0
-    assert.equal(own({ fuelBurntKg: 2530 }).revenue.fuelSaving, 0);
+  test('eficiencia: clarament per sobre del 3 % (3.1 %) cobra', () => {
+    // 2519.4 kg, estalvi 80.6 kg = 3.1 % -> 0.35 * 80.6 * 0.9 = 25.389 -> 25
+    assert.equal(own({ fuelBurntKg: 2519.4 }).revenue.fuelSaving, 25);
+  });
+
+  test('eficiencia: clarament per sota del 3 % (2.9 %) no cobra', () => {
+    // 2524.6 kg, estalvi 75.4 kg = 2.9 % -> 0
+    assert.equal(own({ fuelBurntKg: 2524.6 }).revenue.fuelSaving, 0);
     // mes combustible que el previst -> 0
     assert.equal(own({ fuelBurntKg: 2800 }).revenue.fuelSaving, 0);
   });
@@ -125,6 +128,14 @@ describe('computeFlightResult: mode own', () => {
       crewCount: 1, weatherBonus: 0.10, exclusive: true, financePerFlight: 1000 });
     assert.equal(r.costs.fuel, 1620);
     assert.equal(r.revenue.fuelSaving, 252);
+  });
+
+  test('paxOnBoard del record quan no ve a l entrada', () => {
+    // 120 pax del record, r = 1, m_ruta = 1: bitllets 210 * 120 * 1.08 = 27216
+    // taxes 2 * (12 * 78 + 1.8 * 120) = 2 * 1152 = 2304
+    const r = computeFlightResult({ record: record({ paxOnBoard: 120 }), mode: 'own', ticketPrice: 210 });
+    assert.equal(r.revenue.tickets, 27216);
+    assert.equal(r.costs.fees, 2304);
   });
 
   test('rotacio: tope per classe', () => {
