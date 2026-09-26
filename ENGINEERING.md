@@ -187,18 +187,30 @@ toca `FlightModel`, `Game` ni el render.
 
 Headless, provable a Node alimentant-lo amb un `FlightModel`.
 
+**Implementat (A3).** L'API i el comportament de referència són a la
+capçalera del fitxer; les proves, a `test/recorder.test.js`.
+
 ```js
 export class FlightRecorder {
-  start(meta)            // { aircraftTypeId, from, to, fuelPlannedKg, paxOnBoard, plannedArrivalMin }
-  sample(f, ctl, dt)     // cada Game.step(): pics de g i alabeig, inputs bruscos, acceleració màxima
+  start(meta)              // { aircraftTypeId, from, to, fuelPlannedKg, paxOnBoard, plannedArrivalMin }
+  sample(f, ctl, dt)       // un cop per pas de física, DESPRÉS de f.step()
+  setTimeAccel(k)  cruiseSkip()  event(type)  tailStrike()  rollout(metres)
   touchdown(report, score) // Game.report + Game.scoreReport(report)
-  rollout(metres)
-  crash(cause)           // una de CRASH_CAUSES
-  finish(extra) -> FlightRecord
+  crash(cause)             // un de CRASH_CAUSES; si no ho és, queda 'fuselage'
+  finish({ arrivalMin }) -> FlightRecord   // objecte pla i nou a cada crida
 }
-export const CRASH_CAUSES = ['water', 'terrain', 'excursion', 'gearUp',
-  'hardImpact', 'wingStrike', 'engineStrike', 'fuselage'];
+export const CRASH_CAUSES, EVENT_TYPES, RECORD_KEYS
 ```
+
+Tres regles per a qui l'enganxi a `Game` (A4):
+
+- **`touchdown()` es crida quan `Game` calcula la nota** (la branca
+  `report.shown`), no a `onTouchdown()`: el pic de g i els rebots encara
+  s'actualitzen durant 1,5 s després del contacte.
+- **No es mostreja durant una repetició** (`Game.state === 'replay'`): quan
+  acaba, `fdmRestore` torna el model enrere i el vol no ha passat de debò.
+- El combustible s'integra (`f.out.ff * dt`), no es resta del dipòsit, per no
+  falsejar-lo quan es restaura l'estat del model.
 
 ### Esquema
 
@@ -231,7 +243,8 @@ export const CRASH_CAUSES = ['water', 'terrain', 'excursion', 'gearUp',
  * @typedef {Object} Touchdown       copiat de Game.report i scoreReport
  * @property {number} fpm   @property {number} g   @property {number} bounces
  * @property {boolean} onRunway   @property {string|null} rwy
- * @property {number} tdzDist   @property {number} center   @property {number} crab
+ * @property {number|null} tdzDist   @property {number|null} center   @property {number|null} crab
+ *           (tots tres null si onRunway és fals, igual que rwy)
  * @property {number} ias   @property {number} pitch   @property {number} roll
  * @property {number} score            0..100
  * @property {{sink:number, g:number, zone:number, center:number, attitude:number}} pts
@@ -486,7 +499,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | --- | --- | --- | --- |
 | A1 | `src/i18n/`: `t`, formatadors, `en.json`, `ca.json` | — | Proves de `t`, reserva a `en` i formats |
 | A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | `Storage` no llança mai |
-| A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | Un enlairament i aterratge headless produeixen un `FlightRecord` complet |
+| A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
 | A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
 | A5 | `src/career/state.js` i `types.js` | A1 | Proves de creació, migració, validació, export i import |
 

@@ -18,7 +18,8 @@ test('core exporta el que ha d exportar', () => {
     'FlightModel', 'PHYS_DT', 'SURF',
     'trimAircraft',
     'Autopilot', 'AutoTrim',
-    'Harness', 'newCtl'
+    'Harness', 'newCtl',
+    'FlightRecorder', 'CRASH_CAUSES', 'EVENT_TYPES', 'RECORD_KEYS'
   ]) {
     assert.ok(name in core, `falta l export: ${name}`);
   }
