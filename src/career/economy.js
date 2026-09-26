@@ -33,7 +33,6 @@ import { landingBand } from './landing.js';
 
 const SECONDS_PER_HOUR = 3600;
 const KG_PER_TONNE = 1000;
-const AIRPORTS_PER_LEG = 2;     // les taxes es paguen a l origen i al desti
 
 /** euros enters; converteix -0 en 0 */
 const eur = x => Math.round(x) || 0;
@@ -92,7 +91,7 @@ export function computeFlightResult(input) {
   }
 
   const fuel = fuelKg * B.fuelPricePerKg;
-  const fees = AIRPORTS_PER_LEG * (B.fees.perTonneMTOW * mtowT + B.fees.perPax * pax);
+  const fees = B.fees.airportsPerLeg * (B.fees.perTonneMTOW * mtowT + B.fees.perPax * pax);
   const crew = hours * B.crewRatePerBlockHour[cls];
   const maintenance = hours * B.maintAccrualPerHour[cls];
   const finance = financePerFlight;

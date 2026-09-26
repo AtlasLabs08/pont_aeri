@@ -32,8 +32,6 @@ import { AIRPORT_DEFS, distanceKm } from '../world/index.js';
 import { BALANCE } from './balance.js';
 
 const REPUTATION_SCALE = 100;   // la reputacio va de 0 a 100 (esquema, state.js)
-const DEFAULT_KIND = 'leisure';
-const DEFAULT_SIZE = 'small';
 
 /** 'AAAA-BBBB' amb els dos ICAO en ordre alfabetic. */
 export function routeKey(a, b) {
@@ -52,7 +50,7 @@ export function routeModel({ distanceKm: km, sizeA, sizeB, exception = null }) {
   const model = {
     pRef: d.pRef.base + d.pRef.perKm * km,
     dBase: d.dBase.scale * Math.sqrt(sizeWeight(sizeA) * sizeWeight(sizeB)) * (1 + km / d.dBase.distanceKm),
-    kind: DEFAULT_KIND
+    kind: d.defaultKind
   };
   if (exception) {
     for (const k of ['pRef', 'dBase', 'kind']) if (exception[k] !== undefined) model[k] = exception[k];
@@ -66,7 +64,7 @@ export function routeFor(from, to) {
   const A = Object.hasOwn(AIRPORT_DEFS, a) ? AIRPORT_DEFS[a] : null;
   const B = Object.hasOwn(AIRPORT_DEFS, b) ? AIRPORT_DEFS[b] : null;
   if (!A || !B) return null;
-  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : DEFAULT_SIZE;
+  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : BALANCE.demand.defaultSize;
   const key = routeKey(a, b);
   return routeModel({
     distanceKm: distanceKm(A.lat, A.lon, B.lat, B.lon),

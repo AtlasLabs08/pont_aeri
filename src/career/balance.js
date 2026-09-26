@@ -31,7 +31,7 @@ export const BALANCE = deepFreeze({
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
-  fees: { perTonneMTOW: 12, perPax: 1.8 },
+  fees: { perTonneMTOW: 12, perPax: 1.8, airportsPerLeg: 2 },   // es paga a l origen i al desti
   crewRatePerBlockHour: { commuter: 250, turboprop: 450, narrowbody: 900, widebody: 1800 },
   maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
 
@@ -88,9 +88,11 @@ export const BALANCE = deepFreeze({
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
             pRef: { base: 90, perKm: 0.6 },              // LEBL-LEPA 201,97 km -> 211,18 EUR
             dBase: { scale: 260, distanceKm: 3000 },
-            sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 } },
+            sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 },
+            defaultKind: 'leisure',               // tipus de les rutes sense excepcio
+            defaultSize: 'small' },               // mida dels aeroports que no son a airportSize
 
-  airportSize: {                            // ICAO -> categoria; si no hi es, 'small'
+  airportSize: {                            // ICAO -> categoria; si no hi es, demand.defaultSize
     LEBL: 'hub', LEMD: 'hub', LIRF: 'hub', EGLL: 'hub', EDDF: 'hub', KJFK: 'hub', SBGR: 'hub',
     LEPA: 'major', LEIB: 'major', LEVC: 'major', LEAL: 'major', LEZL: 'major',
     LEMG: 'major', LFMN: 'major', LFPO: 'major', GCLP: 'major',
