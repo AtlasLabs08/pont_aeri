@@ -579,6 +579,12 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 
 ## 12. Etapes
 
+### Ordre de feina (26/09)
+
+Les tasques s'agrupen en un sol PR i s'executen en aquest ordre: F4+F5, B5,
+C1, C2, C3+C4, C5+D1, D2+D5, D3+D4, D6, E1+E5, E2, E3+E4, F1+F2, F3, i al
+final (opcionals) D7 i M1–M3. Les taules de sota no canvien.
+
 Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en verd.
 
 ### Bloc A — Fonaments
@@ -646,6 +652,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | F3 | `world/weather.js` amb llavor | Patrons locals i estacionals |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Canvia la física a propòsit**: actualitzar `smoke.test.js` (nombre d'avions), regenerar `snapshot.json` i afegir entrada a `DECISIONS.md`, tot al mateix PR |
 | F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | Com F4 |
+| F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua) | Sense dependències |
 
 ### Bloc M — Migració pendent (paral·lel, baixa prioritat)
 
