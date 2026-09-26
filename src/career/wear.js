@@ -15,7 +15,8 @@
  *   applyFlightWear(airframe, record) -> { airframe, cycleCost }
  *     Suma hours i cycles de flightDay i resta el desgast de BALANCE.wear a
  *     cada condicio. El tren perd, a mes, gearPerExtraFpm per cada fpm de
- *     |touchdown.fpm| per sobre de gearFreeFpm (nomes si hi ha touchdown).
+ *     |touchdown.fpm| per sobre de gearFreeFpm, i gearPerExtraG per cada g de
+ *     touchdown.g per sobre de gearFreeG (nomes si hi ha touchdown).
  *     Condicions retallades a [0, 100] i arrodonides a 1 decimal.
  *     cycleCost = round(cycles * maintCostPerCycle[cls]), en euros.
  *     Llanca un Error si airframe.typeId no es a BALANCE.fleetTypes, si
@@ -84,6 +85,7 @@ export function applyFlightWear(airframe, record) {
   const { hours, cycles } = flightDay(record, cls);
   const W = BALANCE.wear;
   const extraFpm = td ? Math.max(0, Math.abs(td.fpm) - W.gearFreeFpm) : 0;
+  const extraG = td ? Math.max(0, td.g - W.gearFreeG) : 0;
 
   const a = copyAirframe(airframe);
   const c = a.condition;
@@ -92,7 +94,7 @@ export function applyFlightWear(airframe, record) {
   c.engines = cond(c.engines - W.enginesPerHour * hours);
   c.avionics = cond(c.avionics - W.avionicsPerHour * hours);
   c.airframe = cond(c.airframe - W.airframePerCycle * cycles);
-  c.gear = cond(c.gear - W.gearPerCycle * cycles - W.gearPerExtraFpm * extraFpm);
+  c.gear = cond(c.gear - W.gearPerCycle * cycles - W.gearPerExtraFpm * extraFpm - W.gearPerExtraG * extraG);
   return { airframe: a, cycleCost: eur(cycles * BALANCE.maintCostPerCycle[cls]) };
 }
 

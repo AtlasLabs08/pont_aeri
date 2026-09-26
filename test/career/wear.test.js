@@ -86,6 +86,18 @@ describe('applyFlightWear', () => {
     assert.equal(applyFlightWear(airframe(), record(-500)).airframe.condition.gear, 97.8);
   });
 
+  test('aterratge a 1.6 g: el tren no perd res per g', () => {
+    // gear 100 - 0.02 * 9 - 5 * max(0, 1.6 - 1.6) = 99.82 -> 99.8
+    const rec = record(300, { touchdown: { fpm: 300, g: 1.6, onRunway: true } });
+    assert.equal(applyFlightWear(airframe(), rec).airframe.condition.gear, 99.8);
+  });
+
+  test('aterratge a 2.2 g: el tren perd 3 punts mes', () => {
+    // gear 100 - 0.02 * 9 - 5 * (2.2 - 1.6) = 100 - 0.18 - 3 = 96.82 -> 96.8
+    const rec = record(300, { touchdown: { fpm: 300, g: 2.2, onRunway: true } });
+    assert.equal(applyFlightWear(airframe(), rec).airframe.condition.gear, 96.8);
+  });
+
   test('sense touchdown: nomes el desgast per cicle', () => {
     assert.equal(applyFlightWear(airframe(), record(0, { touchdown: null })).airframe.condition.gear, 99.8);
   });

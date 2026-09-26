@@ -75,7 +75,8 @@ export const BALANCE = deepFreeze({
   wear: {                                   // punts de condicio (0..100) que es perden
     enginesPerHour: 0.0075, avionicsPerHour: 0.05,
     airframePerCycle: 0.005, gearPerCycle: 0.02,
-    gearFreeFpm: 300, gearPerExtraFpm: 0.01   // desgast extra de l aterratge del jugador
+    gearFreeFpm: 300, gearPerExtraFpm: 0.01,  // desgast extra de l aterratge del jugador
+    gearFreeG: 1.6, gearPerExtraG: 5
   },
   maintCostPerCycle: { commuter: 40, turboprop: 60, narrowbody: 120, widebody: 300 },
   checks: {
