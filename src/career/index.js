@@ -8,3 +8,4 @@ export * from './landing.js';
 export * from './demand.js';
 export * from './economy.js';
 export * from './wear.js';
+export * from './damage.js';
