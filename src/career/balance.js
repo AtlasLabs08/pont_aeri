@@ -39,7 +39,13 @@ export const BALANCE = deepFreeze({
     tp:    { cls: 'turboprop',  seats: 70,  rating: 'turboprop'  },
     nb:    { cls: 'narrowbody', seats: 180, rating: 'narrowbody' },
     wb:    { cls: 'widebody',   seats: 300, rating: 'widebody'   },
-    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       }
+    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       },
+    commuter:  { cls: 'commuter',   seats: 19,  rating: 'commuter'   },
+    rj:        { cls: 'narrowbody', seats: 100, rating: 'narrowbody' },
+    tpShort:   { cls: 'turboprop',  seats: 48,  rating: 'turboprop'  },
+    nbShort:   { cls: 'narrowbody', seats: 140, rating: 'narrowbody' },
+    nbStretch: { cls: 'narrowbody', seats: 220, rating: 'narrowbody' },
+    wbEr:      { cls: 'widebody',   seats: 290, rating: 'widebody'   }
   },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 

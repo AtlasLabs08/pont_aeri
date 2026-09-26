@@ -31,8 +31,8 @@ test('world exporta el que ha d exportar', () => {
   }
 });
 
-test('hi ha quatre avions i tots tenen configuracio completa', () => {
-  assert.equal(core.AIRCRAFT_ORDER.length, 4);
+test('hi ha deu avions i tots tenen configuracio completa', () => {
+  assert.equal(core.AIRCRAFT_ORDER.length, 10);
   for (const id of core.AIRCRAFT_ORDER) {
     const c = core.AIRCRAFT[id];
     assert.ok(c, `${id} no existeix a AIRCRAFT`);

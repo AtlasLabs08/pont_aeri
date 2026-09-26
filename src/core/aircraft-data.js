@@ -398,6 +398,6 @@ AIRCRAFT.wbEr = variant('wb', {
   }
 });
 
-export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo'];
+export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo', 'commuter', 'rj', 'tpShort', 'nbShort', 'nbStretch', 'wbEr'];
 // static strut deflection = oleo at 80 % of its stroke + tyre deflection (used by the flight model and the 3D gear)
 for (const id in AIRCRAFT) { const g = AIRCRAFT[id].gear; g.staticDefl = 0.80 * g.stroke + g.tireDefl; }
