@@ -24,3 +24,6 @@ Migjorn Mi-9 i Xaloc X-90, derivats de la fisica existent. No es el mercat enorm
 
 ## 2026-09-26 - Sense perdua total de l avio
 Es mante el BACKLOG. Un accident costa fins al 60 % del valor i fins a 6 setmanes a terra.
+
+## 2026-09-26 - BALANCE omplert sense pujar version
+B1 omple balance.js i deixa version: 1. Encara no hi ha cap partida desada de jugadors, i per tant no cal cap migracio. A partir d ara, qualsevol canvi de valor puja version.
