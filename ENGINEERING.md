@@ -16,8 +16,8 @@ a `dev`) i l'ordre de feina per construir el mode Airline.
 
 Llegeix aquesta secció abans de tocar res. Són obligatòries.
 
-1. **`npm test` ha d'estar en verd abans i després de cada canvi.** Són 224
-   proves. Si en trenques una, el canvi no està acabat.
+1. **`npm test` ha d'estar en verd abans i després de cada canvi.**
+   Si en trenques una, el canvi no està acabat.
 2. **Mai regeneris `test/snapshot.json`** (`node test/snapshot.test.js --update`)
    si la tasca no diu explícitament que canvia la física. Fer passar la prova
    canviant la referència és l'única trampa que invalida tot el sistema.
@@ -29,7 +29,8 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
 8. **Si una tasca sembla exigir trencar un contracte d'aquest document,
    atura't i explica-ho** en comptes de decidir-ho tu.
-9. **No facis push.** Deixa els commits fets; l'humà revisa i puja.
+9. **Puja nomes la teva branca i obre un PR contra `dev`.** Mai facis
+   push a `dev` ni a `main`: GitHub ho bloqueja igualment.
 
 ---
 
@@ -139,7 +140,7 @@ src/
   core/        EXISTEIX. Simulador headless.
   world/       EXISTEIX. Món headless.
   career/      NOU. Lògica del mode Airline. Funcions pures.
-  i18n/        NOU. t(), en.json, ca.json.
+  i18n/        NOU. t(), en.js, ca.js.
   platform/    NOU. L'únic lloc de src/ que pot tocar APIs del navegador
                (localStorage, location, Intl si cal).
   app/         NOU. Orquestració: carrega i desa la partida, aplica les
@@ -160,7 +161,7 @@ src/
 | `app/` | `career/`, `platform/`, `i18n/`, `core/`, `world/` |
 | `ui/` | tot menys `render/` |
 | `index.html` | tot |
-| `test/`, `tools/` | tot menys `ui/`, `platform/`, `render/` |
+| `test/`, `tools/` | tot menys `ui/` i `render/`. `platform/` només es prova amb dobles injectats a `globalThis` |
 
 `career/` ha de poder córrer sencer a Node sense cap mock del navegador.
 
@@ -435,9 +436,20 @@ export const Storage = {
 
 ## 9. i18n
 
-- `src/i18n/index.js`: `t(key, params)`, `setLang(lang)`, `fmtMoney(n)`,
-  `fmtNumber(n, decimals)`, `fmtDate(minute)`, tots amb `Intl`.
-- `en.json` és la font; `ca.json` cau a `en` si li falta una clau.
+- `src/i18n/index.js`: `t(key, params)`, `setLang(lang)`, `getLang()`,
+  `fmtMoney(euros)`, `fmtNumber(n, decimals)`, `fmtDateTime(date)`,
+  `fmtDuration(minutes)`, tots amb `Intl`. Idioma per defecte: `en`.
+  Locales: `ca` → `ca-ES`, `en` → `en-GB`.
+- Els textos són a `src/i18n/en.js` i `src/i18n/ca.js`, amb `export default`
+  d'un objecte pla, no a `.json`: importar JSON no es comporta igual a Node i a
+  Vite. `en.js` és la font; si a `ca.js` li falta una clau, cau a `en`, i si
+  tampoc hi és, `t()` retorna la clau tal qual.
+- `t` interpola `{nom}` amb `params`. Si `params.count` existeix i hi ha claus
+  `key.one` / `key.other`, tria la forma amb `Intl.PluralRules`.
+- `fmtMoney`: euros enters, sense decimals.
+- `fmtDateTime` rep un `Date`; `fmtDuration(160)` dona `2 h 40 min`. i18n no
+  sap res del rellotge de la partida: qui en tingui un minut el converteix
+  abans. i18n no importa res de cap altra capa.
 - Prohibit concatenar: `t('flaps.set', { name })`, mai `'Flaps ' + n`.
 - **Abast:** tot text nou passa per `t()` des del primer dia. Els textos que ja
   hi ha a `index.html` (missatges de `Game.msg`, `scoreReport`, `UI`) es
@@ -501,8 +513,8 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
-| A1 | `src/i18n/`: `t`, formatadors, `en.json`, `ca.json` | — | Proves de `t`, reserva a `en` i formats |
-| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | `Storage` no llança mai |
+| A1 | `src/i18n/`: `t`, formatadors, `en.js`, `ca.js` | — | **Fet.** Proves de `t`, reserva a `en` i formats |
+| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
 | A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
 | A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
 | A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 271 en total |
