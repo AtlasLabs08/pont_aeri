@@ -2620,4 +2620,8 @@ Vs ${n(f.stallSpeed(f.flapPos) / KT, 0)}  V1 ${n(f.vspeeds().v1, 0)}  VR ${n(f.v
 };
 window.addEventListener('load', () => { if (typeof THREE === 'undefined') { document.getElementById('loadtxt').textContent = 'three.js could not be loaded from the CDN.'; return; } Main.boot().catch(e => { console.error(e); document.getElementById('loadtxt').textContent = 'Start-up error: ' + e.message; }); });
 
-</script></body></html>
+</script><script>
+const IS_DEV = location.hostname.endsWith('.pages.dev') || location.hostname === 'localhost' || new URLSearchParams(location.search).has('dev');
+if (IS_DEV) { const b = document.createElement('div'); b.textContent = 'DEV'; b.style.cssText = 'position:fixed;top:6px;right:8px;z-index:9999;font:600 11px/1 system-ui;padding:3px 6px;border-radius:4px;background:#d97706;color:#000;pointer-events:none;opacity:.85'; document.body.appendChild(b); }
+</script>
+</body></html>
