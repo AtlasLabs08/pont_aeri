@@ -18,7 +18,9 @@
  *     |touchdown.fpm| per sobre de gearFreeFpm (nomes si hi ha touchdown).
  *     Condicions retallades a [0, 100] i arrodonides a 1 decimal.
  *     cycleCost = round(cycles * maintCostPerCycle[cls]), en euros.
- *     Llanca un Error si airframe.typeId no es a BALANCE.fleetTypes.
+ *     Llanca un Error si airframe.typeId no es a BALANCE.fleetTypes, si
+ *     record.aircraftTypeId no hi coincideix, si blockSeconds no es un numero
+ *     finit >= 0 (flightDay tambe) o si hi ha touchdown i fpm o g no son finits.
  *   failureChance(condition) -> probabilitat d avaria per vol, [0, 1)
  *     0 si condition >= failure.threshold; per sota, corba quadratica que
  *     passa per pAtThreshold al llindar i per pAtRef a refCondition. Per sota
@@ -59,6 +61,9 @@ function classOf(typeId, fn) {
 export function flightDay(record, cls) {
   const dayHours = lookup(BALANCE.operations.dayHours, cls, null);
   if (dayHours === null) throw new Error('flightDay: classe desconeguda a operations.dayHours: ' + cls);
+  if (!Number.isFinite(record.blockSeconds) || record.blockSeconds < 0) {
+    throw new Error('flightDay: blockSeconds ha de ser un numero finit no negatiu');
+  }
   const blockHours = record.blockSeconds / SECONDS_PER_HOUR;
   const legHours = Math.max(blockHours, BALANCE.operations.minLegHours[cls]);
   const hours = Math.max(dayHours, blockHours);
@@ -69,9 +74,15 @@ export function flightDay(record, cls) {
 /** Avio despres del desgast d un vol, i el cost per cicle. Vegeu la capcalera. */
 export function applyFlightWear(airframe, record) {
   const cls = classOf(airframe.typeId, 'applyFlightWear');
+  if (record.aircraftTypeId !== airframe.typeId) {
+    throw new Error('applyFlightWear: el record es d un ' + record.aircraftTypeId + ' i l avio es ' + airframe.typeId);
+  }
+  const td = record.touchdown;
+  if (td && (!Number.isFinite(td.fpm) || !Number.isFinite(td.g))) {
+    throw new Error('applyFlightWear: touchdown.fpm i touchdown.g han de ser numeros finits');
+  }
   const { hours, cycles } = flightDay(record, cls);
   const W = BALANCE.wear;
-  const td = record.touchdown;
   const extraFpm = td ? Math.max(0, Math.abs(td.fpm) - W.gearFreeFpm) : 0;
 
   const a = copyAirframe(airframe);

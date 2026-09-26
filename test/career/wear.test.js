@@ -110,6 +110,25 @@ describe('applyFlightWear', () => {
   test('typeId desconegut: Error', () => {
     assert.throws(() => applyFlightWear(airframe({ typeId: 'zeppelin' }), record(300)), Error);
   });
+
+  test('blockSeconds no finit o negatiu: Error', () => {
+    for (const blockSeconds of [undefined, NaN, Infinity, -1]) {
+      assert.throws(() => applyFlightWear(airframe(), record(300, { blockSeconds })), Error, String(blockSeconds));
+    }
+  });
+
+  test('aircraftTypeId del record diferent del typeId de l avio: Error', () => {
+    assert.throws(() => applyFlightWear(airframe(), record(300, { aircraftTypeId: 'nb' })), Error);
+  });
+
+  test('touchdown amb fpm no finit: Error', () => {
+    assert.throws(() => applyFlightWear(airframe(), record(NaN)), Error);
+  });
+
+  test('touchdown amb g no finita: Error', () => {
+    const rec = record(300, { touchdown: { fpm: 300, g: NaN, onRunway: true } });
+    assert.throws(() => applyFlightWear(airframe(), rec), Error);
+  });
 });
 
 describe('failureChance', () => {
