@@ -424,7 +424,7 @@ export const Storage = {
 - Clau `pontAeri.career.v1`. Sense prefix d'entorn: `github.io` i `pages.dev`
   són orígens diferents i no comparteixen `localStorage`. **Si mai es serveixen
   des del mateix domini, el prefix passa a ser obligatori.**
-- `career/state.js` (pur): `createCareer(name, seed)`, `migrate(raw)`,
+- `career/state.js` (pur): `createCareer({ name, seed, createdAt })`, `migrate(raw)`,
   `validate(state)`, `exportJson(state)`, `importJson(text)`. `migrate` mai
   llança: si no pot, retorna `null`.
 - Si `balanceVersion !== BALANCE.version`: avisar i oferir migrar o reiniciar.
@@ -455,6 +455,10 @@ export const Storage = {
   hi ha a `index.html` (missatges de `Game.msg`, `scoreReport`, `UI`) es
   migren al bloc M, no abans.
 - Les claus de `balance.js` (`landing.solid`) són claus i18n.
+- `fmtDateTime` formateja en la zona horària del navegador. Quan
+  `career/clock.js` (E1) converteixi minuts de partida a `Date`, caldrà fixar
+  una zona, per exemple `Europe/Madrid`, perquè tots els jugadors vegin la
+  mateixa hora.
 
 ---
 
@@ -513,7 +517,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
 | A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
 | A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
-| A5 | `src/career/state.js` i `types.js` | A1 | Proves de creació, migració, validació, export i import |
+| A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 297 en total |
 
 A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
