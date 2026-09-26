@@ -132,13 +132,15 @@ import {
   AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
-  sign, smoothstep, trimAircraft, wrap360, wrapPi
+  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder
 } from './src/core/index.js';
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
   setRunwayDifficulty, setPhoto
 } from './src/world/index.js';
+
+import { IS_DEV } from './src/platform/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -1919,6 +1921,17 @@ const Cameras = {
    SECTION 18 - GAME STATE: spawning, time, warnings, crash detection, landing score,
    Barcelona -> Palma flight mode
    ============================================================================ */
+/* FlightRecord del vol en curs (ENGINEERING.md seccio 4, tasca A4). Una sola instancia.
+   Traduccio del titol de Game.crashNow a CRASH_CAUSES; un titol que no hi sigui
+   passa tal qual i el recorder el guarda com 'fuselage':
+     'Water impact'      -> water          'Wing strike'       -> wingStrike
+     'Terrain impact'    -> terrain        'Engine pod strike' -> engineStrike
+     'Runway excursion'  -> excursion      'Fuselage impact'   -> fuselage
+     'Gear-up landing'   -> gearUp         'Hard impact'       -> hardImpact */
+const Recorder = new FlightRecorder();
+const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terrain', 'Runway excursion': 'excursion', 'Gear-up landing': 'gearUp',
+  'Hard impact': 'hardImpact', 'Wing strike': 'wingStrike', 'Engine pod strike': 'engineStrike', 'Fuselage impact': 'fuselage' };
+
 const Game = {
   state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
   opts: { aircraft: 'nb', airport: 'LEBL', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
@@ -1956,6 +1969,9 @@ const Game = {
     if (O.start === 'final') this.ap.toggleApp();          // on the ILS already: the flight director guides from the first second
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
     Cameras.mode = O.start === 'final' ? 'cockpit' : 'chase'; Cameras.chaseYaw = f.out.psi; Cameras.orbYaw = 2.4; Cameras.orbPitch = 0.18; Cameras.dist = 1; this.acc = 0; this.lastIas = f.out.ias;
+    // start() torna timeAccelMax a 1: no cal setTimeAccel pel timeAccel = 1 d'aquesta funcio
+    Recorder.start({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelPlannedKg: f.fuel, paxOnBoard: 0, plannedArrivalMin: null });
+    this.recordDone = false; this.warnWas = {};
   },
   msg(t, secs) { UI.toast(t, secs); },
   onKey(code) {
@@ -1987,7 +2003,7 @@ const Game = {
       case 'Period': Cockpit.brightness = clamp(Cockpit.brightness + 0.1, 0.15, 1); this.msg('Panel brightness ' + Math.round(Cockpit.brightness * 100) + '%'); break;
     }
   },
-  cycleAccel() { if (this.fdm.out.altFt < 10000) { this.timeAccel = 1; this.msg('Time acceleration is only available above 10,000 ft'); return; } this.timeAccel = this.timeAccel >= 16 ? 1 : this.timeAccel * 2; this.msg('Time x' + this.timeAccel); },
+  cycleAccel() { if (this.fdm.out.altFt < 10000) { this.timeAccel = 1; Recorder.setTimeAccel(1); this.msg('Time acceleration is only available above 10,000 ft'); return; } this.timeAccel = this.timeAccel >= 16 ? 1 : this.timeAccel * 2; Recorder.setTimeAccel(this.timeAccel); this.msg('Time x' + this.timeAccel); },
   /** cockpit mouse interaction */
   onClick(mx, my, shift) {
     if (this.state !== 'flying' || Cameras.mode !== 'cockpit') return; const a = Cockpit.hit(mx, my); if (!a) return;
@@ -2024,9 +2040,12 @@ const Game = {
     if (!f.wow && c.reverse) c.reverse = false;
     this.updateGusts(PHYS_DT);
     f.step(PHYS_DT, c, this.env); this.time += PHYS_DT; this.record();
+    if (this.state !== 'replay') Recorder.sample(f, c, PHYS_DT);
     const o = f.out, fl = this.flight;
+    // avisos que el joc ja mostra (PFD, HUD, memo del motor): un esdeveniment quan s'encenen
+    this.warnEvent('stallWarning', o.stallWarn && !f.wow); this.warnEvent('overspeed', Instruments.warnings(this).some(w => /OVERSPEED/.test(w))); this.warnEvent('engineFailure', f.fuelOut);
     // events from the flight model
-    if (f.events.length) { for (const ev of f.events) { if (ev === 'touchdown') this.onTouchdown(); else if (ev === 'strike:tail') { if (!this.tailStrike) { this.tailStrike = true; this.msg('TAIL STRIKE', 4); } } else if (ev.startsWith('strike')) this.crashNow(ev === 'strike:wing' ? 'Wing strike' : ev === 'strike:engine' ? 'Engine pod strike' : 'Fuselage impact', 'The airframe touched the ground.'); } f.events.length = 0; }
+    if (f.events.length) { for (const ev of f.events) { if (ev === 'touchdown') this.onTouchdown(); else if (ev === 'strike:tail') { if (!this.tailStrike) { this.tailStrike = true; Recorder.tailStrike(); this.msg('TAIL STRIKE', 4); } } else if (ev.startsWith('strike')) this.crashNow(ev === 'strike:wing' ? 'Wing strike' : ev === 'strike:engine' ? 'Engine pod strike' : 'Fuselage impact', 'The airframe touched the ground.'); } f.events.length = 0; }
     if (f.surfaceType === SURF.WATER && o.agl < 0.5) this.crashNow('Water impact', 'The aircraft went into the sea.');
     else if (f.wow && f.surfaceType === SURF.TERRAIN && o.gs > 25) this.crashNow('Terrain impact', 'The aircraft hit terrain outside the airport.');
     else if (f.wow && f.surfaceType === SURF.GRASS && o.gs > 45) this.crashNow('Runway excursion', 'The aircraft left the paved surface at ' + Math.round(o.gs) + ' kt.');
@@ -2035,8 +2054,11 @@ const Game = {
     // flight timer / summary
     if (!fl.started && o.gs > 3) fl.started = true; if (fl.started && !fl.done) fl.t += PHYS_DT; if (!f.wow) fl.airborne = true; fl.maxAlt = Math.max(fl.maxAlt, o.altFt);
     if (this.report && !this.report.shown && f.wow && o.gs < 35) { this.report.shown = true; this.report.rollout = f.distGround - this.report.dist0; fl.landings++;
-      const atDest = Math.hypot(f.e - fl.to.e, f.n - fl.to.n) < 6000; if (fl.mode === 'route' && atDest) { fl.done = true; } UI.showReport(this.report, fl); }
-    if (this.timeAccel > 1 && o.altFt < 10000) { this.timeAccel = 1; this.msg('Below 10,000 ft: time back to 1x'); }
+      const atDest = Math.hypot(f.e - fl.to.e, f.n - fl.to.n) < 6000; if (fl.mode === 'route' && atDest) { fl.done = true; }
+      Recorder.touchdown(this.report, this.scoreReport(this.report)); Recorder.rollout(this.report.rollout);
+      if (fl.done || fl.mode === 'free') this.finishRecord();          // el vol lliure no te desti: acaba al primer aterratge amb nota
+      UI.showReport(this.report, fl); }
+    if (this.timeAccel > 1 && o.altFt < 10000) { this.timeAccel = 1; Recorder.setTimeAccel(1); this.msg('Below 10,000 ft: time back to 1x'); }
     if (this.lights.landingAuto) this.lights.landing = (o.altFt < 10000 && !f.wow) || (f.wow && c.throttle > 0.4);
   },
 
@@ -2099,7 +2121,11 @@ const Game = {
     const comment = !R.onRunway ? 'That was not a runway. Any landing you can walk away from...' : s >= 92 ? 'Butter. The passengers are still asleep.' : s >= 80 ? 'A very good landing, right in the zone.' : s >= 65 ? 'Solid and safe. A little polish on the flare and centreline.' : s >= 45 ? 'Firm. The cabin crew will have words with you.' : s >= 25 ? 'Rough arrival: check the sink rate and aim for the markers.' : 'Maintenance has been called to inspect the gear.';
     return { score: s, comment, pts };
   },
-  crashNow(title, detail) { if (this.state !== 'flying' || this.crash) return; Sound.crash(); this.crash = { title, detail }; this.state = 'crashed'; UI.showCrash(title, detail); },
+  crashNow(title, detail) { if (this.state !== 'flying' || this.crash) return; Sound.crash(); this.crash = { title, detail }; this.state = 'crashed'; Recorder.crash(CRASH_CAUSE_BY_TITLE[title] || title); this.finishRecord(); UI.showCrash(title, detail); },
+  /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola */
+  finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish({ arrivalMin: null }); if (IS_DEV) console.log('[FlightRecord]', record); },
+  /** Recorder.event(type) quan un avis existent passa d'apagat a ences */
+  warnEvent(type, on) { if (on && !this.warnWas[type]) Recorder.event(type); this.warnWas[type] = on; },
 
   /** per rendered frame */
   frame(dt) {
@@ -2430,12 +2456,12 @@ const Callouts = {
     }
     if (jet && !f.wow && ra < 18 && o.vsFpm < 0 && S.ctl.throttle > 0.03 && !S.ap.athr && this.every('retard', 1.2)) Sound.say('retard', 3, 1.3, 'call');
     if (!f.wow && ra > 30 && ra < 2450 && f.airTime > 5) { const sink = -o.vsFpm;
-      if (sink > 1700 + 1.4 * ra) { if (this.every('pull', 1.6)) Sound.say('pull up', 5, 1.2, 'warn'); }
-      else if (sink > 1100 + 1.0 * ra) { if (this.every('sink', 2.2)) Sound.say('sink rate', 3, 1.25, 'warn'); } }
-    if (W.includes('TOO LOW GEAR') && this.every('gear', 3)) Sound.say('too low, gear', 3, 1.2, 'warn');
+      if (sink > 1700 + 1.4 * ra) { if (this.every('pull', 1.6)) { Recorder.event('gpws'); Sound.say('pull up', 5, 1.2, 'warn'); } }
+      else if (sink > 1100 + 1.0 * ra) { if (this.every('sink', 2.2)) { Recorder.event('gpws'); Sound.say('sink rate', 3, 1.25, 'warn'); } } }
+    if (W.includes('TOO LOW GEAR') && this.every('gear', 3)) { Recorder.event('gpws'); Sound.say('too low, gear', 3, 1.2, 'warn'); }
     if (o.stallWarn && !f.wow && this.every('stall', 1.3)) Sound.say('stall, stall', 4, 1.4, 'warn');
     if (!f.wow && Math.abs(o.roll) > 35 && this.every('bank', 3)) Sound.say('bank angle, bank angle', 2, 1.35, 'warn');
-    const nav = S.nav; if (nav && nav.gsValid && !f.wow && ra > 50 && ra < 1000 && nav.gsDots < -1.3 && f.gearPos > 0.9 && o.vsFpm < 0 && this.every('gs', 3)) Sound.say('glideslope', 1, 1.2, 'warn');
+    const nav = S.nav; if (nav && nav.gsValid && !f.wow && ra > 50 && ra < 1000 && nav.gsDots < -1.3 && f.gearPos > 0.9 && o.vsFpm < 0 && this.every('gs', 3)) { Recorder.event('gpws'); Sound.say('glideslope', 1, 1.2, 'warn'); }
   }
 };
 
