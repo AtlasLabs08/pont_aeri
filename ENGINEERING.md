@@ -31,8 +31,8 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
 8. **Si una tasca sembla exigir trencar un contracte d'aquest document,
    atura't i explica-ho** en comptes de decidir-ho tu.
-9. **Puja nomes la teva branca i obre un PR contra `dev`.** Mai facis
-   push a `dev` ni a `main`: GitHub ho bloqueja igualment.
+9. **Puja la teva branca (`git push -u origin <branca>`) i obre el PR contra
+   `dev`.** Mai facis push a `dev` ni a `main`: GitHub ho bloqueja igualment.
 
 ---
 
@@ -346,10 +346,10 @@ export const BALANCE = {
   maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
 
   fleetTypes: {                             // clau = aircraftTypeId del FlightRecord
-    tp:    { cls: 'turboprop',  seats: 70  },
-    nb:    { cls: 'narrowbody', seats: 180 },
-    wb:    { cls: 'widebody',   seats: 300 },
-    jumbo: { cls: 'widebody',   seats: 400 }
+    tp:    { cls: 'turboprop',  seats: 70,  rating: 'turboprop'  },
+    nb:    { cls: 'narrowbody', seats: 180, rating: 'narrowbody' },
+    wb:    { cls: 'widebody',   seats: 300, rating: 'widebody'   },
+    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       }
   },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
@@ -409,6 +409,21 @@ export const BALANCE = {
     { key: 'captain',    xp: 15000, payMult: 2.20, slots: 7, dispatchPct: 0.50 },
     { key: 'instructor', xp: 35000, payMult: 2.50, slots: 9, dispatchPct: 0.60 }
   ],
+
+  ratings: {                                // habilitacions de tipus (DESIGN.md)
+    commuter:   { rank: 'student',    cost: 0 },
+    turboprop:  { rank: 'private',    cost: 25000 },
+    narrowbody: { rank: 'commercial', cost: 120000 },
+    widebody:   { rank: 'atpl',       cost: 400000 },
+    quad:       { rank: 'captain',    cost: 600000 }
+  },
+  endorsements: {
+    night:      { rank: 'private',    cost: 15000 },
+    crosswind:  { rank: 'student',    cost: 30000 },
+    lowVis:     { rank: 'commercial', cost: 60000 },
+    shortField: { rank: 'commercial', cost: 45000 },
+    longHaul:   { rank: 'atpl',       cost: 150000 }
+  },
 
   rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
 
@@ -584,7 +599,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
 | B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
-| B4 | `progression.js` | B2 | XP, rangs, habilitacions |
+| B4 | `progression.js` | B2 | **Fet.** XP per vol, rangs, habilitacions de tipus i endorsements. Valors a `BALANCE.ratings`, `BALANCE.endorsements` i `fleetTypes[..].rating`. La baixada de rang per accident es proporcional: el rang surt sempre de l'XP. 59 proves noves (58 a `progression.test.js`, 1 de `purity.test.js`), 503 en total |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 
 **Cap línia d'interfície d'Airline abans que B5 passi.**
@@ -593,7 +608,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
-| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | Afegir una lliçó no toca codi |
+| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | Afegir una lliçó no toca codi. Inclou els check-rides de les habilitacions (criteris a DESIGN.md, Habilitacions de tipus) |
 | C2 | `app/`: bus, `setFlightLauncher`, `onFlightFinished` | A2, A5 | Un vol llançat des d'`app` torna el seu `FlightRecord` |
 | C3 | Executor de lliçons a `index.html`: instructor al HUD, criteris en viu | C1, C2, A4 | Les 8 lliçons es poden completar |
 | C4 | Ajudes de l'escola: barra d'arrodoniment, debrief automàtic | C3 | Només visibles dins l'escola |
