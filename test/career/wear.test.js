@@ -119,6 +119,17 @@ describe('applyFlightWear', () => {
     assert.deepEqual(a.condition, { engines: 0, gear: 0, airframe: 0, avionics: 0 });
   });
 
+  test('jumbo: passa per widebody', () => {
+    // BALANCE.fleetTypes.jumbo.cls = 'widebody': mateix calcul que el wb de 45 min
+    // hours = 14; cycles = round(14 / 1.5) = 9; cycleCost = 9 * 300 = 2700
+    const { airframe: a, cycleCost } =
+      applyFlightWear(airframe({ typeId: 'jumbo' }), record(300, { aircraftTypeId: 'jumbo' }));
+    assert.deepEqual(a.condition, { engines: 99.9, gear: 99.8, airframe: 100, avionics: 99.3 });
+    assert.equal(a.hours, 1014);
+    assert.equal(a.cycles, 509);
+    assert.equal(cycleCost, 2700);
+  });
+
   test('typeId desconegut: Error', () => {
     assert.throws(() => applyFlightWear(airframe({ typeId: 'zeppelin' }), record(300)), Error);
   });
