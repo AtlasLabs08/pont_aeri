@@ -325,6 +325,55 @@ export const AIRCRAFT = {
     test: { toMass: 39000, ldgMass: 36000, rotPitch: 9, climbPitchMax: 17 }
   }
 };
+/* F5: variants. Mateixa aerodinamica, inercies (escalades amb la massa), flaps i limits que la base;
+   es retoquen massa, empenta, combustible i longitud (tren de morro, contactes, ull i model 3D). */
+const variant = (base, v) => ({ ...AIRCRAFT[base], ...v });
+const { tp, nb, wb } = AIRCRAFT;
+
+AIRCRAFT.tpShort = variant('tp', {
+  id: 'tpShort', name: 'Garbí G-42', basedOn: 'ATR 42 class',
+  mass: { empty: 11400, typical: 16800, mtow: 18600, mlw: 18300, maxFuel: 4500, typFuel: 1500 },
+  engines: { ...tp.engines, power: 1610e3, staticThrust: 26200 },
+  gear: { ...tp.gear, nose: { x: 7.90, y: 0 }, mains: [{ x: -1.05, y: -2.05 }, { x: -1.05, y: 2.05 }] },
+  contact: { ...tp.contact, tailStrikeDeg: 10.0, tailX: -10.4, nose: [8.8, 0, 0.9] },
+  eye: [7.55, -0.48, -0.55],
+  model: { ...tp.model, length: 22.7, noseX: 9.6 },
+  test: { toMass: 18600, ldgMass: 18300, rotPitch: 8, climbPitchMax: 14 }
+});
+
+AIRCRAFT.nbShort = variant('nb', {
+  id: 'nbShort', name: 'Mestral M-100', basedOn: 'A319 / 737-700 class',
+  mass: { empty: 40600, typical: 60000, mtow: 70000, mlw: 61000, maxFuel: 19000, typFuel: 6000 },
+  engines: { ...nb.engines, thrust: 105000 },
+  gear: { ...nb.gear, nose: { x: 10.00, y: 0 } },
+  contact: { ...nb.contact, tailStrikeDeg: 13.5, tailX: -14.8, nose: [14.6, 0, 1.2] },
+  eye: [13.35, -0.53, -1.15],
+  model: { ...nb.model, length: 33.8, noseX: 15.8 },
+  test: { toMass: 66000, ldgMass: 59500, rotPitch: 10, climbPitchMax: 18 }
+});
+
+AIRCRAFT.nbStretch = variant('nb', {
+  id: 'nbStretch', name: 'Mestral M-300', basedOn: 'A321-100 class',
+  mass: { empty: 47500, typical: 74000, mtow: 83000, mlw: 73500, maxFuel: 23000, typFuel: 7500 },
+  engines: { ...nb.engines, thrust: 147000 },
+  gear: { ...nb.gear, nose: { x: 15.80, y: 0 } },
+  contact: { ...nb.contact, tailStrikeDeg: 9.7, tailX: -20.0, nose: [20.1, 0, 1.2] },
+  eye: [18.85, -0.53, -1.15],
+  model: { ...nb.model, length: 44.5, noseX: 21.3 },
+  test: { toMass: 80000, ldgMass: 66000, rotPitch: 8.5, climbPitchMax: 16 }
+});
+
+AIRCRAFT.wbEr = variant('wb', {
+  id: 'wbEr', name: 'Llevant L-900ER', basedOn: '777-200LR class',
+  mass: { empty: 145000, typical: 215000, mtow: 347500, mlw: 223000, maxFuel: 162000, typFuel: 26000 },
+  engines: { ...wb.engines, thrust: 490000 },
+  gear: { ...wb.gear, nose: { x: 23.4, y: 0 } },
+  contact: { ...wb.contact, tailStrikeDeg: 11.0, tailX: -29.2, nose: [27.2, 0, 1.6] },
+  eye: [25.6, -0.55, -0.85],
+  model: { ...wb.model, length: 63.7, noseX: 29.1 },
+  test: { toMass: 300000, ldgMass: 223000, rotPitch: 8, climbPitchMax: 16 }
+});
+
 export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo'];
 // static strut deflection = oleo at 80 % of its stroke + tyre deflection (used by the flight model and the 3D gear)
 for (const id in AIRCRAFT) { const g = AIRCRAFT[id].gear; g.staticDefl = 0.80 * g.stroke + g.tireDefl; }
