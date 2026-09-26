@@ -57,7 +57,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
 @media (prefers-reduced-motion:reduce){#loadbar,#toast{transition:none}}
 </style></head><body>
 <canvas id="view"></canvas><canvas id="hudcv" aria-hidden="true"></canvas>
-<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. Four airliners, a 200 km procedural Mediterranean, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
+<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. A fleet of airliners, a 200 km procedural Mediterranean, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
 
 <aside id="menu" hidden>
   <h1>Pont Aeri</h1><p class="sub">Flight release, Barcelona and Palma</p>
@@ -2650,7 +2650,7 @@ lift ${kN(o.lift)}   drag ${kN(o.drag)}   thrust ${kN(o.thrust)}   weight ${kN(o
 IAS ${n(o.ias)} kt   TAS ${n(o.tas)} kt   GS ${n(o.gs)} kt   V/S ${n(o.vsFpm, 0)} fpm   AGL ${n(o.aglFt, 0)} ft
 elev ${n(o.de)}\u00b0  ail ${n(o.da)}\u00b0  rud ${n(o.dr)}\u00b0  trim ${n(c.trim, 2)}  flap ${n(f.flapPos, 2)}  mass ${n(f.mass / 1000, 1)} t  fuel flow ${n(o.ff * 3600, 0)} kg/h
 Vs ${n(f.stallSpeed(f.flapPos) / KT, 0)}  V1 ${n(f.vspeeds().v1, 0)}  VR ${n(f.vspeeds().vr, 0)}  V2 ${n(f.vspeeds().v2, 0)}  Vref ${n(f.vspeeds().vref, 0)}  wind ${n(Math.hypot(Game.env.windN, Game.env.windE) / KT, 0)} kt  surface ${['paved', 'grass', 'terrain', 'water'][f.surfaceType]}</pre>`;
-      if (!this.harnessHtml) { this.harnessHtml = '<h4>Headless test harness ' + (this.harness.length < AIRCRAFT_ORDER.length ? '(running ' + this.harness.length + '/4)' : '(all aircraft done)') + '</h4><div class="hgrid">' + this.harness.map(r => `<table><caption class="${r.pass ? 'ok' : 'bad'}">${r.name}: ${r.pass ? 'PASS' : 'FAIL'}</caption>` + r.rows.map(x => `<tr class="${x.pass ? 'ok' : 'bad'}"><td>${x.name}</td><td>${Math.round(x.val * 10) / 10} ${x.unit}</td><td>${x.range[0]}\u2013${Math.round(x.range[1])}</td></tr>`).join('') + '</table>').join('') + '</div>'; }
+      if (!this.harnessHtml) { this.harnessHtml = '<h4>Headless test harness ' + (this.harness.length < AIRCRAFT_ORDER.length ? '(running ' + this.harness.length + '/' + AIRCRAFT_ORDER.length + ')' : '(all aircraft done)') + '</h4><div class="hgrid">' + this.harness.map(r => `<table><caption class="${r.pass ? 'ok' : 'bad'}">${r.name}: ${r.pass ? 'PASS' : 'FAIL'}</caption>` + r.rows.map(x => `<tr class="${x.pass ? 'ok' : 'bad'}"><td>${x.name}</td><td>${Math.round(x.val * 10) / 10} ${x.unit}</td><td>${x.range[0]}\u2013${Math.round(x.range[1])}</td></tr>`).join('') + '</table>').join('') + '</div>'; }
       this.el.debug.innerHTML = h + this.harnessHtml;
     }
   }
