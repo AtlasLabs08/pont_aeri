@@ -53,3 +53,9 @@ L'agent puja la seva branca (git push -u origin <branca>) i obre el PR contra de
 - Els multiplicadors d'XP (turbulencia, meteo dura, dificultat d'aeroport) nomes s'apliquen a l'XP positiva. Un mal aterratge amb turbulencia no resta mes.
 - Els check-rides de les habilitacions de tipus son del motor de l'escola (C1). progression.js nomes compra l'habilitacio quan el check-ride ja s'ha passat.
 - L'endorsement de vent creuat fort (crosswind) no te rang minim: rank 'student' a BALANCE.endorsements.
+
+## 2026-09-26 - Baixar de rang no treu habilitacions
+Un pilot que baixa de rang conserva les habilitacions i els endorsements que ja tenia. canFlyType no mira el rang. Decisio d'en Marc.
+
+## 2026-09-26 - A4: sortida de pista (excursion)
+Sortida de pista (excursion): rolloutMetres > touchdown.remaining.

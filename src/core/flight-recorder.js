@@ -20,7 +20,9 @@
  *   r.event(type)               esdeveniment puntual, un de EVENT_TYPES
  *   r.touchdown(report, score)  quan Game calcula la nota (report.shown), NO a
  *                               onTouchdown: el pic de g i els rebots encara
- *                               s actualitzen durant 1,5 s despres del contacte
+ *                               s actualitzen durant 1,5 s despres del contacte.
+ *                               Touchdown.remaining = metres de pista que queden
+ *                               en el contacte (null fora de pista, com rwy)
  *   r.rollout(metres)
  *   r.tailStrike()
  *   r.crash(cause)              un de CRASH_CAUSES; si no ho es, queda 'fuselage'
@@ -96,6 +98,7 @@ export class FlightRecorder {
     const R = report, on = !!R.onRunway, g = R.gNow !== undefined ? R.gNow : R.g;
     this.td = { fpm: R.fpm, g, bounces: R.bounces || 0, onRunway: on, rwy: on ? R.rwy : null,
       tdzDist: on ? R.tdzDist : null, center: on ? R.center : null, crab: on ? R.crab : null,
+      remaining: on ? R.remaining : null,
       ias: R.ias, pitch: R.pitch, roll: R.roll,
       score: score.score, pts: { sink: score.pts.sink, g: score.pts.g, zone: score.pts.zone, center: score.pts.center, attitude: score.pts.attitude } };
   }

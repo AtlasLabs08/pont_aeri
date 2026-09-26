@@ -248,7 +248,8 @@ Tres regles per a qui l'enganxi a `Game` (A4):
  * @property {number} fpm   @property {number} g   @property {number} bounces
  * @property {boolean} onRunway   @property {string|null} rwy
  * @property {number|null} tdzDist   @property {number|null} center   @property {number|null} crab
- *           (tots tres null si onRunway és fals, igual que rwy)
+ * @property {number|null} remaining  metres de pista que queden en el contacte
+ *           (tots quatre null si onRunway és fals, igual que rwy)
  * @property {number} ias   @property {number} pitch   @property {number} roll
  * @property {number} score            0..100
  * @property {{sink:number, g:number, zone:number, center:number, attitude:number}} pts
@@ -587,7 +588,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | A1 | `src/i18n/`: `t`, formatadors, `en.js`, `ca.js` | — | **Fet.** Proves de `t`, reserva a `en` i formats |
 | A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
 | A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
-| A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
+| A4 | Enganxar el recorder a `Game` a `index.html` | A3 | **Fet.** Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV`, un sol cop per vol: al primer aterratge amb nota, o en estavellar-se. `Touchdown.remaining` al recorder i `excursion` a `damage.js`. 6 proves noves (1 a `recorder.test.js`, 5 a `damage.test.js`), 509 en total |
 | A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 297 en total |
 
 A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
@@ -598,7 +599,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
-| B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
+| B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
 | B4 | `progression.js` | B2 | **Fet.** XP per vol, rangs, habilitacions de tipus i endorsements. Valors a `BALANCE.ratings`, `BALANCE.endorsements` i `fleetTypes[..].rating`. La baixada de rang per accident es proporcional: el rang surt sempre de l'XP. 59 proves noves (58 a `progression.test.js`, 1 de `purity.test.js`), 503 en total |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 
