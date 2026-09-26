@@ -135,54 +135,61 @@ describe('demandPax', () => {
 
   test('P = pRef, factors neutres: dBase', () => {
     // reputacio 50: 0.6 + 0.8 * 0.5 = 1
-    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minuteOfDay: NOON, weatherSeverity: 0, reputation: 50 }), 150);
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: NOON, weatherSeverity: 0, reputation: 50 }), 150);
   });
 
   test('P = pRef: dBase * factors', () => {
     // 150 * 1.15 (punta) * 0.8 (meteo 1) * 1.4 (rep 100: 0.6 + 0.8) = 193.2 -> 193
-    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minuteOfDay: 420, weatherSeverity: 1, reputation: 100 }), 193);
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: 420, weatherSeverity: 1, reputation: 100 }), 193);
     // 150 * 0.7 (matinada) * 0.6 (rep 0) = 63
-    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minuteOfDay: 0, weatherSeverity: 0, reputation: 0 }), 63);
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: 0, weatherSeverity: 0, reputation: 0 }), 63);
+  });
+
+  test('minut absolut >= 1440: es redueix al dia', () => {
+    // 1860 -> 420, punta: 150 * 1.15 * 0.8 * 1.4 = 193.2 -> 193, igual que a 420
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: 1860, weatherSeverity: 1, reputation: 100 }), 193);
+    // 2880 -> 0, matinada: 150 * 0.7 * 0.6 = 63
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: 2880, weatherSeverity: 0, reputation: 0 }), 63);
   });
 
   test('doblar el preu en leisure divideix per 2^1.6', () => {
     // 150 / 2^1.6 = 150 / 3.031433 = 49.48 -> 49
-    assert.equal(demandPax({ route: LEISURE, price: 400, seats: 300, minuteOfDay: NOON, reputation: 50 }), 49);
+    assert.equal(demandPax({ route: LEISURE, price: 400, seats: 300, minute: NOON, reputation: 50 }), 49);
   });
 
   test('doblar el preu en business divideix per 2^1.1', () => {
     // 150 / 2^1.1 = 150 / 2.143547 = 69.98 -> 69
-    assert.equal(demandPax({ route: BUSINESS, price: 400, seats: 300, minuteOfDay: NOON, reputation: 50 }), 69);
+    assert.equal(demandPax({ route: BUSINESS, price: 400, seats: 300, minute: NOON, reputation: 50 }), 69);
   });
 
   test('preu regalat: la demanda puja fins als seients', () => {
     // 150 * 2^1.6 = 454.7 -> tope de 180 seients
-    assert.equal(demandPax({ route: LEISURE, price: 100, seats: 180, minuteOfDay: NOON, reputation: 50 }), 180);
+    assert.equal(demandPax({ route: LEISURE, price: 100, seats: 180, minute: NOON, reputation: 50 }), 180);
   });
 
   test('limit de seients', () => {
-    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 100, minuteOfDay: NOON, reputation: 50 }), 100);
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 100, minute: NOON, reputation: 50 }), 100);
   });
 
   test('floor, no round', () => {
     // 100.9 * 1 -> 100
-    assert.equal(demandPax({ route: { pRef: 200, dBase: 100.9, kind: 'leisure' }, price: 200, seats: 300, minuteOfDay: NOON, reputation: 50 }), 100);
+    assert.equal(demandPax({ route: { pRef: 200, dBase: 100.9, kind: 'leisure' }, price: 200, seats: 300, minute: NOON, reputation: 50 }), 100);
   });
 
   test('sense meteo ni reputacio: severitat 0 i reputacio inicial (50)', () => {
-    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minuteOfDay: NOON }), 150);
+    assert.equal(demandPax({ route: LEISURE, price: 200, seats: 300, minute: NOON }), 150);
   });
 
   test('preu 0, negatiu o no finit: 0', () => {
     for (const price of [0, -10, NaN, Infinity, undefined]) {
-      assert.equal(demandPax({ route: LEISURE, price, seats: 300, minuteOfDay: NOON, reputation: 50 }), 0, String(price));
+      assert.equal(demandPax({ route: LEISURE, price, seats: 300, minute: NOON, reputation: 50 }), 0, String(price));
     }
   });
 
   test('funciona amb el que retorna routeFor', () => {
     // LEBL-LEPA a P = pRef: dBase = 232.18 -> 232
     const route = routeFor('LEBL', 'LEPA');
-    assert.equal(demandPax({ route, price: route.pRef, seats: 300, minuteOfDay: NOON, reputation: 50 }), 232);
+    assert.equal(demandPax({ route, price: route.pRef, seats: 300, minute: NOON, reputation: 50 }), 232);
   });
 
   test('errors: seients que falten i tipus de ruta desconegut', () => {

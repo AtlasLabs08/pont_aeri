@@ -23,7 +23,7 @@
  *   hourFactor(minute)          -> peak, off o 1 (intervals [inici, fi)). Accepta
  *                                  minuts absoluts (E1), tambe negatius: modul 1440
  *   weatherFactor(severity)     -> 1 a severity 0, weatherFactorMin a severity 1
- *   demandPax({ route, price, seats, minuteOfDay, weatherSeverity, reputation })
+ *   demandPax({ route, price, seats, minute, weatherSeverity, reputation })
  *                        -> passatgers, enter entre 0 i seats. 0 si price <= 0
  *                           o no es finit
  */
@@ -93,7 +93,7 @@ export function weatherFactor(severity) {
 }
 
 /** Passatgers que compren bitllet, amb el tope de seients. */
-export function demandPax({ route, price, seats, minuteOfDay, weatherSeverity = 0,
+export function demandPax({ route, price, seats, minute, weatherSeverity = 0,
                             reputation = BALANCE.reputation.start }) {
   if (!Number.isFinite(seats)) throw new Error('demandPax: seats ha de ser un numero');
   if (!Number.isFinite(price) || price <= 0) return 0;
@@ -101,6 +101,6 @@ export function demandPax({ route, price, seats, minuteOfDay, weatherSeverity = 
   const e = d.elasticity[route.kind];
   if (e === undefined) throw new Error('demandPax: tipus de ruta desconegut: ' + route.kind);
   const fRep = d.reputation.base + d.reputation.span * reputation / REPUTATION_SCALE;
-  const n = route.dBase * (route.pRef / price) ** e * hourFactor(minuteOfDay) * weatherFactor(weatherSeverity) * fRep;
+  const n = route.dBase * (route.pRef / price) ** e * hourFactor(minute) * weatherFactor(weatherSeverity) * fRep;
   return Math.max(0, Math.min(seats, Math.floor(n)));
 }
