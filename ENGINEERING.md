@@ -346,10 +346,10 @@ export const BALANCE = {
   maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
 
   fleetTypes: {                             // clau = aircraftTypeId del FlightRecord
-    tp:    { cls: 'turboprop',  seats: 70  },
-    nb:    { cls: 'narrowbody', seats: 180 },
-    wb:    { cls: 'widebody',   seats: 300 },
-    jumbo: { cls: 'widebody',   seats: 400 }
+    tp:    { cls: 'turboprop',  seats: 70,  rating: 'turboprop'  },
+    nb:    { cls: 'narrowbody', seats: 180, rating: 'narrowbody' },
+    wb:    { cls: 'widebody',   seats: 300, rating: 'widebody'   },
+    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       }
   },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
@@ -409,6 +409,21 @@ export const BALANCE = {
     { key: 'captain',    xp: 15000, payMult: 2.20, slots: 7, dispatchPct: 0.50 },
     { key: 'instructor', xp: 35000, payMult: 2.50, slots: 9, dispatchPct: 0.60 }
   ],
+
+  ratings: {                                // habilitacions de tipus (DESIGN.md)
+    commuter:   { rank: 'student',    cost: 0 },
+    turboprop:  { rank: 'private',    cost: 25000 },
+    narrowbody: { rank: 'commercial', cost: 120000 },
+    widebody:   { rank: 'atpl',       cost: 400000 },
+    quad:       { rank: 'captain',    cost: 600000 }
+  },
+  endorsements: {
+    night:      { rank: 'private',    cost: 15000 },
+    crosswind:  { rank: 'student',    cost: 30000 },
+    lowVis:     { rank: 'commercial', cost: 60000 },
+    shortField: { rank: 'commercial', cost: 45000 },
+    longHaul:   { rank: 'atpl',       cost: 150000 }
+  },
 
   rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
 
