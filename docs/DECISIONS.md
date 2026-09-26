@@ -30,3 +30,8 @@ B1 omple balance.js i deixa version: 1. Encara no hi ha cap partida desada de ju
 
 ## 2026-09-26 - BALANCE.version a 1 fins que Airline arribi a main
 BALANCE.version es queda a 1 fins que el mode Airline arribi a main. Mentre no hi hagi partides reals de jugadors, afegir o canviar valors de balance.js no puja version ni afegeix migracio. A partir del primer merge d'Airline a main, qualsevol canvi de valor puja version i porta la seva migracio a career/state.js.
+
+## 2026-09-26 - Revisio del B2: el que queda fora d economy.js
+- El cost per cicle del manteniment no es a economy.js: el calcula wear.js a B3.
+- Als vols de contracte, el pagament es contractFeePerLeg[cls] * rankPayMult * m_aterratge. Decisio d'en Marc: la nota tambe compta quan l'avio no es teu.
+- Un accident fixa el tram d'aterratge al de nota 0.
