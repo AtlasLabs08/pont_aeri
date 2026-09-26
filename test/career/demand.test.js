@@ -86,6 +86,11 @@ describe('routeFor', () => {
 });
 
 describe('hourFactor', () => {
+  test('minut no finit: error', () => {
+    assert.throws(() => hourFactor(undefined), /hourFactor: minute ha de ser un numero finit/);
+    assert.throws(() => hourFactor(NaN), /hourFactor: minute ha de ser un numero finit/);
+  });
+
   test('punta del mati [420, 600)', () => {
     assert.equal(hourFactor(419), 1);
     assert.equal(hourFactor(420), 1.15);
@@ -194,6 +199,8 @@ describe('demandPax', () => {
 
   test('errors: seients que falten i tipus de ruta desconegut', () => {
     assert.throws(() => demandPax({ route: LEISURE, price: 200 }), /seats/);
+    assert.throws(() => demandPax({ route: LEISURE, price: 200, seats: 300 }), /minute/);
+    assert.throws(() => demandPax({ route: LEISURE, price: 200, seats: 300, minute: NaN }), /minute/);
     assert.throws(() => demandPax({ route: { pRef: 1, dBase: 1, kind: 'cargo' }, price: 1, seats: 1 }), /cargo/);
   });
 });

@@ -21,11 +21,13 @@
  *   routeFor(from, to)   -> el mateix per a dos ICAO de world/, o null si
  *                           algun no hi es. Simetric
  *   hourFactor(minute)          -> peak, off o 1 (intervals [inici, fi)). Accepta
- *                                  minuts absoluts (E1), tambe negatius: modul 1440
+ *                                  minuts absoluts (E1), tambe negatius: modul 1440.
+ *                                  Llanca un Error si minute no es un numero finit
  *   weatherFactor(severity)     -> 1 a severity 0, weatherFactorMin a severity 1
  *   demandPax({ route, price, seats, minute, weatherSeverity, reputation })
  *                        -> passatgers, enter entre 0 i seats. 0 si price <= 0
- *                           o no es finit
+ *                           o no es finit. Llanca un Error si minute no es un
+ *                           numero finit (via hourFactor)
  */
 
 import { clamp } from '../core/index.js';
@@ -79,6 +81,7 @@ const inAny = (m, intervals) => intervals.some(([from, to]) => m >= from && m < 
 
 /** Factor horari: punta, matinada o 1. minute es redueix al dia (modul 1440). */
 export function hourFactor(minute) {
+  if (!Number.isFinite(minute)) throw new Error('hourFactor: minute ha de ser un numero finit: ' + minute);
   const m = ((minute % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const { hours, hourFactor: f } = BALANCE.demand;
   if (inAny(m, hours.peak)) return f.peak;
