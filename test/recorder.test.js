@@ -81,7 +81,7 @@ function flyLanding(rec) {
       // el que Game.onTouchdown + la branca report.shown deixen a Game.report
       const td = f.touchdown;
       report = { fpm: td.vs / FPM, g: td.nzPeak, gNow: f.touchdown.nzPeak, bounces: td.bounces, ias: td.ias, pitch: td.pitch, roll: td.roll,
-        onRunway: true, rwy: 'TEST 36', tdzDist: 120, center: 0.4, crab: 0.2, rollout: f.distGround - dist0 };
+        onRunway: true, rwy: 'TEST 36', tdzDist: 120, center: 0.4, crab: 0.2, remaining: 1400, rollout: f.distGround - dist0 };
       break;
     }
   }
@@ -132,6 +132,7 @@ describe('FlightRecorder amb vol real', () => {
     assert.equal(t.score, 88);
     assert.deepEqual(t.pts, SCORE.pts);
     assert.equal(t.rwy, 'TEST 36');
+    assert.equal(t.remaining, 1400);
     assert.ok(r.rolloutMetres > 100, `rodatge ${r.rolloutMetres} m`);
   });
 
@@ -213,9 +214,16 @@ describe('FlightRecorder: casos puntuals', () => {
 
   test('fora de pista, les distancies respecte de la pista son null', () => {
     const rec = new FlightRecorder(); rec.start(META);
-    rec.touchdown({ fpm: 300, g: 1.4, bounces: 0, ias: 110, pitch: 3, roll: 1, onRunway: false }, SCORE);
+    rec.touchdown({ fpm: 300, g: 1.4, bounces: 0, ias: 110, pitch: 3, roll: 1, onRunway: false, remaining: 900 }, SCORE);
     const t = rec.finish().touchdown;
     assert.equal(t.onRunway, false); assert.equal(t.rwy, null); assert.equal(t.tdzDist, null); assert.equal(t.center, null);
+    assert.equal(t.crab, null); assert.equal(t.remaining, null);
+  });
+
+  test('remaining sobre la pista es copia tal qual, tambe 0', () => {
+    const rec = new FlightRecorder(); rec.start(META);
+    rec.touchdown({ fpm: 300, g: 1.4, bounces: 0, ias: 110, pitch: 3, roll: 1, onRunway: true, rwy: '24L', tdzDist: 400, center: 2, crab: 1, remaining: 0 }, SCORE);
+    assert.equal(rec.finish().touchdown.remaining, 0);
   });
 
   test('una sacsejada al comandament en vol compta un cop', () => {
