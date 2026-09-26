@@ -57,7 +57,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
 @media (prefers-reduced-motion:reduce){#loadbar,#toast{transition:none}}
 </style></head><body>
 <canvas id="view"></canvas><canvas id="hudcv" aria-hidden="true"></canvas>
-<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. Four airliners, a 200 km procedural Mediterranean, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
+<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. A fleet of airliners, a 200 km procedural Mediterranean, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
 
 <aside id="menu" hidden>
   <h1>Pont Aeri</h1><p class="sub">Flight release, Barcelona and Palma</p>
@@ -141,6 +141,7 @@ import {
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
+import { t } from './src/i18n/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -1295,6 +1296,15 @@ const MODEL_GEOM = {   // visual proportions per category (metres / degrees)
   wb:    { taper: 0.20, dihedral: 6,   wingZ: 1.55,  hSpan: 21.5, hChord: 7.0, finH: 9.4,  finChord: 9.5, finSweep: 42, nacR: 1.95, nacL: 7.3, wheelR: 0.67, noseWheelR: 0.52, bogie: 3, winglet: 0 },
   jumbo: { taper: 0.27, dihedral: 7,   wingZ: 1.60,  hSpan: 22.2, hChord: 8.0, finH: 10.2, finChord: 11,  finSweep: 45, nacR: 1.35, nacL: 5.6, wheelR: 0.62, noseWheelR: 0.55, bogie: 2, winglet: 1.8 }
 };
+// F4/F5: els avions nous reaprofiten la geometria del seu avio base, escalada a la seva mida (geometria propia a F6).
+// Empenatge amb la longitud, gondoles, rodes i posicio de l ala amb el radi del fuselatge, winglet amb l envergadura.
+const MODEL_BASE = { commuter: 'tp', tpShort: 'tp', rj: 'nb', nbShort: 'nb', nbStretch: 'nb', wbEr: 'wb' };
+for (const [id, base] of Object.entries(MODEL_BASE)) {
+  const G = MODEL_GEOM[base], m = AIRCRAFT[id].model, mb = AIRCRAFT[base].model;
+  const kL = m.length / mb.length, kR = m.fuseR / mb.fuseR, kB = AIRCRAFT[id].geom.b / AIRCRAFT[base].geom.b;
+  MODEL_GEOM[id] = { ...G, wingZ: G.wingZ * kR, hSpan: G.hSpan * kL, hChord: G.hChord * kL, finH: G.finH * kL, finChord: G.finChord * kL,
+    nacR: G.nacR * kR, nacL: G.nacL * kR, wheelR: G.wheelR * kR, noseWheelR: G.noseWheelR * kR, winglet: G.winglet * kB };
+}
 
 const AircraftModel = {
   /** livery texture wrapped around the fuselage: u = nose->tail, v = around (0 belly, .25 right, .5 crown, .75 left) */
@@ -2534,7 +2544,8 @@ const UI = {
     for (const id of ['loading', 'loadbar', 'loadtxt', 'menu', 'hud', 'toast', 'help', 'pause', 'crash', 'report', 'debug', 'yoke', 'yokedot', 'warn', 'topright', 'replaybar', 'replaytime', 'mixer']) this.el[id] = this.$(id);
     const O = Game.opts;
     // aircraft cards
-    this.$('acList').innerHTML = AIRCRAFT_ORDER.map(id => { const a = AIRCRAFT[id]; return `<label class="ac"><input type="radio" name="ac" value="${id}" ${id === O.aircraft ? 'checked' : ''}><span class="acname">${a.name}</span><span class="accat">${a.category}</span><span class="acdata">${Math.round(a.mass.mtow / 1000)} t max, ${a.geom.b.toFixed(0)} m span, ${a.engines.n} ${a.type === 'jet' ? 'turbofans' : 'turboprops'}</span></label>`; }).join('');
+    const acText = (id, k) => { const key = 'aircraft.' + id + '.' + k, s = t(key); return s === key ? AIRCRAFT[id][k] : s; };   // els avions nous, per i18n; els quatre originals es migren al bloc M
+    this.$('acList').innerHTML = AIRCRAFT_ORDER.map(id => { const a = AIRCRAFT[id]; return `<label class="ac"><input type="radio" name="ac" value="${id}" ${id === O.aircraft ? 'checked' : ''}><span class="acname">${acText(id, 'name')}</span><span class="accat">${acText(id, 'category')}</span><span class="acdata">${Math.round(a.mass.mtow / 1000)} t max, ${a.geom.b.toFixed(0)} m span, ${a.engines.n} ${a.type === 'jet' ? 'turbofans' : 'turboprops'}</span></label>`; }).join('');
     document.querySelectorAll('input[name=ac]').forEach(r => r.addEventListener('change', () => { O.aircraft = r.value; Game.setAircraft(r.value); Game.spawn(); Cameras.mode = 'orbit'; this.bestText(); }));
     const fillRw = () => { const A = AIRPORTS[O.airport]; this.$('optRunway').innerHTML = A.allEnds.map((e, i) => `<option value="${i}">Runway ${e.id} (${('00' + Math.round(e.hdg) % 360).slice(-3)}\u00b0, ${e.rw.len} m)</option>`).join(''); O.runway = Math.min(O.runway, A.allEnds.length - 1); this.$('optRunway').value = O.runway; };
     this.$('optAirport').innerHTML = AIRPORT_ORDER.map(id => `<option value="${id}">${AIRPORTS[id].name} (${id})</option>`).join(''); fillRw();
@@ -2639,7 +2650,7 @@ lift ${kN(o.lift)}   drag ${kN(o.drag)}   thrust ${kN(o.thrust)}   weight ${kN(o
 IAS ${n(o.ias)} kt   TAS ${n(o.tas)} kt   GS ${n(o.gs)} kt   V/S ${n(o.vsFpm, 0)} fpm   AGL ${n(o.aglFt, 0)} ft
 elev ${n(o.de)}\u00b0  ail ${n(o.da)}\u00b0  rud ${n(o.dr)}\u00b0  trim ${n(c.trim, 2)}  flap ${n(f.flapPos, 2)}  mass ${n(f.mass / 1000, 1)} t  fuel flow ${n(o.ff * 3600, 0)} kg/h
 Vs ${n(f.stallSpeed(f.flapPos) / KT, 0)}  V1 ${n(f.vspeeds().v1, 0)}  VR ${n(f.vspeeds().vr, 0)}  V2 ${n(f.vspeeds().v2, 0)}  Vref ${n(f.vspeeds().vref, 0)}  wind ${n(Math.hypot(Game.env.windN, Game.env.windE) / KT, 0)} kt  surface ${['paved', 'grass', 'terrain', 'water'][f.surfaceType]}</pre>`;
-      if (!this.harnessHtml) { this.harnessHtml = '<h4>Headless test harness ' + (this.harness.length < AIRCRAFT_ORDER.length ? '(running ' + this.harness.length + '/4)' : '(all aircraft done)') + '</h4><div class="hgrid">' + this.harness.map(r => `<table><caption class="${r.pass ? 'ok' : 'bad'}">${r.name}: ${r.pass ? 'PASS' : 'FAIL'}</caption>` + r.rows.map(x => `<tr class="${x.pass ? 'ok' : 'bad'}"><td>${x.name}</td><td>${Math.round(x.val * 10) / 10} ${x.unit}</td><td>${x.range[0]}\u2013${Math.round(x.range[1])}</td></tr>`).join('') + '</table>').join('') + '</div>'; }
+      if (!this.harnessHtml) { this.harnessHtml = '<h4>Headless test harness ' + (this.harness.length < AIRCRAFT_ORDER.length ? '(running ' + this.harness.length + '/' + AIRCRAFT_ORDER.length + ')' : '(all aircraft done)') + '</h4><div class="hgrid">' + this.harness.map(r => `<table><caption class="${r.pass ? 'ok' : 'bad'}">${r.name}: ${r.pass ? 'PASS' : 'FAIL'}</caption>` + r.rows.map(x => `<tr class="${x.pass ? 'ok' : 'bad'}"><td>${x.name}</td><td>${Math.round(x.val * 10) / 10} ${x.unit}</td><td>${x.range[0]}\u2013${Math.round(x.range[1])}</td></tr>`).join('') + '</table>').join('') + '</div>'; }
       this.el.debug.innerHTML = h + this.harnessHtml;
     }
   }

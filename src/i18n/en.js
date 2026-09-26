@@ -22,5 +22,17 @@ export default {
   'rank.up': 'Promoted to {rank}',
   'duration.hm': '{h} h {m} min',
   'duration.h': '{h} h',
-  'duration.m': '{m} min'
+  'duration.m': '{m} min',
+  'aircraft.commuter.name': 'Migjorn Mi-9',
+  'aircraft.commuter.category': 'Twin turboprop commuter',
+  'aircraft.rj.name': 'Xaloc X-90',
+  'aircraft.rj.category': 'Regional twinjet',
+  'aircraft.tpShort.name': 'Garbí G-42',
+  'aircraft.tpShort.category': 'Short regional turboprop',
+  'aircraft.nbShort.name': 'Mestral M-100',
+  'aircraft.nbShort.category': 'Short narrow-body twinjet',
+  'aircraft.nbStretch.name': 'Mestral M-300',
+  'aircraft.nbStretch.category': 'Stretched narrow-body twinjet',
+  'aircraft.wbEr.name': 'Llevant L-900ER',
+  'aircraft.wbEr.category': 'Long-range wide-body twinjet'
 };
