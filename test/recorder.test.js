@@ -173,6 +173,32 @@ describe('FlightRecorder: casos puntuals', () => {
     assert.equal(r.timeAccelMax, 16); assert.equal(r.usedCruiseSkip, true); assert.equal(r.tailStrike, true);
   });
 
+  test('skippedCruiseFuelKg: 0 per defecte', () => {
+    const rec = new FlightRecorder(); rec.start(META);
+    assert.equal(rec.finish().skippedCruiseFuelKg, 0);
+  });
+
+  test('cruiseSkip(fuelKg) acumula el combustible saltat', () => {
+    const rec = new FlightRecorder(); rec.start(META);
+    rec.cruiseSkip(1200); rec.cruiseSkip(300.5);
+    const r = rec.finish();
+    assert.equal(r.skippedCruiseFuelKg, 1500.5); assert.equal(r.usedCruiseSkip, true);
+  });
+
+  test('cruiseSkip() sense argument no canvia res mes que usedCruiseSkip', () => {
+    const a = new FlightRecorder(); a.start(META);
+    const b = new FlightRecorder(); b.start(META); b.cruiseSkip();
+    const ra = a.finish(), rb = b.finish();
+    assert.equal(rb.usedCruiseSkip, true); assert.equal(rb.skippedCruiseFuelKg, 0);
+    assert.deepEqual({ ...rb, usedCruiseSkip: false }, ra);
+  });
+
+  test('start() torna skippedCruiseFuelKg a 0', () => {
+    const rec = new FlightRecorder(); rec.start(META); rec.cruiseSkip(500);
+    rec.start(META);
+    assert.equal(rec.finish().skippedCruiseFuelKg, 0);
+  });
+
   test('fora de pista, les distancies respecte de la pista son null', () => {
     const rec = new FlightRecorder(); rec.start(META);
     rec.touchdown({ fpm: 300, g: 1.4, bounces: 0, ias: 110, pitch: 3, roll: 1, onRunway: false }, SCORE);

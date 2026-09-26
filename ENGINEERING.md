@@ -195,7 +195,7 @@ capçalera del fitxer; les proves, a `test/recorder.test.js`.
 export class FlightRecorder {
   start(meta)              // { aircraftTypeId, from, to, fuelPlannedKg, paxOnBoard, plannedArrivalMin }
   sample(f, ctl, dt)       // un cop per pas de física, DESPRÉS de f.step()
-  setTimeAccel(k)  cruiseSkip()  event(type)  tailStrike()  rollout(metres)
+  setTimeAccel(k)  cruiseSkip(fuelKg?)  event(type)  tailStrike()  rollout(metres)
   touchdown(report, score) // Game.report + Game.scoreReport(report)
   crash(cause)             // un de CRASH_CAUSES; si no ho és, queda 'fuselage'
   finish({ arrivalMin }) -> FlightRecord   // objecte pla i nou a cada crida
@@ -232,6 +232,7 @@ Tres regles per a qui l'enganxi a `Game` (A4):
  * @property {number}  abruptInputs     per al confort de cabina
  * @property {number}  timeAccelMax
  * @property {boolean} usedCruiseSkip
+ * @property {number}  skippedCruiseFuelKg  combustible del tram saltat, sense penalitzacio; 0 per defecte
  * @property {number}  arrivalDeltaMin  + = tard
  * @property {Touchdown|null} touchdown null si no ha aterrat
  * @property {number}  rolloutMetres
@@ -588,7 +589,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | E1 | `career/clock.js` i posició de la flota | D4 | L'avió queda on aterra |
 | E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel` |
 | E3 | Detector de creuer estable i ×32 | A4 | **Estén** `Game.cycleAccel`, no el substitueix. El bucle de `Game` limita a `16 * 12` passos per frame: a ×32 cal mesurar el temps de frame |
-| E4 | Salt de creuer | E3 | +8 % de combustible, condicions revelades en sortir |
+| E4 | Salt de creuer | E3 | +8 % de combustible, condicions revelades en sortir. Omple skippedCruiseFuelKg amb cruiseSkip(fuelKg): el combustible que s'hauria cremat al tram saltat, sense penalitzacio. La penalitzacio del 8 % l'aplica economy.js. |
 | E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada |
 
 ### Bloc F — Contingut (paral·lel, delegable)

@@ -12,7 +12,9 @@
  *                                        paxOnBoard, plannedArrivalMin }
  *   r.sample(f, ctl, dt)        un cop per pas de fisica, DESPRES de f.step()
  *   r.setTimeAccel(k)           cada cop que canvia l acceleracio de temps
- *   r.cruiseSkip()              el jugador ha saltat el creuer
+ *   r.cruiseSkip(fuelKg)        el jugador ha saltat el creuer; fuelKg (opcional)
+ *                               es el combustible del tram saltat, que s acumula
+ *                               a skippedCruiseFuelKg sense cap penalitzacio
  *   r.event(type)               esdeveniment puntual, un de EVENT_TYPES
  *   r.touchdown(report, score)  quan Game calcula la nota (report.shown), NO a
  *                               onTouchdown: el pic de g i els rebots encara
@@ -37,8 +39,8 @@ export const EVENT_TYPES = ['engineFailure', 'gearFault', 'hydraulicFault',
 export const RECORD_KEYS = ['aircraftTypeId', 'from', 'to', 'blockSeconds',
   'airborneSeconds', 'fuelBurntKg', 'fuelPlannedKg', 'paxOnBoard', 'maxAltFt',
   'maxG', 'maxBankDeg', 'abruptInputs', 'timeAccelMax', 'usedCruiseSkip',
-  'arrivalDeltaMin', 'touchdown', 'rolloutMetres', 'tailStrike', 'crashCause',
-  'events'];
+  'skippedCruiseFuelKg', 'arrivalDeltaMin', 'touchdown', 'rolloutMetres',
+  'tailStrike', 'crashCause', 'events'];
 
 const STARTED_GS_KT = 3;        // com Game.flight: el bloc compta des que l avio es mou
 const ABRUPT_RATE = 4;          // canvi de comandament (fraccio de recorregut per segon)
@@ -51,7 +53,7 @@ export class FlightRecorder {
     this.started = false; this.block = 0; this.airborne = 0; this.fuel = 0;
     this.maxAlt = -Infinity; this.maxG = 1; this.maxBank = 0;
     this.abrupt = 0; this.lastAbrupt = -Infinity; this.lastPitch = null; this.lastRoll = null;
-    this.accelMax = 1; this.skipped = false; this.td = null; this.rollM = 0;
+    this.accelMax = 1; this.skipped = false; this.skippedFuel = 0; this.td = null; this.rollM = 0;
     this.tail = false; this.crashCause = null; this.events = [];
   }
 
@@ -82,7 +84,7 @@ export class FlightRecorder {
   }
 
   setTimeAccel(k) { if (k > this.accelMax) this.accelMax = k; }
-  cruiseSkip() { this.skipped = true; }
+  cruiseSkip(fuelKg) { this.skipped = true; if (fuelKg !== undefined) this.skippedFuel += fuelKg; }
   event(type) { this.events.push({ type, atSecond: this.block }); }
   rollout(metres) { this.rollM = metres; }
   tailStrike() { this.tail = true; }
@@ -106,7 +108,8 @@ export class FlightRecorder {
       fuelBurntKg: this.fuel, fuelPlannedKg: m.fuelPlannedKg, paxOnBoard: m.paxOnBoard,
       maxAltFt: this.maxAlt === -Infinity ? 0 : this.maxAlt,
       maxG: this.maxG, maxBankDeg: this.maxBank, abruptInputs: this.abrupt,
-      timeAccelMax: this.accelMax, usedCruiseSkip: this.skipped, arrivalDeltaMin: arrival,
+      timeAccelMax: this.accelMax, usedCruiseSkip: this.skipped,
+      skippedCruiseFuelKg: this.skippedFuel, arrivalDeltaMin: arrival,
       touchdown: this.td ? { ...this.td, pts: { ...this.td.pts } } : null,
       rolloutMetres: this.rollM, tailStrike: this.tail, crashCause: this.crashCause,
       events: this.events.map(e => ({ ...e }))
