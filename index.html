@@ -1971,7 +1971,7 @@ const Game = {
     Cameras.mode = O.start === 'final' ? 'cockpit' : 'chase'; Cameras.chaseYaw = f.out.psi; Cameras.orbYaw = 2.4; Cameras.orbPitch = 0.18; Cameras.dist = 1; this.acc = 0; this.lastIas = f.out.ias;
     // start() torna timeAccelMax a 1: no cal setTimeAccel pel timeAccel = 1 d'aquesta funcio
     Recorder.start({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelPlannedKg: f.fuel, paxOnBoard: 0, plannedArrivalMin: null });
-    this.recordDone = false; this.warnWas = {};
+    this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
   msg(t, secs) { UI.toast(t, secs); },
   onKey(code) {
