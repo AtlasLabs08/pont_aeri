@@ -9,7 +9,9 @@
  *   flightDay(record, cls) -> { hours, cycles }
  *     Cada vol pilotat compta com un dia d operacio (docs/DECISIONS.md):
  *     hours = max(operations.dayHours[cls], blockSeconds / 3600)
- *     cycles = max(1, round(hours / hores de bloc)); 1 si blockSeconds es 0
+ *     cycles = max(1, round(hours / max(hores de bloc, operations.minLegHours[cls])))
+ *     El tram minim evita que un vol molt curt (accident a l enlairament,
+ *     circuit) compti centenars de cicles.
  *   applyFlightWear(airframe, record) -> { airframe, cycleCost }
  *     Suma hours i cycles de flightDay i resta el desgast de BALANCE.wear a
  *     cada condicio. El tren perd, a mes, gearPerExtraFpm per cada fpm de
@@ -58,8 +60,9 @@ export function flightDay(record, cls) {
   const dayHours = lookup(BALANCE.operations.dayHours, cls, null);
   if (dayHours === null) throw new Error('flightDay: classe desconeguda a operations.dayHours: ' + cls);
   const blockHours = record.blockSeconds / SECONDS_PER_HOUR;
+  const legHours = Math.max(blockHours, BALANCE.operations.minLegHours[cls]);
   const hours = Math.max(dayHours, blockHours);
-  const cycles = blockHours > 0 ? Math.max(1, Math.round(hours / blockHours)) : 1;
+  const cycles = Math.max(1, Math.round(hours / legHours));
   return { hours, cycles };
 }
 

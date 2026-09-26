@@ -70,7 +70,8 @@ export const BALANCE = deepFreeze({
   crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
 
   // B3 (wear.js): valors provisionals, es calibren a B5
-  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 } },
+  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
+                minLegHours: { commuter: 0.5, turboprop: 0.6, narrowbody: 0.75, widebody: 1.5 } },
   wear: {                                   // punts de condicio (0..100) que es perden
     enginesPerHour: 0.0075, avionicsPerHour: 0.05,
     airframePerCycle: 0.005, gearPerCycle: 0.02,
