@@ -83,3 +83,6 @@ Els rangs dels avions nous son al bloc expect de cada avio a aircraft-data.js, c
 
 ## 2026-09-26 - snapshot.json regenerat per F4+F5
 F4+F5 canvien la fisica a proposit. snapshot.json es regenera amb node test/snapshot.test.js --update: nomes s'hi afegeixen les entrades dels sis avions nous, i els 108 valors de tp, nb, wb i jumbo son identics.
+
+## 2026-09-26 - Noms propis i panell DEV fora d'i18n
+Decisio d'en Marc. Els noms propis (noms de companyia pintats a les lliurees, com Velanta Regional o Solquer, i noms dels models d'avio) no passen per i18n perque no es tradueixen. El panell DEV no es interficie de jugador i queda fora de l'abast d'i18n; a mes, core/ no pot importar d'i18n/ (seccio 3 d'ENGINEERING.md), i els noms que mostra el panell surten de Harness.run, a core/.
