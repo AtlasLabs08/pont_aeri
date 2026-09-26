@@ -379,6 +379,24 @@ export const BALANCE = {
   // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
   crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
 
+  // B3 (wear.js): valors provisionals, es calibren a B5
+  operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 } },
+  wear: {                                   // punts de condicio (0..100) que es perden
+    enginesPerHour: 0.0075, avionicsPerHour: 0.05,
+    airframePerCycle: 0.005, gearPerCycle: 0.02,
+    gearFreeFpm: 300, gearPerExtraFpm: 0.01   // desgast extra de l aterratge del jugador
+  },
+  maintCostPerCycle: { commuter: 40, turboprop: 60, narrowbody: 120, widebody: 300 },
+  checks: {
+    A:      { intervalHours: 500,  pctOfValue: 0.008, groundedDays: 1,
+              restore: { avionics: 100 }, boost: { gear: 20 } },
+    C:      { intervalHours: 6000, pctOfValue: 0.04,  groundedDays: 10,
+              restore: { airframe: 100, gear: 100, avionics: 100 } },
+    engine: {                     pctOfValue: 0.03,  groundedDays: 5,
+              restore: { engines: 100 } }
+  },
+  failure: { threshold: 70, pAtThreshold: 0.002, refCondition: 20, pAtRef: 0.08 },
+
   insurance: { premiumPctPerFlight: 0.0012, excessOptions: [0.05, 0.10, 0.25] },
 
   ranks: [
