@@ -581,7 +581,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
-| B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta. Inclou el cost per cicle del manteniment (DESIGN.md, Els costos) |
+| B3 | `wear.js`, `damage.js` | B2 | **Fet.** Una nota de 20 punts amb 850 fpm en un avio de 8.000.000 EUR dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). `excursion` no s'avalua: el `FlightRecord` no porta la pista que queda (A4). 45 proves, 434 en total |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
 
@@ -614,10 +614,10 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | Id | Tasca | Depèn de | Nota |
 | --- | --- | --- | --- |
 | E1 | `career/clock.js` i posició de la flota | D4 | L'avió queda on aterra |
-| E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel` |
+| E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel`. Tira les avaries amb failureChance de wear.js i draw(state). Desgast extra de motors per TOGA prolongat: cal una dada nova al FlightRecord. |
 | E3 | Detector de creuer estable i ×32 | A4 | **Estén** `Game.cycleAccel`, no el substitueix. El bucle de `Game` limita a `16 * 12` passos per frame: a ×32 cal mesurar el temps de frame |
 | E4 | Salt de creuer | E3 | +8 % de combustible, condicions revelades en sortir. Omple skippedCruiseFuelKg amb cruiseSkip(fuelKg): el combustible que s'hauria cremat al tram saltat, sense penalitzacio. La penalitzacio del 8 % l'aplica economy.js. |
-| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada |
+| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada. Cada vol despatxat aplica applyFlightWear. |
 
 ### Bloc F — Contingut (paral·lel, delegable)
 
