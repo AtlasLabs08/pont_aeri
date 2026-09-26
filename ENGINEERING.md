@@ -517,7 +517,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
 | A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
 | A4 | Enganxar el recorder a `Game` a `index.html` | A3 | Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV` |
-| A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 271 en total |
+| A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 297 en total |
 
 A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
