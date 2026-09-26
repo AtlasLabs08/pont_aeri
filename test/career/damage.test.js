@@ -79,6 +79,14 @@ describe('assessDamage: contacte', () => {
   test('sense touchdown ni accident: cap item', () => {
     assert.deepEqual(assess(record({}, { touchdown: null })).items, []);
   });
+
+  test('tail strike sense touchdown ni accident: es factura', () => {
+    // 0.025 * 8.000.000 = 200.000; 5 dies
+    assert.deepEqual(assess(record({}, { touchdown: null, tailStrike: true })), {
+      items: [{ id: 'tailStrike', cost: 200000, groundedDays: 5 }],
+      cost: 200000, playerCost: 200000, groundedDays: 5, xpLoss: 0
+    });
+  });
 });
 
 describe('assessDamage: accident', () => {

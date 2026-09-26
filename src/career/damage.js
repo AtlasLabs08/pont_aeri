@@ -11,10 +11,12 @@
  *     en [0, 1] es obligatori (qui crida el treu de draw(state)); cost,
  *     groundedDays i xpLoss s interpolen dins dels intervals de BALANCE.crash
  *     i s arrodoneixen. Sense perdua total de l avio (BACKLOG.md).
- *     Sense accident i amb touchdown, items de BALANCE.damage:
- *       veryHard si |fpm| > 800 o g > 2.6; si no, hardLanding si |fpm| > 600
- *       o g > 2.2 (mai tots dos; comparacio estricta); tailStrike si
- *       record.tailStrike; offRunway si touchdown.onRunway es fals.
+ *     Sense accident, items de BALANCE.damage:
+ *       amb touchdown, veryHard si |fpm| > 800 o g > 2.6; si no, hardLanding
+ *       si |fpm| > 600 o g > 2.2 (mai tots dos; comparacio estricta);
+ *       tailStrike si record.tailStrike, amb touchdown o sense (tail strike
+ *       a l enlairament d un vol que no aterra);
+ *       offRunway si hi ha touchdown i touchdown.onRunway es fals.
  *       excursion no s avalua: el FlightRecord no porta la pista que queda
  *       al contacte (ho decidira l A4).
  *     cost de cada item = round(pctOfValue * airframeValue); cost = suma;
@@ -47,16 +49,17 @@ function damageRow(id) {
   return row;
 }
 
-/** Ids dels danys de contacte d un vol sense accident. */
+/** Ids dels danys d un vol sense accident. El tail strike compta amb touchdown o sense. */
 function contactDamageIds(record) {
-  const td = record.touchdown;
-  if (!td) return [];
-  const fpm = Math.abs(td.fpm), ids = [];
-  const exceeds = row => fpm > row.fpm || td.g > row.g;
-  if (exceeds(damageRow('veryHard'))) ids.push('veryHard');
-  else if (exceeds(damageRow('hardLanding'))) ids.push('hardLanding');
+  const td = record.touchdown, ids = [];
+  if (td) {
+    const fpm = Math.abs(td.fpm);
+    const exceeds = row => fpm > row.fpm || td.g > row.g;
+    if (exceeds(damageRow('veryHard'))) ids.push('veryHard');
+    else if (exceeds(damageRow('hardLanding'))) ids.push('hardLanding');
+  }
   if (record.tailStrike) ids.push('tailStrike');
-  if (!td.onRunway) ids.push('offRunway');
+  if (td && !td.onRunway) ids.push('offRunway');
   return ids;
 }
 
