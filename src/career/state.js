@@ -27,11 +27,9 @@ import { BALANCE } from './balance.js';
 
 export const SCHEMA_VERSION = 1;
 
-/* Limits de l esquema. PENDENT B1: la reputacio inicial es una constant
- * economica i s ha de moure a BALANCE; aqui nomes fins que balance.js existeixi. */
+/* Limits de l esquema. La reputacio inicial es economia: BALANCE.reputation.start. */
 const REPUTATION_MIN = 0;
 const REPUTATION_MAX = 100;
-const STARTING_REPUTATION = 50;
 const STARTING_RANK = 'student';
 
 const AIRFRAME_STATUS = ['ready', 'maintenance', 'dispatched', 'inFlight'];
@@ -66,7 +64,7 @@ export function createCareer(opts) {
       xp: 0, rank: STARTING_RANK, ratings: [], endorsements: [], logbook: []
     },
     company: {
-      cash: 0, reputation: STARTING_REPUTATION, bases: [], loans: [],
+      cash: 0, reputation: BALANCE.reputation.start, bases: [], loans: [],
       insurance: {}, flightsFlown: 0, lifetimeRevenue: 0
     },
     fleet: [],

@@ -1,12 +1,81 @@
 /* Totes les constants economiques del mode Airline, en un sol objecte.
- * NOU: tasca A5 en deixa l esquelet; la tasca B1 l omple (ENGINEERING.md
- * seccio 6).
+ * NOU: tasca B1 d ENGINEERING.md (seccio 6). Congelat en profunditat: cap
+ * codi no el pot modificar mentre el joc corre.
  *
  * EXPORTA: BALANCE
  *
  * INTERFICIE (no la canviis, state.js i els tests en depenen):
  *   BALANCE.version   s incrementa cada cop que canvia qualsevol valor, i
  *                     state.js ho detecta amb needsBalanceUpdate()
+ *   BALANCE.reputation.start   reputacio de la companyia en crear la partida
+ *   La resta de claus, tal com les descriu la seccio 6.
  */
 
-export const BALANCE = { version: 1 };
+/** Congela obj i tots els objectes i llistes de dins. Retorna obj. */
+function deepFreeze(obj) {
+  for (const v of Object.values(obj)) {
+    if (v !== null && typeof v === 'object') deepFreeze(v);
+  }
+  return Object.freeze(obj);
+}
+
+export const BALANCE = deepFreeze({
+  version: 1,
+  K: 2.6,                                   // factor global: l unica palanca de ritme
+
+  startingCash: 400000,
+  startingLoan: { principal: 250000, ratePerFlight: 0.004 },
+  reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
+
+  fuelPricePerKg: 0.90,
+  fees: { perTonneMTOW: 12, perPax: 1.8 },
+  crewRatePerBlockHour: { commuter: 250, turboprop: 450, narrowbody: 900, widebody: 1800 },
+  maintAccrualPerHour:  { commuter: 180, turboprop: 300, narrowbody: 700, widebody: 1600 },
+
+  landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
+    { min: 99, mult: 1.35, xp: 55,  key: 'landing.textbook' },
+    { min: 95, mult: 1.20, xp: 40,  key: 'landing.flawless' },
+    { min: 90, mult: 1.08, xp: 30,  key: 'landing.excellent' },
+    { min: 82, mult: 1.00, xp: 20,  key: 'landing.solid' },
+    { min: 72, mult: 0.85, xp: 12,  key: 'landing.safe' },
+    { min: 60, mult: 0.60, xp: 4,   key: 'landing.firm' },
+    { min: 45, mult: 0.35, xp: 0,   key: 'landing.rough' },
+    { min: 30, mult: 0.15, xp: -8,  key: 'landing.veryHard' },
+    { min: 15, mult: 0.00, xp: -20, key: 'landing.incident' },
+    { min: 0,  mult: 0.00, xp: -35, key: 'landing.inspection' }
+  ],
+
+  bonuses: { minScore: 82, punctualityPct: 0.04, punctualityWindowMin: 10,
+             fuelSavingShare: 0.35, fuelSavingThreshold: 0.03 },
+
+  damage: [                                 // pctOfValue sobre Airframe.value
+    { id: 'hardLanding',   fpm: 600, g: 2.2, pctOfValue: 0.0015, groundedDays: 1 },
+    { id: 'veryHard',      fpm: 800, g: 2.6, pctOfValue: 0.012,  groundedDays: 3 },
+    { id: 'tailStrike',                       pctOfValue: 0.025,  groundedDays: 5 },
+    { id: 'offRunway',                        pctOfValue: 0.005,  groundedDays: 1 },
+    { id: 'excursion',                        pctOfValue: 0.03,   groundedDays: 7 }
+  ],
+  // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
+  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
+
+  insurance: { premiumPctPerFlight: 0.0012, excessOptions: [0.05, 0.10, 0.25] },
+
+  ranks: [
+    { key: 'student',    xp: 0,     payMult: 1.00, slots: 0, dispatchPct: 0    },
+    { key: 'private',    xp: 500,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
+    { key: 'commercial', xp: 2000,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
+    { key: 'atpl',       xp: 6000,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
+    { key: 'captain',    xp: 15000, payMult: 2.20, slots: 7, dispatchPct: 0.50 },
+    { key: 'instructor', xp: 35000, payMult: 2.50, slots: 9, dispatchPct: 0.60 }
+  ],
+
+  rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
+
+  demand: { elasticity: { leisure: 1.6, business: 1.1 },
+            hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
+            reputation: { base: 0.6, span: 0.8 } },
+
+  cruiseSkipFuelPenalty: 0.08,
+  xpMultipliers: { turbulence: 1.3, hardWeather: 1.4 },
+  school: { passScore: 45, mercyScore: 30, mercyAttempt: 3, graduationXp: 250 }
+});

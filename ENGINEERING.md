@@ -330,6 +330,7 @@ export const BALANCE = {
 
   startingCash: 400000,
   startingLoan: { principal: 250000, ratePerFlight: 0.004 },
+  reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
   fees: { perTonneMTOW: 12, perPax: 1.8 },
@@ -525,7 +526,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
-| B1 | `balance.js` complet | A5 | Cap número màgic a `career/` |
+| B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | Proves dels trams i de l'elasticitat |
 | B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
