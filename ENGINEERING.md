@@ -553,7 +553,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
 | B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
-| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | Proves dels trams i de l'elasticitat |
+| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 65 proves, 373 en total |
 | B3 | `wear.js`, `damage.js` | B2 | Una nota de 20 punts genera la factura correcta |
 | B4 | `progression.js` | B2 | XP, rangs, habilitacions |
 | B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | Criteris de §10 |
