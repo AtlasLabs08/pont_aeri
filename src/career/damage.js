@@ -16,9 +16,9 @@
  *       si |fpm| > 600 o g > 2.2 (mai tots dos; comparacio estricta);
  *       tailStrike si record.tailStrike, amb touchdown o sense (tail strike
  *       a l enlairament d un vol que no aterra);
- *       offRunway si hi ha touchdown i touchdown.onRunway es fals.
- *       excursion no s avalua: el FlightRecord no porta la pista que queda
- *       al contacte (ho decidira l A4).
+ *       offRunway si hi ha touchdown i touchdown.onRunway es fals;
+ *       excursion si touchdown.onRunway i record.rolloutMetres >
+ *       touchdown.remaining (estricte; mai si remaining es null).
  *     cost de cada item = round(pctOfValue * airframeValue); cost = suma;
  *     groundedDays = el maxim dels items (0 si no n hi ha); xpLoss = 0 si no
  *     hi ha accident.
@@ -60,6 +60,7 @@ function contactDamageIds(record) {
   }
   if (record.tailStrike) ids.push('tailStrike');
   if (td && !td.onRunway) ids.push('offRunway');
+  if (td && td.onRunway && td.remaining != null && record.rolloutMetres > td.remaining) ids.push('excursion');
   return ids;
 }
 

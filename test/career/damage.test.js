@@ -89,6 +89,39 @@ describe('assessDamage: contacte', () => {
   });
 });
 
+describe('assessDamage: sortida de pista (excursion)', () => {
+  /** aterratge a pista amb remaining metres per davant i rollout metres de rodatge */
+  const rollout = (remaining, metres, td = {}) => record({ remaining, ...td }, { rolloutMetres: metres });
+
+  test('rodatge igual a la pista que queda: no compta', () => {
+    assert.deepEqual(ids(rollout(1500, 1500)), []);
+  });
+
+  test('un metre mes: excursion, 240.000 EUR i 7 dies', () => {
+    // 0.03 * 8.000.000 = 240.000
+    assert.deepEqual(assess(rollout(1500, 1501)), {
+      items: [{ id: 'excursion', cost: 240000, groundedDays: 7 }],
+      cost: 240000, playerCost: 240000, groundedDays: 7, xpLoss: 0
+    });
+  });
+
+  test('onRunway fals: offRunway, mai excursion', () => {
+    assert.deepEqual(ids(rollout(1500, 3000, { onRunway: false })), ['offRunway']);
+  });
+
+  test('remaining null: no s avalua', () => {
+    assert.deepEqual(ids(rollout(null, 3000)), []);
+  });
+
+  test('amb veryHard: cost sumat, dies el maxim', () => {
+    // 96.000 + 240.000 = 336.000; dies = max(3, 7) = 7
+    const r = assess(rollout(800, 900, { fpm: 850 }));
+    assert.deepEqual(r.items.map(i => i.id), ['veryHard', 'excursion']);
+    assert.equal(r.cost, 336000);
+    assert.equal(r.groundedDays, 7);
+  });
+});
+
 describe('assessDamage: accident', () => {
   const crash = (s, td = {}, over = {}) =>
     assess(record(td, { crashCause: 'hardImpact', ...over }), { crashSeverity: s });
