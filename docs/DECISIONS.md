@@ -59,3 +59,27 @@ Un pilot que baixa de rang conserva les habilitacions i els endorsements que ja 
 
 ## 2026-09-26 - A4: sortida de pista (excursion)
 Sortida de pista (excursion): rolloutMetres > touchdown.remaining.
+
+## 2026-09-26 - F4+F5: ids i classes dels avions nous
+- commuter: Migjorn Mi-9, classe commuter, 19 seients, habilitacio commuter.
+- rj: Xaloc X-90, classe narrowbody, 100 seients, habilitacio narrowbody.
+- tpShort: Garbi G-42, classe turboprop, 48 seients, habilitacio turboprop.
+- nbShort: Mestral M-100, classe narrowbody, 140 seients, habilitacio narrowbody.
+- nbStretch: Mestral M-300, classe narrowbody, 220 seients, habilitacio narrowbody.
+- wbEr: Llevant L-900ER, classe widebody, 290 seients, habilitacio widebody.
+BALANCE.version es queda a 1 (vegeu l'entrada del 26/09/2026 sobre BALANCE.version).
+
+## 2026-09-26 - El Xaloc X-90 es narrowbody
+Tot i ser un jet regional, el X-90 fa servir les tarifes de narrowbody (tripulacio, manteniment, contractes, rotacio) i demana l'habilitacio narrowbody. No hi ha classe regional a BALANCE.
+
+## 2026-09-26 - G-72F i T-4F ajornats
+Les variants de carrega no s'afegeixen fins que hi hagi contractes de carrega.
+
+## 2026-09-26 - Geometria 3D reaprofitada fins a F6
+Cada avio nou dibuixa el MODEL_GEOM del seu avio base escalat a la seva mida: Mi-9 i G-42 del G-72; X-90, M-100 i M-300 del M-200; L-900ER del L-900. La geometria propia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua) es la tasca F6. La fisica del X-90 ja porta els motors a cua.
+
+## 2026-09-26 - F4+F5: rangs del harness al bloc expect
+Els rangs dels avions nous son al bloc expect de cada avio a aircraft-data.js, com els quatre existents: Harness.run els llegeix d'alla i harness.test.js no canvia. Els avions nous entren a AIRCRAFT_ORDER al mateix commit que fleetTypes, smoke i snapshot, perque cada commit quedi en verd.
+
+## 2026-09-26 - snapshot.json regenerat per F4+F5
+F4+F5 canvien la fisica a proposit. snapshot.json es regenera amb node test/snapshot.test.js --update: nomes s'hi afegeixen les entrades dels sis avions nous, i els 108 valors de tp, nb, wb i jumbo son identics.

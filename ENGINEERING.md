@@ -220,7 +220,7 @@ Tres regles per a qui l'enganxi a `Game` (A4):
 ```js
 /**
  * @typedef {Object} FlightRecord
- * @property {string}  aircraftTypeId   'tp' | 'nb' | 'wb' | 'jumbo' (+ nous a F4)
+ * @property {string}  aircraftTypeId   'tp' | 'nb' | 'wb' | 'jumbo' | 'commuter' | 'rj' | 'tpShort' | 'nbShort' | 'nbStretch' | 'wbEr'
  * @property {string}  from             ICAO
  * @property {string}  to               ICAO
  * @property {number}  blockSeconds     Game.flight.t
@@ -650,8 +650,8 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | Pistes reals d'OurAirports |
 | F2 | Taxiways i portes procedimentals | Tots menys LEBL i LEPA |
 | F3 | `world/weather.js` amb llavor | Patrons locals i estacionals |
-| F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Canvia la física a propòsit**: actualitzar `smoke.test.js` (nombre d'avions), regenerar `snapshot.json` i afegir entrada a `DECISIONS.md`, tot al mateix PR |
-| F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | Com F4 |
+| F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
+| F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |
 | F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua) | Sense dependències |
 
 ### Bloc M — Migració pendent (paral·lel, baixa prioritat)
