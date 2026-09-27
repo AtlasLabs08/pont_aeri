@@ -86,3 +86,45 @@ F4+F5 canvien la fisica a proposit. snapshot.json es regenera amb node test/snap
 
 ## 2026-09-26 - Noms propis i panell DEV fora d'i18n
 Decisio d'en Marc. Els noms propis (noms de companyia pintats a les lliurees, com Velanta Regional o Solquer, i noms dels models d'avio) no passen per i18n perque no es tradueixen. El panell DEV no es interficie de jugador i queda fora de l'abast d'i18n; a mes, core/ no pot importar d'i18n/ (seccio 3 d'ENGINEERING.md), i els noms que mostra el panell surten de Harness.run, a core/.
+
+## 2026-09-27 - B5: preus d'ocasio de referencia
+Proposats per en Marc. BALANCE.usedPrice, en euros: commuter 350.000, tpShort 1.100.000, tp 1.800.000, rj 4.500.000, nbShort 6.500.000, nb 8.000.000, nbStretch 10.000.000, wb 22.000.000, wbEr 25.000.000, jumbo 30.000.000.
+
+## 2026-09-27 - B5: financament dels avions
+30 % d'entrada i la resta en quotes constants per vol, mai pel pas del temps. Interes per vol 0,004, el mateix que el credit inicial. Termini final: 260 vols (BALANCE.financing). Ho calcula career/finance.js.
+
+## 2026-09-27 - B5: quotes dels prestecs fora de K*r
+Decisio d'en Marc. Les quotes dels prestecs es paguen del cash tal qual, fora de K*r: el preu d'un avio es en euros reals. Divergencia de docs/DESIGN.md, que posa el financament entre els costos del tram (C): computeFlightResult encara accepta financePerFlight, pero el harness no el fa servir.
+
+## 2026-09-27 - B5: termini del credit inicial
+Decisio d'en Marc. El credit inicial (250.000 EUR) te el mateix termini que el financament dels avions: BALANCE.startingLoan.termFlights = 260, un valor propi del startingLoan. Una prova de balance.test.js comprova que coincideixen.
+
+## 2026-09-27 - B5: rangs calibrats
+Decisio d'en Marc. Llindars d'XP calibrats amb el harness perque cada rang que demana una classe arribi a +-5 vols del moment en que hi ha diners per a l'entrada: private 650, commercial 1.250, atpl 1.950, captain 2.450, instructor 3.200 (uns 60 vols despres del jumbo). Amb la llavor per defecte: private al vol 51 (diners al 53), commercial al 93 (96), atpl al 144 (146), captain al 188 (193), instructor al 253 (jumbo + 60). Sense multiplicador d'XP per classe d'avio. Divergencia de docs/DESIGN.md: la taula de rangs deia 500, 2.000, 6.000, 15.000 i 35.000.
+
+## 2026-09-27 - B5: XP perduda per accident
+Decisio d'en Marc. BALANCE.crash.xpLoss passa de [200, 1500] a [35, 230]: l'accident mes lleu costa l'XP d'uns 3 vols mitjans i el mes greu la d'uns 20 (11,5 XP per vol mitja al harness).
+
+## 2026-09-27 - B5: preu de referencia calibrat per classe
+Decisio d'en Marc. BALANCE.demand.pRef passa de 90 + 0,60 EUR/km a 260 + 0,09 EUR/km: puja les rutes curtes i evita que el llarg radi es dispari. Amb K = 2,6 els cinc tipus base queden dins del +-20 % de la Corba objectiu (net per vol sol / amb tripulacio completa): Mi-9 -19 % / -18 %, G-72 +19 % / +15 %, M-200 +18 % / +19 %, L-900 -11 % / -13 %, T-4 -16 % / -11 %. rotation.cap no s'ha tocat.
+
+## 2026-09-27 - B5: cost de contractacio de tripulacio
+Decisio d'en Marc. BALANCE.crewHireCost, cost unic per tripulacio i classe: commuter 42.000, turboprop 60.000, narrowbody 180.000, widebody 200.000. El sou no hi es: ja es dins dels costos del tram multiplicats pel factor de rotacio. Ho calcula career/crew.js (maxCrew, hireCrew). Divergencia de docs/DESIGN.md, que no posava preu a contractar tripulacio. Amb la llavor per defecte la primera tripulacio arriba al vol 10.
+
+## 2026-09-27 - B5: reserva del harness en contractar tripulacio
+El jugador simulat contracta una tripulacio per vol, nomes si no compra la classe seguent i si despres de pagar-la li queda cash per a 1,2 contractacions mes (HARNESS.crewReserve).
+
+## 2026-09-27 - B5: valor final de K i del termini
+K es queda a 2,6. El termini del financament (i del credit inicial) es de 260 vols. Salts de classe: 53, 43, 50 i 47 vols; 4,0 % de vols en negatiu; actes tancats de 12,3, 10,9 i 14,9 h.
+
+## 2026-09-27 - B5: criteris nous de la seccio 10
+Decisio d'en Marc. Per a aquest calibratge, cada salt de classe entre 40 i 50 vols (en comptes de 25 a 35) i cap acte de mes de 16 h de joc (en comptes de 12). Com que la primera tripulacio ha d'arribar entre el vol 8 i el 12, nomes el primer salt (commuter -> turbohelix) pot arribar fins a 55 vols. Es mante menys del 12 % de vols en negatiu.
+
+## 2026-09-27 - B5: suposicions acceptades del harness
+Decisio d'en Marc. El harness no fa servir weatherBonus (0), no simula accidents ni asseguranca, deixa la reputacio a 50 i no mesura l'ultim acte, que queda obert. Vola els tipus base (Mi-9, G-72, M-200, L-900, T-4), cadascun en una rotacio d'aeroports fixa.
+
+## 2026-09-27 - B5: cicles del dia d'operacio
+Els ~15 cicles del dia d'operacio de wear.js i el factor de rotacio maxim (2,7) no es corresponen. Decisio d'en Marc: no es toca ara; es revisa a l'E2.
+
+## 2026-09-27 - B5: draw() a career/rng.js
+draw(state) de la seccio 7 d'ENGINEERING.md viu a src/career/rng.js, exportat pel barrel de career/. El harness economic en treu tot l'atzar.
