@@ -34,7 +34,8 @@ export const HARNESS = Object.freeze({
   seed: 20260927,
   flights: 200,
 
-  // Nota d aterratge: normal(72, 14) retallada a [0, 100]; un 3 % de vols,
+  // Nota d aterratge: normal(72, 14) truncada a [0, 100] (es torna a tirar
+  // fins que cau dins, no es retalla); un 3 % de vols,
   // uniforme a [0, 25) (la cua de mals aterratges)
   score: { mean: 72, sd: 14, tailPct: 0.03, tailMax: 25 },
 
@@ -118,11 +119,15 @@ function gauss(state) {
 
 const clampTo = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 
-/** Nota d aterratge del jugador mitja. */
+/** Nota d aterratge del jugador mitja. La normal es truncada: es torna a
+ * tirar fins que cau a [0, 100], com diu la seccio 10. */
 function landingScore(state) {
   const S = H.score;
   if (draw(state) < S.tailPct) return draw(state) * S.tailMax;
-  return clampTo(S.mean + S.sd * gauss(state), 0, 100);
+  for (;;) {
+    const x = S.mean + S.sd * gauss(state);
+    if (x >= 0 && x <= 100) return x;
+  }
 }
 
 // ---------------------------------------------------------------------------
