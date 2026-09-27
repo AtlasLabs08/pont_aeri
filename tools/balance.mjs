@@ -41,14 +41,15 @@ export const HARNESS = Object.freeze({
   // Escala de flota del jugador: cada salt es la seguent classe
   ladder: ['commuter', 'tp', 'nb', 'wb', 'jumbo'],
 
-  // Rutes per tipus, anada i tornada des de la base (LEBL). Acte 1: LEBL,
-  // LEPA, LEGE i LERS (DESIGN.md, "Arc de la partida")
+  // Rotacio de cada tipus: una volta d aeroports, que torna a comencar. El
+  // tram i va de cycle[i] a cycle[i + 1]. Acte 1: LEBL, LEPA, LEGE i LERS
+  // (DESIGN.md, "Arc de la partida")
   routes: {
-    commuter: ['LEPA', 'LEGE', 'LEPA', 'LERS'],
-    tp:       ['LEPA', 'LEIB', 'LEMH', 'LEVC'],
-    nb:       ['LEMD', 'LFPO', 'LEMG', 'LIRF', 'LFMN'],
-    wb:       ['KJFK', 'EGLL', 'SBGR', 'EDDF'],
-    jumbo:    ['KJFK', 'SBGR']
+    commuter: ['LEBL', 'LEPA', 'LEGE', 'LEBL', 'LEPA', 'LERS'],
+    tp:       ['LEBL', 'LEPA', 'LEBL', 'LEIB', 'LEBL', 'LEMH', 'LEBL', 'LEVC'],
+    nb:       ['LEBL', 'LEMD', 'LEBL', 'LFPO', 'LEBL', 'LEMG', 'LEBL', 'LIRF', 'LEBL', 'LFMN'],
+    wb:       ['LEBL', 'KJFK', 'LEBL', 'EGLL', 'LEBL', 'SBGR', 'LEBL', 'EDDF'],
+    jumbo:    ['LEBL', 'KJFK', 'LEBL', 'SBGR']
   },
   base: 'LEBL',
 
@@ -84,6 +85,13 @@ export const HARNESS = Object.freeze({
   // Durada real d un cicle de joc: de 12 a 25 minuts segons la ruta (DESIGN.md,
   // "El bucle de joc"), interpolat en escala logaritmica de la distancia
   realMinutes: { min: 12, max: 25, kmMin: 80, kmMax: 8500 },
+
+  // Corba objectiu de DESIGN.md (net per vol sol i amb tripulacio completa):
+  // nomes per comparar, no entra a la simulacio
+  targets: {
+    commuter: [8500, 22000], tp: [28000, 75000], nb: [80000, 215000],
+    wb: [230000, 420000], jumbo: [350000, 600000]
+  },
 
   // Actes de DESIGN.md segons la classe de l avio que vola el jugador
   acts: { commuter: 1, turboprop: 2, narrowbody: 3, widebody: 4 }
@@ -257,10 +265,9 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
     // de K * r * (ingressos - costos). Es contracta fins al sostre de la classe.
     crewCount = Math.max(crewCount, maxCrew(cls));
 
-    // Ruta: anada o tornada
-    const dests = H.routes[typeId];
-    const dest = dests[Math.floor(legIndex / 2) % dests.length];
-    const [from, to] = legIndex % 2 === 0 ? [H.base, dest] : [dest, H.base];
+    // Tram seguent de la rotacio del tipus
+    const cycle = H.routes[typeId];
+    const from = cycle[legIndex % cycle.length], to = cycle[(legIndex + 1) % cycle.length];
     legIndex++;
     const { km, model } = route(from, to);
 
@@ -271,7 +278,11 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
       weatherSeverity: hardWeatherDemand ? H.weatherSeverityMax : 0, reputation: co.reputation });
 
     const { record, turbulence, hardWeather } = syntheticRecord(state, typeId, from, to, km, pax);
-    const res = computeFlightResult({ record, mode: 'own', ticketPrice: model.pRef, paxOnBoard: pax, crewCount });
+    const input = { record, mode: 'own', ticketPrice: model.pRef, paxOnBoard: pax };
+    const res = computeFlightResult({ ...input, crewCount });
+    // El mateix vol sense tripulacio i amb la tripulacio completa, per a la Corba objectiu
+    const netSolo = computeFlightResult({ ...input, crewCount: 0 }).net;
+    const netFull = computeFlightResult({ ...input, crewCount: maxCrew(cls) }).net;
 
     // Desgast, manteniment i danys: euros reals, fora de K
     const worn = applyFlightWear(airframe, record);
@@ -311,7 +322,8 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
 
     log.push({
       flight: f, typeId, cls, act: H.acts[cls], from, to, km: Math.round(km), pax,
-      score: record.touchdown.score, net: res.net, maint, damage: dmg.playerCost, flightResult,
+      score: record.touchdown.score, net: res.net, netSolo, netFull, crewCount, xpGain: xp,
+      maint, damage: dmg.playerCost, flightResult,
       instalments, cash: co.cash, debt: co.loans.reduce((s, l) => s + l.balance, 0),
       xp: state.pilot.xp, rank: state.pilot.rank, realMin: realMinutes(km)
     });
@@ -367,6 +379,21 @@ export function formatReport(r) {
       break;
     }
   }
+  p('');
+
+  p('Corba objectiu (net mitja per vol del mateix vol sol i amb tripulacio completa; objectiu de DESIGN.md)');
+  p('  tipus     vols        sol   objectiu    desv.       complet   objectiu    desv.');
+  for (const t of H.ladder) {
+    const rows = r.log.filter(e => e.typeId === t);
+    if (!rows.length) continue;
+    const avg = k => rows.reduce((s, e) => s + e[k], 0) / rows.length;
+    const [ts, tf] = H.targets[t];
+    const dev = (v, tgt) => ((v / tgt - 1) * 100).toFixed(0).padStart(5) + ' %';
+    p('  ' + t.padEnd(8) + pad(rows.length, 5) + pad(fmt(avg('netSolo')), 11) + pad(fmt(ts), 11) + '  ' + dev(avg('netSolo'), ts) +
+      pad(fmt(avg('netFull')), 14) + pad(fmt(tf), 11) + '  ' + dev(avg('netFull'), tf));
+  }
+  const xpAvg = r.log.reduce((s, e) => s + e.xpGain, 0) / r.log.length;
+  p('  XP mitjana per vol: ' + xpAvg.toFixed(1));
   p('');
 
   p('Rangs');

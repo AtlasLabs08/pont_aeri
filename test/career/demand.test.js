@@ -29,22 +29,22 @@ describe('routeKey', () => {
 
 describe('routeModel', () => {
   test('ruta inventada: 1500 km entre dos major', () => {
-    // pRef = 90 + 0.6 * 1500 = 990
+    // pRef = 260 + 0.09 * 1500 = 395
     // dBase = 260 * sqrt(0.7 * 0.7) * (1 + 1500 / 3000) = 260 * 0.7 * 1.5 = 273
     const m = routeModel({ distanceKm: 1500, sizeA: 'major', sizeB: 'major' });
-    near(m.pRef, 990); near(m.dBase, 273); assert.equal(m.kind, 'leisure');
+    near(m.pRef, 395); near(m.dBase, 273); assert.equal(m.kind, 'leisure');
   });
 
   test('ruta inventada: 600 km entre hub i small', () => {
-    // pRef = 90 + 0.6 * 600 = 450
+    // pRef = 260 + 0.09 * 600 = 314
     // dBase = 260 * sqrt(1 * 0.15) * 1.2 = 260 * 0.3872983 * 1.2 = 120.8371
     const m = routeModel({ distanceKm: 600, sizeA: 'hub', sizeB: 'small' });
-    near(m.pRef, 450); near(m.dBase, 120.8371, 1e-4);
+    near(m.pRef, 314); near(m.dBase, 120.8371, 1e-4);
   });
 
   test('una excepcio que nomes porta kind substitueix nomes kind', () => {
     const m = routeModel({ distanceKm: 1500, sizeA: 'major', sizeB: 'major', exception: { kind: 'business' } });
-    near(m.pRef, 990); near(m.dBase, 273); assert.equal(m.kind, 'business');
+    near(m.pRef, 395); near(m.dBase, 273); assert.equal(m.kind, 'business');
   });
 
   test('una excepcio que porta pRef substitueix nomes pRef', () => {
@@ -56,8 +56,8 @@ describe('routeModel', () => {
     // LEMD encara no es a world/: routeFor no la pot fer, es prova amb routeModel
     const m = routeModel({ distanceKm: 483, sizeA: 'hub', sizeB: 'hub', exception: BALANCE.routeExceptions['LEBL-LEMD'] });
     assert.equal(m.kind, 'business');
-    // pRef = 90 + 0.6 * 483 = 379.8; dBase = 260 * 1 * (1 + 483 / 3000) = 301.86
-    near(m.pRef, 379.8); near(m.dBase, 301.86);
+    // pRef = 260 + 0.09 * 483 = 303.47; dBase = 260 * 1 * (1 + 483 / 3000) = 301.86
+    near(m.pRef, 303.47); near(m.dBase, 301.86);
   });
 
   test('mida desconeguda: error clar', () => {
@@ -68,10 +68,10 @@ describe('routeModel', () => {
 describe('routeFor', () => {
   test('LEBL-LEPA: hub i major, ~202 km, leisure', () => {
     // distancia 201.966 km (test/geo.test.js)
-    // pRef = 90 + 0.6 * 201.966 = 211.18
+    // pRef = 260 + 0.09 * 201.966 = 278.18
     // dBase = 260 * sqrt(1 * 0.7) * (1 + 201.966 / 3000) = 260 * 0.83666 * 1.067322 = 232.18
     const m = routeFor('LEBL', 'LEPA');
-    near(m.pRef, 211.18, 1e-2); near(m.dBase, 232.18, 1e-2); assert.equal(m.kind, 'leisure');
+    near(m.pRef, 278.18, 1e-2); near(m.dBase, 232.18, 1e-2); assert.equal(m.kind, 'leisure');
   });
 
   test('es simetrica', () => {
