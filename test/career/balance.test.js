@@ -158,3 +158,26 @@ describe('BALANCE: coherencia de progressio (B4)', () => {
     }
   });
 });
+
+describe('BALANCE: preus d ocasio i financament (B5)', () => {
+  test('usedPrice: un preu enter positiu per a cada fleetType, i cap mes', () => {
+    assert.deepEqual(Object.keys(BALANCE.usedPrice).sort(), Object.keys(BALANCE.fleetTypes).sort());
+    for (const [id, p] of Object.entries(BALANCE.usedPrice)) {
+      assert.ok(Number.isInteger(p) && p > 0, 'usedPrice.' + id);
+    }
+  });
+
+  test('usedPrice: no baixa en pujar de classe', () => {
+    const order = ['commuter', 'turboprop', 'narrowbody', 'widebody'];
+    const byCls = cls => Object.entries(BALANCE.fleetTypes)
+      .filter(([, ft]) => ft.cls === cls).map(([id]) => BALANCE.usedPrice[id]);
+    pairs(order, (lo, hi) => assert.ok(Math.min(...byCls(hi)) >= Math.max(...byCls(lo)), lo + ' -> ' + hi));
+  });
+
+  test('financing: entrada entre 0 i 1, interes >= 0 i termini enter >= 1', () => {
+    const f = BALANCE.financing;
+    assert.ok(f.downPct > 0 && f.downPct < 1);
+    assert.ok(f.ratePerFlight >= 0);
+    assert.ok(Number.isInteger(f.termFlights) && f.termFlights >= 1);
+  });
+});

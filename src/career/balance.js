@@ -47,6 +47,14 @@ export const BALANCE = deepFreeze({
     nbStretch: { cls: 'narrowbody', seats: 220, rating: 'narrowbody' },
     wbEr:      { cls: 'widebody',   seats: 290, rating: 'widebody'   }
   },
+  // B5: preu d ocasio de referencia per tipus, en euros (proposta d en Marc)
+  usedPrice: {
+    commuter: 350000, tpShort: 1100000, tp: 1800000, rj: 4500000, nbShort: 6500000,
+    nb: 8000000, nbStretch: 10000000, wb: 22000000, wbEr: 25000000, jumbo: 30000000
+  },
+  // B5: compra a terminis. Entrada downPct del preu; la resta en quotes per vol,
+  // mai pel pas del temps (DESIGN.md, "Escala economica")
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 60 },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
