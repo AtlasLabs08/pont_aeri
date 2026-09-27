@@ -21,14 +21,15 @@
  *                     * (1 + airportDifficulty[destination], 0 si no hi es)).
  *     Si landingXp <= 0 es retorna igual: els multiplicadors nomes pugen
  *     l XP positiva (docs/DECISIONS.md, 26/09/2026).
- *     Llanca un Error si landingXp no es un enter.
+ *     Llanca un Error si landingXp no es un enter o si turbulence o
+ *     hardWeather no son booleans.
  *   applyXp(pilot, delta) -> { pilot, rankBefore, rankAfter, change }
  *     xp nova = max(0, pilot.xp + delta); rank = rankForXp(xp nova): la
  *     baixada es proporcional, el rang surt sempre de l XP.
  *     rankBefore = pilot.rank; change = 'up' | 'down' | null.
  *     La perdua per accident es delta = -assessDamage(...).xpLoss, igual als
- *     dos modes. Llanca un Error si delta no es un enter o si pilot.rank no
- *     es a BALANCE.ranks.
+ *     dos modes. Llanca un Error si delta no es un enter, si pilot.xp no es
+ *     un numero finit >= 0 o si pilot.rank no es a BALANCE.ranks.
  *   canFlyType(pilot, typeId) -> true si pilot.ratings inclou
  *     BALANCE.fleetTypes[typeId].rating. Llanca un Error si el tipus no hi es.
  *   purchaseRating(pilot, cash, key), purchaseEndorsement(pilot, cash, key)
@@ -88,6 +89,8 @@ export function dispatchLimits(rankKey) {
 /** XP d un vol a partir de la del tram d aterratge. Vegeu la capcalera. */
 export function flightXp({ landingXp, turbulence, hardWeather, destination }) {
   if (!Number.isInteger(landingXp)) throw new Error('flightXp: landingXp ha de ser un enter');
+  if (typeof turbulence !== 'boolean') throw new Error('flightXp: turbulence ha de ser un boolea');
+  if (typeof hardWeather !== 'boolean') throw new Error('flightXp: hardWeather ha de ser un boolea');
   if (landingXp <= 0) return landingXp;
   const m = BALANCE.xpMultipliers;
   return Math.round(landingXp
@@ -99,6 +102,9 @@ export function flightXp({ landingXp, turbulence, hardWeather, destination }) {
 /** Suma delta a l XP del pilot i en recalcula el rang. Vegeu la capcalera. */
 export function applyXp(pilot, delta) {
   if (!Number.isInteger(delta)) throw new Error('applyXp: delta ha de ser un enter');
+  if (!Number.isFinite(pilot.xp) || pilot.xp < 0) {
+    throw new Error('applyXp: pilot.xp ha de ser un numero finit no negatiu');
+  }
   const before = rankIndex(pilot.rank, 'applyXp');
   const xp = Math.max(0, pilot.xp + delta);
   const after = rankIndexForXp(xp, 'applyXp');
