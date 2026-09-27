@@ -6,8 +6,11 @@
  *
  * Correr:  npm run balance            (llavor i vols per defecte)
  *          node tools/balance.mjs [llavor] [vols]
+ *          npm run balance -- --seeds N  (mediana i percentil 90 de les
+ *                                         metriques sobre N llavors seguides,
+ *                                         a partir de la llavor)
  *
- * EXPORTA: runBalance formatReport HARNESS
+ * EXPORTA: runBalance metrics runSeeds formatReport formatSeeds HARNESS
  *
  * Tot l atzar surt de draw(state): la mateixa llavor dona sempre el mateix
  * resultat. Cap Math.random().
@@ -357,7 +360,86 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
     }
   }
 
-  return { seed, flights, log, purchases, crews, ranks, checks, affordableAt, valid: validate(state), state };
+  const r = { seed, flights, log, purchases, crews, ranks, checks, affordableAt, valid: validate(state), state };
+  r.metrics = metrics(r);
+  return r;
+}
+
+/** Actes que es poden tancar: tots menys l ultim, que queda obert. */
+const CLOSABLE_ACTS = [...new Set(Object.values(H.acts))].slice(0, -1);
+
+/**
+ * Metriques de la seccio 10 d una partida:
+ *   firstCrew    vol de la primera tripulacio contractada, o null
+ *   jumps        vols de cada salt de classe fet (sense els que falten)
+ *   negativePct  % de vols en negatiu (resultat - manteniment - danys, sense quotes)
+ *   actHours     { acte: hores de joc } dels actes tancats
+ */
+export function metrics(r) {
+  const jumps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
+  const neg = r.log.filter(e => e.flightResult < 0).length;
+  const present = [...new Set(r.log.map(e => e.act))];
+  const actHours = {};
+  for (const act of present.slice(0, -1)) {
+    actHours[act] = r.log.filter(e => e.act === act).reduce((s, e) => s + e.realMin, 0) / MINUTES_PER_HOUR;
+  }
+  return {
+    firstCrew: r.crews.length ? r.crews[0].flight : null,
+    jumps, negativePct: 100 * neg / r.log.length, actHours
+  };
+}
+
+/** Mediana (mitjana dels dos centrals si n es parell). Infinity compta com a valor. */
+function median(xs) {
+  const a = [...xs].sort((x, y) => x - y), m = a.length >> 1;
+  return a.length % 2 ? a[m] : a[m - 1] === a[m] ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/** Percentil p (0..100) pel rang mes proper: el valor de la posicio ceil(p/100 * n). */
+function percentile(xs, p) {
+  const a = [...xs].sort((x, y) => x - y);
+  return a[Math.max(0, Math.ceil(p / 100 * a.length) - 1)];
+}
+
+/**
+ * Corre la partida amb `seeds` llavors seguides (seed, seed + 1, ...) i
+ * torna, per a cada metrica, els valors, la mediana i el percentil 90. Un
+ * salt o un acte que no arriba, o una tripulacio que no es contracta, compta
+ * com a Infinity (pitjor que qualsevol valor) i es compta a `missing`.
+ * @param {{seed?:number, seeds?:number, flights?:number}} opts
+ */
+export function runSeeds({ seed = H.seed, seeds = 50, flights = H.flights } = {}) {
+  const runs = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights }).metrics);
+  const rows = [];
+  const add = (key, label, values) => rows.push({
+    key, label, values, median: median(values), p90: percentile(values, 90),
+    missing: values.filter(v => v === Infinity).length
+  });
+  add('firstCrew', 'primera tripulacio (vol)', runs.map(m => m.firstCrew ?? Infinity));
+  for (let i = 0; i + 1 < H.ladder.length; i++) {
+    add('jump' + (i + 1), 'salt ' + (i + 1) + ' ' + H.ladder[i] + ' -> ' + H.ladder[i + 1] + ' (vols)',
+      runs.map(m => m.jumps[i] ?? Infinity));
+  }
+  add('negativePct', 'vols en negatiu (%)', runs.map(m => m.negativePct));
+  for (const act of CLOSABLE_ACTS) {
+    add('act' + act, 'acte ' + act + ' (h de joc)', runs.map(m => m.actHours[act] ?? Infinity));
+  }
+  return { seed, seeds, flights, rows };
+}
+
+/** Text de l informe de runSeeds. */
+export function formatSeeds(s) {
+  const out = [];
+  const p = x => out.push(x);
+  const num = v => v === Infinity ? 'no arriba' : Number.isInteger(v) ? String(v) : v.toFixed(1);
+  p('Harness economic de Pont Aeri — ' + s.seeds + ' llavors (' + s.seed + ' a ' + (s.seed + s.seeds - 1) + '), ' +
+    s.flights + ' vols, K = ' + BALANCE.K + ', termini ' + BALANCE.financing.termFlights + ' vols');
+  p('');
+  p('  metrica                           mediana        p90   no arriba');
+  for (const r of s.rows) {
+    p('  ' + r.label.padEnd(32) + num(r.median).padStart(9) + num(r.p90).padStart(11) + String(r.missing).padStart(12));
+  }
+  return out.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -486,8 +568,29 @@ export function formatReport(r) {
   return out.join('\n');
 }
 
+/** Arguments de la linia d ordres: [llavor] [vols] i --seeds N. Amb
+ * npm run balance --seeds N (sense --), npm es queda el --seeds
+ * (npm_config_seeds = 'true') i passa nomes la N: es el primer posicional. */
+function parseArgs(argv, env) {
+  const pos = [];
+  let seeds = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--seeds') seeds = Number(argv[++i]);
+    else if (argv[i].startsWith('--seeds=')) seeds = Number(argv[i].slice('--seeds='.length));
+    else pos.push(argv[i]);
+  }
+  if (seeds === null && env.npm_config_seeds !== undefined) {
+    seeds = Number(env.npm_config_seeds === 'true' ? pos.shift() : env.npm_config_seeds);
+  }
+  if (seeds !== null && !(Number.isInteger(seeds) && seeds >= 1)) throw new Error('--seeds ha de ser un enter >= 1');
+  return {
+    seed: pos[0] !== undefined ? Number(pos[0]) : H.seed,
+    flights: pos[1] !== undefined ? Number(pos[1]) : H.flights,
+    seeds
+  };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const seed = process.argv[2] !== undefined ? Number(process.argv[2]) : H.seed;
-  const flights = process.argv[3] !== undefined ? Number(process.argv[3]) : H.flights;
-  console.log(formatReport(runBalance({ seed, flights })));
+  const { seed, flights, seeds } = parseArgs(process.argv.slice(2), process.env);
+  console.log(seeds === null ? formatReport(runBalance({ seed, flights })) : formatSeeds(runSeeds({ seed, seeds, flights })));
 }

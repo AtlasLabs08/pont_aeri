@@ -7,7 +7,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runBalance, formatReport } from '../tools/balance.mjs';
+import { runBalance, formatReport, HARNESS } from '../tools/balance.mjs';
 
 describe('harness economic', () => {
   test('la mateixa llavor dona exactament el mateix resultat dues vegades', () => {
@@ -23,5 +23,16 @@ describe('harness economic', () => {
     const a = runBalance({ seed: 12345, flights: 20 });
     const b = runBalance({ seed: 54321, flights: 20 });
     assert.notDeepEqual(a.log, b.log);
+  });
+
+  test('la llavor per defecte torna metriques finites i valid definit', () => {
+    const r = runBalance();
+    assert.equal(r.seed, HARNESS.seed);
+    assert.equal(r.log.length, HARNESS.flights);
+    assert.ok(r.valid && typeof r.valid.ok === 'boolean', 'valid definit');
+    const m = r.metrics;
+    const values = [m.firstCrew, ...m.jumps, m.negativePct, ...Object.values(m.actHours)];
+    assert.ok(m.jumps.length > 0 && Object.keys(m.actHours).length > 0);
+    for (const v of values) assert.ok(Number.isFinite(v), String(v));
   });
 });
