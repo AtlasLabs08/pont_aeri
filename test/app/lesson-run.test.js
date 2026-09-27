@@ -174,6 +174,20 @@ describe('llico maneuvers: D5', () => {
     assert.equal(facts.altDeviationMaxFt, 0);
     assert.equal(facts.headingChangeDeg, 0);
   });
+
+  test("comenca a l'altitud de 'airborne' i la mante amb viratges: aprova", () => {
+    const aglFt = LESSONS.find(l => l.id === 'maneuvers').spawn.aglFt;
+    const run = new LessonRun('maneuvers');
+    run.sample(snap({ altFt: aglFt, hdgDeg: 0 }));
+    run.sample(snap({ altFt: aglFt, hdgDeg: 90 }));
+    run.sample(snap({ altFt: aglFt, hdgDeg: 180 }));
+    fly(run, 117, { altFt: aglFt, hdgDeg: 180 });
+    assert.equal(run.readyToEnd(), true);
+    const facts = run.finish(record());
+    assert.equal(facts.altDeviationMaxFt, 0);
+    assert.equal(facts.headingChangeDeg, 180);
+    assert.equal(passed('maneuvers', facts), true);
+  });
 });
 
 describe('llico circuit: D6, cada condicio per separat', () => {
@@ -204,6 +218,20 @@ describe('llico circuit: D6, cada condicio per separat', () => {
       assert.equal(run.readyToEnd(), false);
     });
   }
+
+  test("a la posicio de 'downwind', sense volar el circuit, no aprova", () => {
+    const S = LESSONS.find(l => l.id === 'circuit').spawn;
+    const downwind = snap({
+      aglFt: S.aglFt, distThrNm: 0.2, rwyHdgDeg: 250, hdgDeg: 70, gearDown: false,
+      flapsLanding: false, vrefKt: 120, iasKt: 130, vsFpm: 0
+    });
+    const run = new LessonRun('circuit');
+    for (let i = 0; i < 200; i++) run.sample(downwind);
+    assert.equal(run.facts.stabilizedOnFinal, false);
+    assert.equal(run.readyToEnd(), false);
+    const facts = run.finish(record());
+    assert.equal(passed('circuit', facts), false);
+  });
 });
 
 describe('llico ils: ilsFlown amb world/ils.js', () => {

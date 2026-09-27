@@ -129,7 +129,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
    ============================================================================ */
 
 import {
-  AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FlightModel,
+  AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FT, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
   sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder
@@ -1993,11 +1993,19 @@ async function launchLesson(lessonId, unlockAll) {
   const lesson = LESSONS.find(l => l.id === lessonId);
   activeLessonId = lessonId; activeLesson = new LessonRun(lessonId);
   const start = lesson.id === 'exterior' || lesson.id === 'cockpit' || lesson.id === 'taxi' ? 'gate'
-    : lesson.id === 'takeoff' ? 'runway' : 'final';
+    : lesson.id === 'takeoff' ? 'runway'
+    : lesson.id === 'maneuvers' ? 'airborne'
+    : lesson.id === 'circuit' ? 'downwind'
+    : 'final';
+  // spawnAglFt/spawnOffsetNm/spawnFlaps: nomes els fan servir 'airborne' i 'downwind' (Game.spawn).
+  // Els valors venen de LESSONS[..].spawn a lessons.js, mai escrits aqui.
+  const spawnOpts = lesson.spawn
+    ? { spawnAglFt: lesson.spawn.aglFt, spawnOffsetNm: lesson.spawn.offshoreNm ?? lesson.spawn.lateralNm, spawnFlaps: lesson.spawn.flaps }
+    : {};
   Sound.unlock(); UI.showMenu(false); Game.state = 'loading'; UI.loading(0.5, 'Preparing the lesson');
   const flightDone = launchFlight({ aircraft: lesson.aircraftTypeId, airport: 'LEBL', runway: 0, start,
     hours: 11.5, windDir: 250, windKt: 0, turb: false, mode: 'free',
-    quality: Game.opts.quality, difficulty: 'normal', autoTrim: true });
+    quality: Game.opts.quality, difficulty: 'normal', autoTrim: true, ...spawnOpts });
   await Main.preloadTerrain();
   UI.loading(1); UI.el.report.hidden = true; UI.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
   flightDone.then(record => concludeLesson(record)).catch(err => { if (IS_DEV) console.error(err); activeLesson = null; activeLessonId = null; });
@@ -2047,10 +2055,33 @@ const Game = {
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; Input.pitch = Input.roll = Input.yaw = 0;
     const other = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.dest = O.mode === 'route' ? other : A;
-    if (O.start === 'final') {
-      const d = 10 * NM, thr = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d), alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic;
-      f.reset({}); const v = f.vspeeds(); const tr = trimAircraft(f, { cas: v.vapp * KT, alt, gamma: -3 * DEG, flaps: cfg.flapLDG, gearDown: true, hdg: en.hdg, n: thr[1], e: thr[0] });
-      ctl.flaps = cfg.flapLDG; ctl.trim = tr.trim; ctl.throttle = tr.throttle; ctl.gearDown = true; f.groundSpoilerArmed = true;
+    if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
+      // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
+      // en vol que 'final' (posicionar i trimar amb trimAircraft), amb una altra posicio, altitud,
+      // velocitat i configuracio. Els valors (ft, nm, flaps) venen d opts, que launchLesson() omple
+      // des de LESSONS[..].spawn a lessons.js: cap valor de llico escrit aqui.
+      f.reset({}); const v = f.vspeeds();
+      let pos, alt, hdg, cas, gamma, flaps, gearDown;
+      if (O.start === 'final') {
+        const d = 10 * NM; pos = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d);
+        alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic;
+        hdg = en.hdg; cas = v.vapp * KT; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+      } else if (O.start === 'airborne') {
+        // en vol, anivellat, uns spawnOffsetNm mar endins de l aeroport (mateix eix que 'final'),
+        // rumb de la pista, tren amunt, flaps segons opts.spawnFlaps. Sense velocitat de creuer
+        // explicita a aircraft-data.js: es pren el 75% de limits.vmo (vegeu la descripcio del PR).
+        const d = O.spawnOffsetNm * NM; pos = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d);
+        alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; hdg = en.hdg;
+        cas = 0.75 * cfg.limits.vmo * KT; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+      } else {
+        // al travers del llindar (downwind), rumb contrari al de la pista, separacio lateral
+        // spawnOffsetNm cap a l esquerra de la trajectoria (mateixa convencio de signe que ILS.geom)
+        const d = O.spawnOffsetNm * NM; pos = A.toWorld(en.thr[0] - en.dir[1] * d, en.thr[1] + en.dir[0] * d);
+        alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; hdg = wrap360(en.hdg + 180);
+        cas = v.vapp * KT; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+      }
+      const tr = trimAircraft(f, { cas, alt, gamma, flaps, gearDown, hdg, n: pos[1], e: pos[0] });
+      ctl.flaps = flaps; ctl.trim = tr.trim; ctl.throttle = tr.throttle; ctl.gearDown = gearDown; f.groundSpoilerArmed = O.start === 'final';
     } else {
       let p, hdg; f.reset({});
       if (O.start === 'gate') { const big = cfg.geom.b > 50, g = A.gates.find(q => (q.size === 'H') === big) || A.gates[0]; p = A.toWorld(g.a, g.c); hdg = wrap360(g.hdg); }
@@ -2586,7 +2617,7 @@ const Main = {
     Scenery.init(); prog(0.55, 'Painting runways and switching on the lights'); await tick();
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
-    setFlightLauncher(opts => { Object.assign(Game.opts, opts); Game.spawn(); });
+    setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); Object.assign(Game.opts, opts); Game.spawn(); });
     if (IS_DEV) DevSchoolPanel.init();
     Env.update(Game.opts.hours, 100, [0, 0, -1]);
     prog(0.7, 'Generating terrain'); await tick();
