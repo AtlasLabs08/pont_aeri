@@ -129,6 +129,8 @@ export const BALANCE = deepFreeze({
     longHaul:   { rank: 'atpl',       cost: 150000 }
   },
 
+  // B5: cost unic de contractar una tripulacio, per classe (el sou ja es als costos del tram)
+  crewHireCost: { commuter: 42000, turboprop: 60000, narrowbody: 180000, widebody: 200000 },
   rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
 
   demand: { elasticity: { leisure: 1.6, business: 1.1 },

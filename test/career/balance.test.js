@@ -181,3 +181,12 @@ describe('BALANCE: preus d ocasio i financament (B5)', () => {
     assert.ok(Number.isInteger(f.termFlights) && f.termFlights >= 1);
   });
 });
+
+describe('BALANCE: contractacio de tripulacio (B5)', () => {
+  test('crewHireCost: un enter positiu per a cada classe de rotation.cap, i cap mes', () => {
+    assert.deepEqual(Object.keys(BALANCE.crewHireCost).sort(), Object.keys(BALANCE.rotation.cap).sort());
+    for (const [cls, c] of Object.entries(BALANCE.crewHireCost)) {
+      assert.ok(Number.isInteger(c) && c > 0, 'crewHireCost.' + cls);
+    }
+  });
+});

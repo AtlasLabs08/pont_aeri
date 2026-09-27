@@ -12,3 +12,4 @@ export * from './damage.js';
 export * from './progression.js';
 export * from './finance.js';
 export * from './rng.js';
+export * from './crew.js';

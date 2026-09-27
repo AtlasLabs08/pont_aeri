@@ -23,7 +23,7 @@ import {
   BALANCE, createCareer, draw, routeFor, routeModel, routeKey, demandPax,
   computeFlightResult, applyFlightWear, checksDue, performCheck, failureChance, assessDamage,
   rankForXp, flightXp, applyXp, purchaseRating, financeAircraft, makeLoan, payInstalment,
-  validate
+  maxCrew, hireCrew, validate
 } from '../src/career/index.js';
 import { distanceKm } from '../src/world/index.js';
 
@@ -78,6 +78,10 @@ export const HARNESS = Object.freeze({
   pHardWeather: 1 / 15,      // un de cada quinze amb condicions dures
   weatherSeverityMax: 0.6,   // severitat per a demandPax quan hi ha meteo dura
   pTailStrike: 0.004,
+
+  // Reserva que el jugador guarda en contractar tripulacio: el cash que li
+  // queda despres de pagar-la ha de valer almenys crewReserve contractacions
+  crewReserve: 1.2,
 
   // Contacte a partir de la nota: fpm = fpmAt0 - fpmPerPoint * nota + soroll
   touchdown: { fpmAt0: 900, fpmPerPoint: 8.5, fpmSd: 40, fpmMin: 40, gPerFpm: 1 / 650, gSd: 0.05 },
@@ -206,11 +210,6 @@ function graduate(state) {
     BALANCE.startingLoan.ratePerFlight, BALANCE.financing.termFlights) }];
 }
 
-/** Maxim de tripulacions que encara pugen el factor de rotacio d aquesta classe. */
-function maxCrew(cls) {
-  return Math.ceil((BALANCE.rotation.cap[cls] - 1) / BALANCE.rotation.perCrew);
-}
-
 /**
  * Simula la partida. Retorna les dades en brut; formatReport les imprimeix.
  * @param {{seed?:number, flights?:number}} opts
@@ -220,7 +219,7 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
   graduate(state);
   const co = state.company;
 
-  const log = [], purchases = [], ranks = [{ key: state.pilot.rank, flight: 0 }], checks = [];
+  const log = [], purchases = [], crews = [], ranks = [{ key: state.pilot.rank, flight: 0 }], checks = [];
   const affordableAt = {};   // primer vol en que hi havia diners per al seguent salt
   let rung = 0, legIndex = 0, crewCount = 0, loanSeq = 1;
 
@@ -260,10 +259,6 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
     const airframe = state.fleet[state.fleet.length - 1];
     const typeId = airframe.typeId;
     const cls = BALANCE.fleetTypes[typeId].cls;
-
-    // Tripulacio: BALANCE no te cap preu de contractacio; el sou ja es dins
-    // de K * r * (ingressos - costos). Es contracta fins al sostre de la classe.
-    crewCount = Math.max(crewCount, maxCrew(cls));
 
     // Tram seguent de la rotacio del tipus
     const cycle = H.routes[typeId];
@@ -328,11 +323,21 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
       xp: state.pilot.xp, rank: state.pilot.rank, realMin: realMinutes(km)
     });
 
-    // Compres obvies
+    // Compres obvies: primer la classe seguent; si no, una tripulacio mes,
+    // si en pagar-la queda la reserva
     if (rung + 1 < H.ladder.length && tryBuy(rung + 1, f)) rung++;
+    else {
+      const reserve = H.crewReserve * BALANCE.crewHireCost[cls];
+      const h = hireCrew({ cls, crewCount, cash: co.cash - reserve });
+      if (h.ok) {
+        co.cash -= h.cost;
+        crewCount = h.crewCount;
+        crews.push({ flight: f, typeId, crewCount, cost: h.cost });
+      }
+    }
   }
 
-  return { seed, flights, log, purchases, ranks, checks, affordableAt, valid: validate(state), state };
+  return { seed, flights, log, purchases, crews, ranks, checks, affordableAt, valid: validate(state), state };
 }
 
 // ---------------------------------------------------------------------------
@@ -378,6 +383,13 @@ export function formatReport(r) {
       p('  no comprat: ' + t + (aff !== undefined ? ' (diners des del vol ' + aff + ', sense el rang)' : ''));
       break;
     }
+  }
+  p('');
+
+  p('Tripulacions contractades');
+  for (const t of H.ladder) {
+    const c = r.crews.filter(x => x.typeId === t);
+    if (c.length) p('  ' + t.padEnd(8) + ' ' + c.map(x => 'vol ' + x.flight + ' (' + fmt(x.cost) + ')').join(', '));
   }
   p('');
 
