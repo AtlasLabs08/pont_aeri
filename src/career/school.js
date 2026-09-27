@@ -30,7 +30,8 @@
  *   recordLessonAttempt(school, lessonId, facts)
  *     -> { school, passed, mercy, attempt, results }
  *     school = { lessonsPassed, attempts, graduated } (el subobjecte de
- *     CareerState). attempt = attempts[lessonId] + 1 (o 1), i es desa sempre
+ *     CareerState). Llanca un Error amb l id si isLessonAvailable es fals
+ *     (una llico aprovada es pot repetir). attempt = attempts[lessonId] + 1 (o 1), i es desa sempre
  *     al school nou. Llindar de nota: mercyScore si la llico te mercy i
  *     attempt >= mercyAttempt; si no, passScore. mercy es true nomes si ha
  *     aprovat amb score < passScore. Si aprova, l id s afegeix a
@@ -108,6 +109,9 @@ export function isLessonAvailable(school, lessonId) {
 /** Desa un intent d una llico i en diu el resultat. Vegeu la capcalera. */
 export function recordLessonAttempt(school, lessonId, facts) {
   const lesson = LESSONS[lessonIndex(lessonId, 'recordLessonAttempt')];
+  if (!isLessonAvailable(school, lessonId)) {
+    throw new Error('recordLessonAttempt: llico no disponible: ' + lessonId);
+  }
   const s = BALANCE.school;
   const attempt = (Object.hasOwn(school.attempts, lessonId) ? school.attempts[lessonId] : 0) + 1;
   const threshold = lesson.mercy && attempt >= s.mercyAttempt ? s.mercyScore : s.passScore;

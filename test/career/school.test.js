@@ -24,8 +24,18 @@ const school = (over = {}) => ({ lessonsPassed: [], attempts: {}, graduated: fal
 /** Copia profunda per comprovar que la funcio no toca l entrada. */
 const clone = o => JSON.parse(JSON.stringify(o));
 
-/** Intent de la llico lessonId amb un school buit. */
-const attemptOf = (lessonId, facts) => recordLessonAttempt(school(), lessonId, facts);
+/** Ids de les llicons anteriors a lessonId ([] si no hi es). */
+const passedBefore = lessonId => {
+  const i = LESSONS.findIndex(l => l.id === lessonId);
+  return LESSONS.slice(0, Math.max(i, 0)).map(l => l.id);
+};
+
+/** Llicons anteriors a la 7, aprovades. */
+const before7 = passedBefore('landing');
+
+/** Primer intent de la llico lessonId, amb les anteriors aprovades. */
+const attemptOf = (lessonId, facts) =>
+  recordLessonAttempt(school({ lessonsPassed: passedBefore(lessonId) }), lessonId, facts);
 
 /** FlightRecord minim amb touchdown; over sobreescriu camps. */
 const record = (over = {}) => ({
@@ -68,11 +78,11 @@ describe('llico 7: gracia a partir del tercer intent', () => {
   test('45 al primer intent passa amb mercy false', () => {
     const r = attemptOf('landing', { landed: true, score: 45 });
     assert.deepEqual([r.passed, r.mercy, r.attempt], [true, false, 1]);
-    assert.deepEqual(r.school.lessonsPassed, ['landing']);
+    assert.deepEqual(r.school.lessonsPassed, [...before7, 'landing']);
   });
 
   test('44, 44, 30, 50: intents 1 a 4', () => {
-    let s = school();
+    let s = school({ lessonsPassed: before7 });
     const run = score => {
       const r = recordLessonAttempt(s, 'landing', { landed: true, crashed: false, score });
       s = r.school;
@@ -80,15 +90,15 @@ describe('llico 7: gracia a partir del tercer intent', () => {
     };
     assert.deepEqual(run(44), [false, false, 1]);           // llindar 45
     assert.deepEqual(run(44), [false, false, 2]);           // llindar 45
-    assert.deepEqual(s.lessonsPassed, []);
+    assert.deepEqual(s.lessonsPassed, before7);
     assert.deepEqual(run(30), [true, true, 3]);             // llindar 30, 30 < 45
     assert.deepEqual(run(50), [true, false, 4]);            // 50 >= 45
     assert.equal(s.attempts.landing, 4);
-    assert.deepEqual(s.lessonsPassed, ['landing']);         // sense duplicats
+    assert.deepEqual(s.lessonsPassed, [...before7, 'landing']);   // sense duplicats
   });
 
   test('30 al tercer passa amb mercy true; 29 al tercer falla', () => {
-    const s = school({ attempts: { landing: 2 } });
+    const s = school({ lessonsPassed: before7, attempts: { landing: 2 } });
     const ok = recordLessonAttempt(s, 'landing', { landed: true, score: 30 });
     assert.deepEqual([ok.passed, ok.mercy, ok.attempt], [true, true, 3]);
     assert.equal(ok.results.find(r => r.metric === 'score').target, 30);
@@ -97,13 +107,10 @@ describe('llico 7: gracia a partir del tercer intent', () => {
   });
 
   test('50 al quart passa amb mercy false', () => {
-    const r = recordLessonAttempt(school({ attempts: { landing: 3 } }), 'landing',
+    const r = recordLessonAttempt(school({ lessonsPassed: before7, attempts: { landing: 3 } }), 'landing',
       { landed: true, score: 50 });
     assert.deepEqual([r.passed, r.mercy, r.attempt], [true, false, 4]);
   });
-
-  // Les llicons anteriors a la 7, aprovades
-  const before7 = LESSONS.slice(0, LESSONS.findIndex(l => l.id === 'landing')).map(l => l.id);
 
   test('al quart intent el llindar continua a 30: 30 passa amb mercy, 29 falla', () => {
     const s = school({ lessonsPassed: before7, attempts: { landing: 3 } });
@@ -137,7 +144,7 @@ describe('llico 7: gracia a partir del tercer intent', () => {
   });
 
   test('una llico sense mercy no baixa el llindar al tercer intent', () => {
-    const s = school({ attempts: { maneuvers: 5 } });
+    const s = school({ lessonsPassed: passedBefore('maneuvers'), attempts: { maneuvers: 5 } });
     assert.equal(recordLessonAttempt(s, 'maneuvers', { altDeviationMaxFt: 201 }).passed, false);
   });
 });
@@ -191,6 +198,27 @@ describe('recordLessonAttempt', () => {
 
   test('llico desconeguda llanca amb l id', () => {
     assert.throws(() => attemptOf('aerobatics', {}), /aerobatics/);
+  });
+
+  test('la 8 sense la 7 aprovada llanca amb l id', () => {
+    const s = school({ lessonsPassed: LESSONS.map(l => l.id).filter(id => id !== 'landing') });
+    const before = clone(s);
+    assert.throws(() => recordLessonAttempt(s, 'ils', { landed: true, onRunway: true }), /ils/);
+    assert.deepEqual(s, before);
+    assert.throws(() => recordLessonAttempt(school(), 'cockpit', { controlsIdentified: 6 }), /cockpit/);
+  });
+
+  test('la 1 sempre funciona', () => {
+    assert.equal(recordLessonAttempt(school(), 'exterior', { viewsVisited: 4 }).passed, true);
+    const s = school({ lessonsPassed: ['landing'], attempts: { exterior: 3 } });
+    assert.equal(recordLessonAttempt(s, 'exterior', { viewsVisited: 4 }).attempt, 4);
+  });
+
+  test('la 7 aprovada es pot repetir', () => {
+    const s = school({ lessonsPassed: [...before7, 'landing'], attempts: { landing: 1 } });
+    const r = recordLessonAttempt(s, 'landing', { crashed: false, landed: true, score: 60 });
+    assert.deepEqual([r.passed, r.attempt], [true, 2]);
+    assert.deepEqual(r.school.lessonsPassed, [...before7, 'landing']);
   });
 });
 
