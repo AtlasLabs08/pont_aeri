@@ -103,8 +103,8 @@ export const HARNESS = Object.freeze({
 
 const H = HARNESS;
 
-/** Criteris de la seccio 10 d ENGINEERING.md. */
-const CRITERIA = { jumpMin: 25, jumpMax: 35, negativeMax: 0.12, actHoursMax: 12 };
+/** Criteris de la seccio 10 d ENGINEERING.md, amb el canvi del B5 (docs/DECISIONS.md). */
+const CRITERIA = { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, negativeMax: 0.12, actHoursMax: 16 };
 
 // ---------------------------------------------------------------------------
 // Atzar
@@ -205,9 +205,8 @@ function graduate(state) {
   state.school.graduated = true;
   state.company.cash = BALANCE.startingCash;
   state.company.bases = [H.base];
-  // El credit inicial torna amb el mateix termini que el financament d avions
   state.company.loans = [{ id: 'L0', ...makeLoan(BALANCE.startingLoan.principal,
-    BALANCE.startingLoan.ratePerFlight, BALANCE.financing.termFlights) }];
+    BALANCE.startingLoan.ratePerFlight, BALANCE.startingLoan.termFlights) }];
 }
 
 /**
@@ -445,13 +444,15 @@ export function formatReport(r) {
   // Criteris de la seccio 10
   const gaps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
   const allJumps = r.purchases.length === H.ladder.length;
-  const jumpsOk = allJumps && gaps.every(g => g >= CRITERIA.jumpMin && g <= CRITERIA.jumpMax);
+  const jumpsOk = allJumps && gaps.every((g, i) =>
+    g >= CRITERIA.jumpMin && g <= (i === 0 ? CRITERIA.firstJumpMax : CRITERIA.jumpMax));
   const negOk = neg / r.log.length < CRITERIA.negativeMax;
   const closed = acts.slice(0, -1);
   const actsOk = closed.every(a => actHours[a] <= CRITERIA.actHoursMax);
   const yes = ok => ok ? 'compleix' : 'NO compleix';
   p('Criteris (seccio 10)');
-  p('  salts de classe entre ' + CRITERIA.jumpMin + ' i ' + CRITERIA.jumpMax + ' vols: ' + (gaps.join(', ') || '-') +
+  p('  salts de classe entre ' + CRITERIA.jumpMin + ' i ' + CRITERIA.jumpMax + ' vols (el primer fins a ' +
+    CRITERIA.firstJumpMax + '): ' + (gaps.join(', ') || '-') +
     (allJumps ? '' : ' (falten ' + (H.ladder.length - r.purchases.length) + ' salts)') + ' -> ' + yes(jumpsOk));
   p('  vols en negatiu < ' + 100 * CRITERIA.negativeMax + ' %: ' + (100 * neg / r.log.length).toFixed(1) + ' % -> ' + yes(negOk));
   p('  actes tancats de ' + CRITERIA.actHoursMax + ' h o menys: ' +

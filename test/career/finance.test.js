@@ -1,7 +1,8 @@
 /* Proves de career/finance.js (tasca B5): entrada, quota per vol i
  * amortitzacio dels prestecs. Els valors esperats son literals calculats a
  * ma a partir de BALANCE.financing (downPct 0,30, ratePerFlight 0,004,
- * termFlights 60), amb el calcul al comentari.
+ * termFlights 260), amb el calcul al comentari. Les proves d amortitzacio
+ * fan servir un termini explicit de 60 vols.
  *
  * Correr:  npm test
  */
@@ -42,7 +43,7 @@ describe('downPayment', () => {
 describe('makeLoan', () => {
   test('quota constant: 5.600.000 a 60 vols al 0,4 % -> 105.167', () => {
     // 5.600.000 * 0,004 / (1 - 1,004^-60) = 105.166,55 -> 105.167
-    assert.deepEqual(makeLoan(5600000), {
+    assert.deepEqual(makeLoan(5600000, 0.004, 60), {
       principal: 5600000, balance: 5600000, ratePerFlight: 0.004, termFlights: 60,
       instalment: 105167, flightsPaid: 0
     });
@@ -73,14 +74,16 @@ describe('financeAircraft', () => {
     const { downPayment: down, loan } = financeAircraft(8000000);
     assert.equal(down, 2400000);
     assert.equal(loan.principal, 5600000);
-    assert.equal(loan.instalment, 105167);
+    // termini de BALANCE.financing: 5.600.000 * 0,004 / (1 - 1,004^-260) = 34.685,05 -> 34.685
+    assert.equal(loan.termFlights, 260);
+    assert.equal(loan.instalment, 34685);
   });
 });
 
 describe('payInstalment', () => {
   test('primera quota: interes 22.400 i el balanc baixa 82.767', () => {
     // interes = 5.600.000 * 0,004 = 22.400; balanc = 5.600.000 + 22.400 - 105.167
-    const loan = makeLoan(5600000);
+    const loan = makeLoan(5600000, 0.004, 60);
     const r = payInstalment(loan);
     assert.equal(r.interest, 22400);
     assert.equal(r.paid, 105167);
@@ -90,7 +93,7 @@ describe('payInstalment', () => {
   });
 
   test('es torna exactament en termFlights vols, sense resta', () => {
-    const { loan, flights, total } = payOff(makeLoan(5600000));
+    const { loan, flights, total } = payOff(makeLoan(5600000, 0.004, 60));
     assert.equal(flights, 60);
     assert.equal(loan.balance, 0);
     // 60 quotes de ~105.167: el total es principal + interessos, en euros enters

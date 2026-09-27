@@ -27,7 +27,7 @@ export const BALANCE = deepFreeze({
   K: 2.6,                                   // factor global: l unica palanca de ritme
 
   startingCash: 400000,
-  startingLoan: { principal: 250000, ratePerFlight: 0.004 },
+  startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 260 },   // termini = financing
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
@@ -54,7 +54,7 @@ export const BALANCE = deepFreeze({
   },
   // B5: compra a terminis. Entrada downPct del preu; la resta en quotes per vol,
   // mai pel pas del temps (DESIGN.md, "Escala economica")
-  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 60 },
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 260 },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min

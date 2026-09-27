@@ -174,6 +174,11 @@ describe('BALANCE: preus d ocasio i financament (B5)', () => {
     pairs(order, (lo, hi) => assert.ok(Math.min(...byCls(hi)) >= Math.max(...byCls(lo)), lo + ' -> ' + hi));
   });
 
+  test('el credit inicial te el mateix interes i termini que el financament', () => {
+    assert.equal(BALANCE.startingLoan.ratePerFlight, BALANCE.financing.ratePerFlight);
+    assert.equal(BALANCE.startingLoan.termFlights, BALANCE.financing.termFlights);
+  });
+
   test('financing: entrada entre 0 i 1, interes >= 0 i termini enter >= 1', () => {
     const f = BALANCE.financing;
     assert.ok(f.downPct > 0 && f.downPct < 1);
