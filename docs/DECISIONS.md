@@ -144,3 +144,17 @@ Decisio d'en Marc: nomes es toquen rangs, crash.xpLoss, K, el termini dels prest
 - Rangs: private 600, commercial 1.100, atpl 1.500, captain 1.950, instructor 2.550 (uns 60 vols despres de la mediana del jumbo, al vol 176).
 - crash.xpLoss: [30, 200], uns 3 i uns 20 vols mitjans d'XP (9,9 XP per vol).
 Resultat sobre les llavors 20260927 a 20260976 (mediana / p90): primera tripulacio 9 / 12; salts 47 / 55, 42 / 52, 42 / 50 i 42 / 56 vols (el jumbo no arriba dins dels 200 vols en 4 de les 50); vols en negatiu 4,5 / 6,5 %; actes 10,9 / 12,8, 10,6 / 13,2 i 12,5 / 14,9 h. Corba objectiu (sol / complet): commuter -8 / -8 %, turbohelix +18 / +15 %, M-200 +11 / +12 %, L-900 -3 / -4 %, T-4 +8 / +13 %. El p90 del salt al jumbo es el mes ajustat: el llindar de captain el mou molt (1.925 dona 41 / 56 amb una mediana a 1 vol del minim; 1.975 dona 42 / 69).
+
+## 2026-09-27 - C1: lessons.js, excepcio a la regla 4
+src/career/lessons.js es un fitxer de dades amb els llindars de pilotatge de les llicons i dels check-rides: ft, vistes, comandaments, notes i nusos del setup (3.000 ft, 200 ft, 4 vistes, 6 comandaments, notes de 70 i 80, 12 kt de vent creuat). Es una excepcio a la regla 4 de la seccio 0 d'ENGINEERING.md: els valors economics i passScore, mercyScore i mercyAttempt de l'escola continuen a BALANCE.school. El criteri de nota de la llico 7 no porta el 45 escrit: porta la marca SCHOOL_PASS, que school.js resol amb BALANCE.school.
+- fuelWithinPlan (factsFromRecord) compta el creuer saltat igual que economy.js: fuelBurntKg + skippedCruiseFuelKg * (1 + BALANCE.cruiseSkipFuelPenalty) <= fuelPlannedKg; sense skippedCruiseFuelKg compta 0. economy.js no exporta aquest calcul (es dins de computeFlightResult), i per no tocar-lo la formula es repeteix a school.js amb un comentari que ho diu.
+- recordLessonAttempt llanca un Error amb l'id si isLessonAvailable es fals: no es pot desar l'intent d'una llico amb l'anterior sense aprovar. Una llico ja aprovada continua sent repetible.
+
+## 2026-09-27 - C1: la gracia de la llico 7
+La nota minima baixa de passScore (45) a mercyScore (30) a partir de l'intent mercyAttempt (3) inclos: el tercer intent ja pot aprovar amb 30. DESIGN.md parla del "tercer intent fallit"; es pren com el tercer intent. Que s'ha aprovat per gracia (mercy) es retorna a qui crida pero no es desa a la partida: el subobjecte school no canvia d'esquema.
+
+## 2026-09-27 - C1: school.js treballa sobre el subobjecte school
+recordLessonAttempt rep i retorna nomes CareerState.school ({ lessonsPassed, attempts, graduated }), no l'estat sencer. Com progression.js, no modifica el que rep: retorna un school nou dins del resultat ({ school, passed, mercy, attempt, results }). No toca graduated: graduar-se (habilitacio commuter, graduationXp) es del C5.
+
+## 2026-09-27 - C1: els check-rides nomes avaluen
+evaluateCheckRide(ratingId, facts) diu si s'ha passat i prou. Donar l'habilitacio, comprovar el rang i cobrar-ne el cost son de purchaseRating a progression.js. El setup de cada check-ride (vent creuat, ILS, massa) es informacio per al C3 i el D3: school.js no l'interpreta.
