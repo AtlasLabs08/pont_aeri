@@ -335,10 +335,10 @@ de valor puja `version` i porta la seva migració a `career/state.js` (vegeu
 ```js
 export const BALANCE = {
   version: 1,
-  K: 2.6,                                   // factor global: l unica palanca de ritme
+  K: 2.4,                                   // factor global: l unica palanca de ritme
 
   startingCash: 400000,
-  startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 260 },   // termini = financing
+  startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 340 },   // termini = financing
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
@@ -356,7 +356,7 @@ export const BALANCE = {
     commuter: 350000, tpShort: 1100000, tp: 1800000, rj: 4500000, nbShort: 6500000,
     nb: 8000000, nbStretch: 10000000, wb: 22000000, wbEr: 25000000, jumbo: 30000000
   },
-  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 260 },   // B5: quotes per vol
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340 },   // B5: quotes per vol
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
@@ -383,7 +383,7 @@ export const BALANCE = {
     { id: 'excursion',                        pctOfValue: 0.03,   groundedDays: 7 }
   ],
   // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
-  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [35, 230] },
+  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [30, 200] },
 
   // B3 (wear.js): valors provisionals, es calibren a B5
   operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
@@ -409,11 +409,11 @@ export const BALANCE = {
 
   ranks: [
     { key: 'student',    xp: 0,     payMult: 1.00, slots: 0, dispatchPct: 0    },
-    { key: 'private',    xp: 650,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
-    { key: 'commercial', xp: 1250,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
-    { key: 'atpl',       xp: 1950,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
-    { key: 'captain',    xp: 2450,  payMult: 2.20, slots: 7, dispatchPct: 0.50 },
-    { key: 'instructor', xp: 3200,  payMult: 2.50, slots: 9, dispatchPct: 0.60 }
+    { key: 'private',    xp: 600,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
+    { key: 'commercial', xp: 1100,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
+    { key: 'atpl',       xp: 1500,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
+    { key: 'captain',    xp: 1950,  payMult: 2.20, slots: 7, dispatchPct: 0.50 },
+    { key: 'instructor', xp: 2550,  payMult: 2.50, slots: 9, dispatchPct: 0.60 }
   ],
 
   ratings: {                                // habilitacions de tipus (DESIGN.md)
@@ -431,14 +431,14 @@ export const BALANCE = {
     longHaul:   { rank: 'atpl',       cost: 150000 }
   },
 
-  crewHireCost: { commuter: 42000, turboprop: 60000, narrowbody: 180000, widebody: 200000 },   // B5
+  crewHireCost: { commuter: 44000, turboprop: 60000, narrowbody: 100000, widebody: 200000 },   // B5
   rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
 
   demand: { elasticity: { leisure: 1.6, business: 1.1 },
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
             reputation: { base: 0.6, span: 0.8 },
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
-            pRef: { base: 260, perKm: 0.09 },            // LEBL-LEPA 201,97 km -> 278,18 EUR
+            pRef: { base: 290, perKm: 0.10 },            // LEBL-LEPA 201,97 km -> 310,20 EUR
             dBase: { scale: 260, distanceKm: 3000 },
             sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 },
             defaultKind: 'leisure',               // tipus de les rutes sense excepcio
@@ -559,15 +559,30 @@ No forma part de `npm test` (és lent i dona informació, no un sí o un no).
 
 1. Crea una partida nova amb llavor fixa.
 2. Simula 200 vols. Notes d'aterratge: normal de mitjana 72 i desviació 14,
-   truncada a [0, 100], amb un 3 % de cua sota 25.
+   truncada a [0, 100] (es torna a tirar fins que cau dins, no es retalla),
+   amb un 3 % de cua sota 25.
 3. Aplica les compres òbvies quan hi ha diners.
 4. Imprimeix: corba de `cash`, vol de cada compra, vols fins a cada rang, % de
    vols en negatiu, ingressos per hora de joc a cada acte.
 
-**Criteris** (canviats al B5, vegeu `docs/DECISIONS.md`): cada salt de classe
-entre 40 i 50 vols (el primer, commuter → turbohèlix, fins a 55); menys del
-12 % de vols en negatiu; cap acte de més de 16 hores de joc. A més, els cinc
-tipus base dins del ±20 % de la Corba objectiu de `docs/DESIGN.md`.
+`npm run balance --seeds N` (o `npm run balance -- --seeds N`) corre la
+partida amb N llavors seguides a partir de la llavor per defecte i imprimeix,
+per a cada mètrica (vol de la primera tripulació, cada salt, % de vols en
+negatiu, durada de cada acte tancat), la mediana i el percentil 90 (rang més
+proper). Un salt o un acte que no arriba dins dels 200 vols compta com a
+infinit. També imprimeix la Corba objectiu amb tots els vols de totes les
+llavors i avalua els criteris.
+
+**Criteris** (criteri robust del B5, vegeu `docs/DECISIONS.md`), sobre 50
+llavors (`npm run balance --seeds 50`):
+
+- Mediana: cada salt de classe entre 40 i 50 vols (el primer, commuter →
+  turbohèlix, fins a 55); primera tripulació entre el vol 8 i el 12; menys del
+  12 % de vols en negatiu; cap acte de més de 16 hores de joc.
+- Percentil 90: cap salt de més de 60 vols; cap acte de més de 20 hores de joc.
+- Els cinc tipus base dins del ±20 % de la Corba objectiu de `docs/DESIGN.md`.
+
+Una sola llavor no demostra res: l'informe d'una llavor només és orientatiu.
 
 ---
 
@@ -616,7 +631,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
 | B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
 | B4 | `progression.js` | B2 | **Fet.** XP per vol, rangs, habilitacions de tipus i endorsements. Valors a `BALANCE.ratings`, `BALANCE.endorsements` i `fleetTypes[..].rating`. La baixada de rang per accident es proporcional: el rang surt sempre de l'XP. 59 proves noves (58 a `progression.test.js`, 1 de `purity.test.js`), 503 en total |
-| B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | **Fet.** Harness econòmic (`npm run balance`), `career/finance.js`, `career/crew.js` i `career/rng.js` (`draw`). K es queda a 2,6; termini de 260 vols; rangs, `crash.xpLoss`, `demand.pRef` i `crewHireCost` calibrats (`docs/DECISIONS.md`, 27/09/2026). Compleix els criteris de §10: salts de 53, 43, 50 i 47 vols, 4,0 % de vols en negatiu, actes de 12,3, 10,9 i 14,9 h. 45 proves noves, 884 en total |
+| B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | **Fet.** Harness econòmic (`npm run balance`, i `--seeds N` per a la mediana i el percentil 90 sobre N llavors), `career/finance.js`, `career/crew.js` i `career/rng.js` (`draw`). K 2,4; termini de 340 vols; rangs, `crash.xpLoss`, `demand.pRef` i `crewHireCost` calibrats (`docs/DECISIONS.md`, 27/09/2026). Compleix el criteri robust de §10 sobre 50 llavors: salts de 47, 42, 42 i 42 vols de mediana (55, 52, 50 i 56 al p90), primera tripulació al vol 9, 4,5 % de vols en negatiu, actes de 10,9, 10,6 i 12,5 h de mediana (12,8, 13,2 i 14,9 h al p90). 53 proves noves, 892 en total |
 
 **Cap línia d'interfície d'Airline abans que B5 passi.**
 
