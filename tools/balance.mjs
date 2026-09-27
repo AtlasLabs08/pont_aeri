@@ -20,7 +20,7 @@
 
 import { pathToFileURL } from 'node:url';
 import {
-  BALANCE, createCareer, draw, routeFor, routeModel, routeKey, demandPax,
+  BALANCE, createCareer, draw, routeFor, routeForDistance, demandPax,
   computeFlightResult, applyFlightWear, checksDue, performCheck, failureChance, assessDamage,
   rankForXp, flightXp, applyXp, purchaseRating, financeAircraft, makeLoan, payInstalment,
   maxCrew, hireCrew, validate
@@ -133,17 +133,11 @@ function landingScore(state) {
 // ---------------------------------------------------------------------------
 // Rutes
 
-const sizeOf = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : BALANCE.demand.defaultSize;
-
 /** Distancia i model de demanda d una ruta. world/ si hi es; si no, les coordenades de HARNESS. */
 function route(from, to) {
   const [a, b] = [H.coords[from], H.coords[to]];
   const km = distanceKm(a[0], a[1], b[0], b[1]);
-  const key = routeKey(from, to);
-  const model = routeFor(from, to) ?? routeModel({
-    distanceKm: km, sizeA: sizeOf(from), sizeB: sizeOf(to),
-    exception: Object.hasOwn(BALANCE.routeExceptions, key) ? BALANCE.routeExceptions[key] : null
-  });
+  const model = routeFor(from, to) ?? routeForDistance(from, to, km);
   return { km, model };
 }
 

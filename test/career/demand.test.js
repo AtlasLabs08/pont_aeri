@@ -15,7 +15,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  routeKey, routeModel, routeFor, hourFactor, weatherFactor, demandPax, BALANCE
+  routeKey, routeModel, routeFor, routeForDistance, hourFactor, weatherFactor, demandPax, BALANCE
 } from '../../src/career/index.js';
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
@@ -82,6 +82,27 @@ describe('routeFor', () => {
     assert.equal(routeFor('LEBL', 'ZZZZ'), null);
     assert.equal(routeFor('ZZZZ', 'LEPA'), null);
     assert.equal(routeFor('toString', 'LEBL'), null);
+  });
+});
+
+describe('routeForDistance', () => {
+  test('LEBL-LEPA amb la distancia de world/ dona el mateix que routeFor', () => {
+    assert.deepEqual(routeForDistance('LEBL', 'LEPA', 201.966), routeModel({ distanceKm: 201.966, sizeA: 'hub', sizeB: 'major' }));
+    const r = routeFor('LEBL', 'LEPA');
+    const d = routeForDistance('LEBL', 'LEPA', (r.pRef - BALANCE.demand.pRef.base) / BALANCE.demand.pRef.perKm);
+    near(d.pRef, r.pRef); near(d.dBase, r.dBase); assert.equal(d.kind, r.kind);
+  });
+
+  test('aeroports que no son a world/: excepcio i simetria', () => {
+    const m = routeForDistance('LEMD', 'LEBL', 483);
+    assert.equal(m.kind, 'business');
+    near(m.pRef, 303.47); near(m.dBase, 301.86);
+    assert.deepEqual(m, routeForDistance('LEBL', 'LEMD', 483));
+  });
+
+  test('un aeroport sense mida fa servir demand.defaultSize', () => {
+    assert.deepEqual(routeForDistance('ZZZZ', 'LEBL', 100),
+      routeModel({ distanceKm: 100, sizeA: BALANCE.demand.defaultSize, sizeB: 'hub' }));
   });
 });
 

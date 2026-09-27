@@ -7,7 +7,7 @@
  * ruta: el B5 simula rutes que encara no existeixen. BALANCE.routeExceptions
  * corregeix les rutes especials.
  *
- * EXPORTA: routeKey routeModel routeFor hourFactor weatherFactor demandPax
+ * EXPORTA: routeKey routeModel routeFor routeForDistance hourFactor weatherFactor demandPax
  *
  * IMPORTA: AIRPORT_DEFS i distanceKm de world/ (nomes dades i utilitats).
  *
@@ -20,6 +20,11 @@
  *                           valor calculat
  *   routeFor(from, to)   -> el mateix per a dos ICAO de world/, o null si
  *                           algun no hi es. Simetric
+ *   routeForDistance(from, to, distanceKm)
+ *                        -> el mateix per a dos ICAO qualssevol amb la
+ *                           distancia donada: mida de BALANCE.airportSize (o
+ *                           demand.defaultSize) i excepcio de
+ *                           BALANCE.routeExceptions. No toca world/. Simetric
  *   hourFactor(minute)          -> peak, off o 1 (intervals [inici, fi)). Accepta
  *                                  minuts absoluts (E1), tambe negatius: modul 1440.
  *                                  Llanca un Error si minute no es un numero finit
@@ -62,19 +67,25 @@ export function routeModel({ distanceKm: km, sizeA, sizeB, exception = null }) {
   return model;
 }
 
+/** routeModel per a dos ICAO i una distancia donada, sense tocar world/. */
+export function routeForDistance(from, to, km) {
+  const [a, b] = from <= to ? [from, to] : [to, from];
+  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : BALANCE.demand.defaultSize;
+  const key = routeKey(a, b);
+  return routeModel({
+    distanceKm: km,
+    sizeA: size(a), sizeB: size(b),
+    exception: Object.hasOwn(BALANCE.routeExceptions, key) ? BALANCE.routeExceptions[key] : null
+  });
+}
+
 /** routeModel per a dos aeroports reals de world/; null si algun no existeix. */
 export function routeFor(from, to) {
   const [a, b] = from <= to ? [from, to] : [to, from];
   const A = Object.hasOwn(AIRPORT_DEFS, a) ? AIRPORT_DEFS[a] : null;
   const B = Object.hasOwn(AIRPORT_DEFS, b) ? AIRPORT_DEFS[b] : null;
   if (!A || !B) return null;
-  const size = icao => Object.hasOwn(BALANCE.airportSize, icao) ? BALANCE.airportSize[icao] : BALANCE.demand.defaultSize;
-  const key = routeKey(a, b);
-  return routeModel({
-    distanceKm: distanceKm(A.lat, A.lon, B.lat, B.lon),
-    sizeA: size(a), sizeB: size(b),
-    exception: Object.hasOwn(BALANCE.routeExceptions, key) ? BALANCE.routeExceptions[key] : null
-  });
+  return routeForDistance(a, b, distanceKm(A.lat, A.lon, B.lat, B.lon));
 }
 
 const inAny = (m, intervals) => intervals.some(([from, to]) => m >= from && m < to);
