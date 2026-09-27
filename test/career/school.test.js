@@ -102,6 +102,32 @@ describe('llico 7: gracia a partir del tercer intent', () => {
     assert.deepEqual([r.passed, r.mercy, r.attempt], [true, false, 4]);
   });
 
+  // Les llicons anteriors a la 7, aprovades
+  const before7 = LESSONS.slice(0, LESSONS.findIndex(l => l.id === 'landing')).map(l => l.id);
+
+  test('al quart intent el llindar continua a 30: 30 passa amb mercy, 29 falla', () => {
+    const s = school({ lessonsPassed: before7, attempts: { landing: 3 } });
+    const ok = recordLessonAttempt(s, 'landing', { crashed: false, landed: true, score: 30 });
+    assert.deepEqual([ok.passed, ok.mercy, ok.attempt], [true, true, 4]);
+    const ko = recordLessonAttempt(s, 'landing', { crashed: false, landed: true, score: 29 });
+    assert.deepEqual([ko.passed, ko.mercy, ko.attempt], [false, false, 4]);
+  });
+
+  test('al segon intent el llindar es 45: 45 aprova, 30 falla', () => {
+    const s = school({ lessonsPassed: before7, attempts: { landing: 1 } });
+    const ok = recordLessonAttempt(s, 'landing', { crashed: false, landed: true, score: 45 });
+    assert.deepEqual([ok.passed, ok.mercy, ok.attempt], [true, false, 2]);
+    const ko = recordLessonAttempt(s, 'landing', { crashed: false, landed: true, score: 30 });
+    assert.deepEqual([ko.passed, ko.mercy, ko.attempt], [false, false, 2]);
+  });
+
+  test('un crash al tercer intent amb 30 falla', () => {
+    const s = school({ lessonsPassed: before7, attempts: { landing: 2 } });
+    const r = recordLessonAttempt(s, 'landing', { crashed: true, landed: true, score: 30 });
+    assert.deepEqual([r.passed, r.mercy, r.attempt], [false, false, 3]);
+    assert.deepEqual(r.school.lessonsPassed, before7);
+  });
+
   test('els llindars surten de BALANCE.school', () => {
     assert.deepEqual(
       [BALANCE.school.passScore, BALANCE.school.mercyScore, BALANCE.school.mercyAttempt],
@@ -124,6 +150,16 @@ describe('recordLessonAttempt', () => {
     assert.deepEqual(s, before);
     assert.deepEqual(r.school.attempts, { exterior: 1, cockpit: 1 });
     assert.deepEqual(r.school.lessonsPassed, ['exterior']);
+  });
+
+  test('un intent aprovat tampoc no toca l entrada', () => {
+    const s = school({ lessonsPassed: ['exterior'], attempts: { exterior: 1 } });
+    const before = clone(s);
+    const r = recordLessonAttempt(s, 'cockpit', { crashed: false, controlsIdentified: 6 });
+    assert.equal(r.passed, true);
+    assert.deepEqual(s, before);
+    assert.deepEqual(r.school.lessonsPassed, ['exterior', 'cockpit']);
+    assert.deepEqual(r.school.attempts, { exterior: 1, cockpit: 1 });
   });
 
   test('aprovar afegeix l id sense duplicats', () => {
