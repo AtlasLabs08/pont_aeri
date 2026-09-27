@@ -1,4 +1,4 @@
-/* Proves de career/balance.js (tasca B1): coherencia interna de BALANCE.
+/* Proves de career/balance.js (tasques B1, B4 i B5): coherencia interna de BALANCE.
  * No comproven els valors concrets, sino que les taules tinguin sentit:
  * ordres, monotonia, numeros finits i objecte congelat.
  *
@@ -138,5 +138,60 @@ describe('BALANCE', () => {
     assert.throws(() => { BALANCE.crash.groundedDays[0] = 1; }, TypeError);
     assert.throws(() => { BALANCE.reputation.start = 0; }, TypeError);
     assert.equal(JSON.stringify(BALANCE), before);
+  });
+});
+
+describe('BALANCE: coherencia de progressio (B4)', () => {
+  test('ratings i endorsements demanen rangs que existeixen i costen enters >= 0', () => {
+    const ranks = BALANCE.ranks.map(r => r.key);
+    for (const table of ['ratings', 'endorsements']) {
+      for (const [key, item] of Object.entries(BALANCE[table])) {
+        assert.ok(ranks.includes(item.rank), table + '.' + key + '.rank');
+        assert.ok(Number.isInteger(item.cost) && item.cost >= 0, table + '.' + key + '.cost');
+      }
+    }
+  });
+
+  test('cada fleetType demana una rating que existeix', () => {
+    for (const [id, ft] of Object.entries(BALANCE.fleetTypes)) {
+      assert.ok(Object.hasOwn(BALANCE.ratings, ft.rating), id + '.rating');
+    }
+  });
+});
+
+describe('BALANCE: preus d ocasio i financament (B5)', () => {
+  test('usedPrice: un preu enter positiu per a cada fleetType, i cap mes', () => {
+    assert.deepEqual(Object.keys(BALANCE.usedPrice).sort(), Object.keys(BALANCE.fleetTypes).sort());
+    for (const [id, p] of Object.entries(BALANCE.usedPrice)) {
+      assert.ok(Number.isInteger(p) && p > 0, 'usedPrice.' + id);
+    }
+  });
+
+  test('usedPrice: no baixa en pujar de classe', () => {
+    const order = ['commuter', 'turboprop', 'narrowbody', 'widebody'];
+    const byCls = cls => Object.entries(BALANCE.fleetTypes)
+      .filter(([, ft]) => ft.cls === cls).map(([id]) => BALANCE.usedPrice[id]);
+    pairs(order, (lo, hi) => assert.ok(Math.min(...byCls(hi)) >= Math.max(...byCls(lo)), lo + ' -> ' + hi));
+  });
+
+  test('el credit inicial te el mateix interes i termini que el financament', () => {
+    assert.equal(BALANCE.startingLoan.ratePerFlight, BALANCE.financing.ratePerFlight);
+    assert.equal(BALANCE.startingLoan.termFlights, BALANCE.financing.termFlights);
+  });
+
+  test('financing: entrada entre 0 i 1, interes >= 0 i termini enter >= 1', () => {
+    const f = BALANCE.financing;
+    assert.ok(f.downPct > 0 && f.downPct < 1);
+    assert.ok(f.ratePerFlight >= 0);
+    assert.ok(Number.isInteger(f.termFlights) && f.termFlights >= 1);
+  });
+});
+
+describe('BALANCE: contractacio de tripulacio (B5)', () => {
+  test('crewHireCost: un enter positiu per a cada classe de rotation.cap, i cap mes', () => {
+    assert.deepEqual(Object.keys(BALANCE.crewHireCost).sort(), Object.keys(BALANCE.rotation.cap).sort());
+    for (const [cls, c] of Object.entries(BALANCE.crewHireCost)) {
+      assert.ok(Number.isInteger(c) && c > 0, 'crewHireCost.' + cls);
+    }
   });
 });

@@ -2,7 +2,7 @@
  * Cap valor esperat es calcula amb la mateixa formula: son literals fets a
  * ma, amb el calcul al comentari.
  *
- * Valors de BALANCE i d AIRCRAFT fets servir: K 2.6; fuelPricePerKg 0.90;
+ * Valors de BALANCE i d AIRCRAFT fets servir: K 2.4; fuelPricePerKg 0.90;
  * fees 12 EUR/t MTOW + 1.8 EUR/pax per aeroport; nb: narrowbody, MTOW 78.000 kg,
  * tripulacio 900 EUR/h, manteniment 700 EUR/h, rotation.cap 2.7, contracte
  * 18.000 EUR; wb: widebody, cap 1.8; rotation.perCrew 0.5; exclusivityBonus
@@ -46,7 +46,7 @@ const withScore = score => ({ touchdown: { ...TOUCHDOWN, score } });
  *   manteniment  0.75 h * 700                       = 525
  *   financament                                    = 1000
  *   C                                              = 6772
- * r = min(1 + 0.5 * 1, 2.7) = 1.5;  K * r = 3.9
+ * r = min(1 + 0.5 * 1, 2.7) = 1.5;  K * r = 3.6
  * m_ruta = 1 + 0 (LEPA) + 0.10 (meteo) + 0.25 (exclusiva) = 1.35
  * P * pax * m_ruta = 210 * 150 * 1.35 = 42525 */
 const COSTS = { fuel: 2160, fees: 2412, crew: 675, maintenance: 525, finance: 1000 };
@@ -57,37 +57,37 @@ describe('computeFlightResult: mode own', () => {
     // bitllets     42525 * 1.08                   = 45927
     // puntualitat  |4| <= 10:  0.04 * 45927       = 1837.08
     // eficiencia   estalvi 200 kg = 7.7 % >= 3 %:  0.35 * 200 * 0.9 = 63
-    // net = 3.9 * (45927 + 1837.08 + 63 - 6772) = 3.9 * 41055.08 = 160114.812 -> 160115
+    // net = 3.6 * (45927 + 1837.08 + 63 - 6772) = 3.6 * 41055.08 = 147798.288 -> 147798
     assert.deepEqual(own(), {
       mode: 'own',
       landing: { key: 'landing.excellent', mult: 1.08, xp: 30 },
       revenue: { tickets: 45927, contract: 0, punctuality: 1837, fuelSaving: 63 },
       costs: COSTS,
-      rotation: 1.5, K: 2.6, net: 160115
+      rotation: 1.5, K: 2.4, net: 147798
     });
   });
 
   test('la mateixa entrada amb nota 30 tanca en perdues', () => {
     // veryHard, m_aterratge 0.15: bitllets 42525 * 0.15 = 6378.75, sense bonus
-    // net = 3.9 * (6378.75 - 6772) = 3.9 * -393.25 = -1533.675 -> -1534
+    // net = 3.6 * (6378.75 - 6772) = 3.6 * -393.25 = -1415.7 -> -1416
     const r = own(withScore(30));
     assert.deepEqual(r.landing, { key: 'landing.veryHard', mult: 0.15, xp: -8 });
     assert.deepEqual(r.revenue, { tickets: 6379, contract: 0, punctuality: 0, fuelSaving: 0 });
     assert.deepEqual(r.costs, COSTS);
-    assert.equal(r.net, -1534);
+    assert.equal(r.net, -1416);
     assert.ok(r.net < 0);
   });
 
   test('per sota de 82 no hi ha bonus; a 82 si', () => {
-    // 81.99 -> safe 0.85: bitllets 42525 * 0.85 = 36146.25; net = 3.9 * (36146.25 - 6772) = 114559.575 -> 114560
+    // 81.99 -> safe 0.85: bitllets 42525 * 0.85 = 36146.25; net = 3.6 * (36146.25 - 6772) = 105747.3 -> 105747
     const low = own(withScore(81.99));
     assert.deepEqual(low.revenue, { tickets: 36146, contract: 0, punctuality: 0, fuelSaving: 0 });
-    assert.equal(low.net, 114560);
+    assert.equal(low.net, 105747);
     // 82 -> solid 1.00: bitllets 42525; puntualitat 0.04 * 42525 = 1701; eficiencia 63
-    // net = 3.9 * (42525 + 1701 + 63 - 6772) = 3.9 * 37517 = 146316.3 -> 146316
+    // net = 3.6 * (42525 + 1701 + 63 - 6772) = 3.6 * 37517 = 135061.2 -> 135061
     const at = own(withScore(82));
     assert.deepEqual(at.revenue, { tickets: 42525, contract: 0, punctuality: 1701, fuelSaving: 63 });
-    assert.equal(at.net, 146316);
+    assert.equal(at.net, 135061);
   });
 
   test('puntualitat: nomes dins de la finestra de 10 min, tard o d hora', () => {
@@ -115,9 +115,9 @@ describe('computeFlightResult: mode own', () => {
     const r = own({ fuelBurntKg: 1800, skippedCruiseFuelKg: 500, usedCruiseSkip: true });
     assert.equal(r.costs.fuel, 2106);
     assert.equal(r.revenue.fuelSaving, 82);
-    // net = 3.9 * (45927 + 1837.08 + 81.9 - (2106 + 2412 + 675 + 525 + 1000))
-    //     = 3.9 * (47845.98 - 6718) = 3.9 * 41127.98 = 160399.122 -> 160399
-    assert.equal(r.net, 160399);
+    // net = 3.6 * (45927 + 1837.08 + 81.9 - (2106 + 2412 + 675 + 525 + 1000))
+    //     = 3.6 * (47845.98 - 6718) = 3.6 * 41127.98 = 148060.728 -> 148061
+    assert.equal(r.net, 148061);
   });
 
   test('record sense skippedCruiseFuelKg: val 0', () => {
@@ -150,12 +150,12 @@ describe('computeFlightResult: mode own', () => {
   test('valors per defecte: sense tripulacio, meteo, exclusivitat ni financament', () => {
     // r = 1, m_ruta = 1: bitllets 210 * 150 * 1.08 = 34020; puntualitat 1360.8; eficiencia 63
     // C = 2160 + 2412 + 675 + 525 = 5772
-    // net = 2.6 * (34020 + 1360.8 + 63 - 5772) = 2.6 * 29671.8 = 77146.68 -> 77147
+    // net = 2.4 * (34020 + 1360.8 + 63 - 5772) = 2.4 * 29671.8 = 71212.32 -> 71212
     const r = computeFlightResult({ record: record(), mode: 'own', ticketPrice: 210, paxOnBoard: 150 });
     assert.equal(r.rotation, 1);
     assert.deepEqual(r.revenue, { tickets: 34020, contract: 0, punctuality: 1361, fuelSaving: 63 });
     assert.equal(r.costs.finance, 0);
-    assert.equal(r.net, 77147);
+    assert.equal(r.net, 71212);
   });
 
   test('dificultat de l aeroport de desti', () => {
@@ -165,12 +165,12 @@ describe('computeFlightResult: mode own', () => {
   });
 
   test('accident: ingressos 0, els costos es paguen i tram de nota 0', () => {
-    // net = 3.9 * -6772 = -26410.8 -> -26411
+    // net = 3.6 * -6772 = -24379.2 -> -24379
     // nota 95 (flawless, +40 XP) pero accident: tram de nota 0, inspection, -35 XP
     const r = own({ crashCause: 'terrain', ...withScore(95) });
     assert.deepEqual(r.revenue, { tickets: 0, contract: 0, punctuality: 0, fuelSaving: 0 });
     assert.deepEqual(r.costs, COSTS);
-    assert.equal(r.net, -26411);
+    assert.equal(r.net, -24379);
     assert.equal(r.landing.key, 'landing.inspection');
     assert.equal(r.landing.xp, -35);
   });
@@ -178,7 +178,7 @@ describe('computeFlightResult: mode own', () => {
   test('sense aterratge: ingressos 0, costos pagats i tram de nota 0', () => {
     const r = own({ touchdown: null });
     assert.equal(r.revenue.tickets, 0);
-    assert.equal(r.net, -26411);
+    assert.equal(r.net, -24379);
     assert.equal(r.landing.key, 'landing.inspection');
   });
 
@@ -190,7 +190,7 @@ describe('computeFlightResult: mode own', () => {
         for (const v of [...Object.values(r.revenue), ...Object.values(r.costs)]) assert.ok(Number.isInteger(v));
       }
     }
-    // financament que compensa exactament: net = 3.9 * (x - x) = 0
+    // financament que compensa exactament: net = K * (x - x) = 0
     const zero = own({ crashCause: 'water' }, { financePerFlight: -5772, crewCount: 0 });
     assert.ok(Object.is(zero.net, 0));
   });

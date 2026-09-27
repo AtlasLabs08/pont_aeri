@@ -121,7 +121,19 @@ function checkState(s, err) {
       err.push('company.reputation: ha de ser un numero entre ' + REPUTATION_MIN + ' i ' + REPUTATION_MAX);
     }
     need(err, 'company.bases', c.bases, isIcaoArray);
-    need(err, 'company.loans', c.loans, isObjectArray);
+    if (!Array.isArray(c.loans)) err.push('company.loans: no es una llista');
+    else {
+      const ids = new Set();
+      c.loans.forEach((l, i) => {
+        const at = 'company.loans[' + i + ']';
+        if (!isObject(l)) { err.push(at + ': no es un objecte'); return; }
+        need(err, at + '.id', l.id, isNonEmptyString);
+        if (isNonEmptyString(l.id)) {
+          if (ids.has(l.id)) err.push(at + '.id: prestec repetit ' + l.id);
+          ids.add(l.id);
+        }
+      });
+    }
     need(err, 'company.insurance', c.insurance, v => isObject(v) && Object.values(v).every(isObject));
     need(err, 'company.flightsFlown', c.flightsFlown, isNatural);
     need(err, 'company.lifetimeRevenue', c.lifetimeRevenue, Number.isInteger, 'ha de ser un enter d euros');

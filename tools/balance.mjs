@@ -1,0 +1,659 @@
+/* Harness economic del mode Airline (seccio 10 d ENGINEERING.md, tasca B5).
+ * Simula una partida d un jugador mitja amb les funcions reals de career/ i
+ * imprimeix la corba de diners, el vol de cada compra, els vols fins a cada
+ * rang, el % de vols en negatiu i els ingressos per hora de joc de cada acte.
+ * No forma part de npm test: dona informacio, no un si o un no.
+ *
+ * Correr:  npm run balance            (llavor i vols per defecte)
+ *          node tools/balance.mjs [llavor] [vols]
+ *          npm run balance -- --seeds N  (mediana i percentil 90 de les
+ *                                         metriques sobre N llavors seguides,
+ *                                         a partir de la llavor)
+ *
+ * EXPORTA: runBalance metrics runSeeds formatReport formatSeeds HARNESS
+ *
+ * Tot l atzar surt de draw(state): la mateixa llavor dona sempre el mateix
+ * resultat. Cap Math.random().
+ *
+ * Els numeros de HARNESS no son economia del joc (aquesta es tota a
+ * BALANCE): descriuen el jugador simulat i els FlightRecords sintetics que
+ * substitueixen el model de vol. El joc real treu el consum, les hores de
+ * bloc i el contacte del FlightRecorder.
+ */
+
+import { pathToFileURL } from 'node:url';
+import {
+  BALANCE, createCareer, draw, routeFor, routeForDistance, demandPax,
+  computeFlightResult, applyFlightWear, checksDue, performCheck, failureChance, assessDamage,
+  rankForXp, flightXp, applyXp, purchaseRating, financeAircraft, makeLoan, payInstalment,
+  maxCrew, hireCrew, validate
+} from '../src/career/index.js';
+import { distanceKm } from '../src/world/index.js';
+
+const SECONDS_PER_HOUR = 3600;
+const MINUTES_PER_HOUR = 60;
+
+export const HARNESS = Object.freeze({
+  seed: 20260927,
+  flights: 200,
+
+  // Nota d aterratge: normal(72, 14) truncada a [0, 100] (es torna a tirar
+  // fins que cau dins, no es retalla); un 3 % de vols,
+  // uniforme a [0, 25) (la cua de mals aterratges)
+  score: { mean: 72, sd: 14, tailPct: 0.03, tailMax: 25 },
+
+  // Escala de flota del jugador: cada salt es la seguent classe
+  ladder: ['commuter', 'tp', 'nb', 'wb', 'jumbo'],
+
+  // Rotacio de cada tipus: una volta d aeroports, que torna a comencar. El
+  // tram i va de cycle[i] a cycle[i + 1]. Acte 1: LEBL, LEPA, LEGE i LERS
+  // (DESIGN.md, "Arc de la partida")
+  routes: {
+    commuter: ['LEBL', 'LEPA', 'LEGE', 'LEBL', 'LEPA', 'LERS'],
+    tp:       ['LEBL', 'LEPA', 'LEBL', 'LEIB', 'LEBL', 'LEMH', 'LEBL', 'LEVC'],
+    nb:       ['LEBL', 'LEMD', 'LEBL', 'LFPO', 'LEBL', 'LEMG', 'LEBL', 'LIRF', 'LEBL', 'LFMN'],
+    wb:       ['LEBL', 'KJFK', 'LEBL', 'EGLL', 'LEBL', 'SBGR', 'LEBL', 'EDDF'],
+    jumbo:    ['LEBL', 'KJFK', 'LEBL', 'SBGR']
+  },
+  base: 'LEBL',
+
+  // Coordenades dels aeroports que world/ encara no te (F1)
+  coords: {
+    LEBL: [41.297, 2.078], LEPA: [39.552, 2.739], LEGE: [41.901, 2.760], LERS: [41.147, 1.167],
+    LEIB: [38.873, 1.373], LEMH: [39.863, 4.219], LEVC: [39.489, -0.482], LEMD: [40.472, -3.561],
+    LEMG: [36.675, -4.499], LFPO: [48.723, 2.379], LIRF: [41.800, 12.239], LFMN: [43.658, 7.216],
+    EGLL: [51.470, -0.454], EDDF: [50.033, 8.570], KJFK: [40.640, -73.779], SBGR: [-23.432, -46.469]
+  },
+
+  // FlightRecord sintetic per tipus: velocitat de bloc (km/h), temps fix de
+  // rodatge, pujada i baixada (h), consum mitja de bloc (kg/h), altitud de
+  // creuer (ft). Ordres de magnitud dels avions reals de referencia.
+  perf: {
+    commuter: { kmh: 380, fixedH: 0.35, kgPerH: 300,   altFt: 12000 },
+    tp:       { kmh: 470, fixedH: 0.40, kgPerH: 750,   altFt: 21000 },
+    nb:       { kmh: 780, fixedH: 0.50, kgPerH: 2600,  altFt: 36000 },
+    wb:       { kmh: 850, fixedH: 0.60, kgPerH: 6200,  altFt: 39000 },
+    jumbo:    { kmh: 870, fixedH: 0.60, kgPerH: 11000, altFt: 37000 }
+  },
+  fuelSd: 0.03,              // desviacio del consum real respecte del pla
+  arrivalSd: 8,              // minuts de retard o d avancament (desviacio)
+  departMinutes: [360, 1320],// hora de sortida, uniforme (dia)
+  pTurbulence: 0.20,         // un vol de cada cinc amb vent apreciable (DESIGN.md)
+  pHardWeather: 1 / 15,      // un de cada quinze amb condicions dures
+  weatherSeverityMax: 0.6,   // severitat per a demandPax quan hi ha meteo dura
+  pTailStrike: 0.004,
+
+  // Camps fixos del FlightRecord sintetic: el jugador mitja fa sempre el
+  // mateix contacte a la pista, i nomes l fpm, la g i la nota varien.
+  // rolloutMetres (1100) < remaining (1800): amb aquests valors mai no hi ha
+  // excursion (damage.js: rolloutMetres > touchdown.remaining).
+  record: {
+    remaining: 1800,         // metres de pista que queden en el contacte
+    rolloutMetres: 1100,     // metres de frenada fins a velocitat de rodatge
+    taxiH: 0.2,              // hores de bloc a terra (airborne = block - taxiH)
+    maxGFloor: 1.3,          // maxG minima del vol: maniobres i turbulencia lleu
+    maxBankDeg: 25,          // inclinacio maxima, dins del confort de cabina
+    timeAccelMax: 16,        // l acceleracio maxima que ja existeix (Game.cycleAccel)
+    rwy: '24R',              // pista d arribada (nomes informativa)
+    tdzDist: 400,            // metres del llindar al punt de contacte, dins la TDZ
+    center: 2,               // metres de desviacio de l eix
+    crab: 1,                 // graus de crab en el contacte
+    ias: 130,                // nusos en el contacte
+    pitch: 4                 // graus de cabrejada en el contacte
+  },
+
+  // Any de fabricacio dels avions d ocasio que compra el jugador
+  yearBuilt: 2010,
+
+  // Reserva que el jugador guarda en contractar tripulacio: el cash que li
+  // queda despres de pagar-la ha de valer almenys crewReserve contractacions
+  crewReserve: 1.2,
+
+  // Contacte a partir de la nota: fpm = fpmAt0 - fpmPerPoint * nota + soroll
+  touchdown: { fpmAt0: 900, fpmPerPoint: 8.5, fpmSd: 40, fpmMin: 40, gPerFpm: 1 / 650, gSd: 0.05 },
+
+  // Durada real d un cicle de joc: de 12 a 25 minuts segons la ruta (DESIGN.md,
+  // "El bucle de joc"), interpolat en escala logaritmica de la distancia
+  realMinutes: { min: 12, max: 25, kmMin: 80, kmMax: 8500 },
+
+  // Corba objectiu de DESIGN.md (net per vol sol i amb tripulacio completa):
+  // nomes per comparar, no entra a la simulacio
+  targets: {
+    commuter: [8500, 22000], tp: [28000, 75000], nb: [80000, 215000],
+    wb: [230000, 420000], jumbo: [350000, 600000]
+  },
+
+  // Actes de DESIGN.md segons la classe de l avio que vola el jugador
+  acts: { commuter: 1, turboprop: 2, narrowbody: 3, widebody: 4 }
+});
+
+const H = HARNESS;
+
+/** Criteris de la seccio 10 d ENGINEERING.md (criteri robust del B5, docs/DECISIONS.md):
+ * sobre `seeds` llavors, la mediana i el percentil 90 de cada metrica. */
+const CRITERIA = {
+  seeds: 50,
+  median: { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, firstCrewMin: 8, firstCrewMax: 12,
+            negativePctMax: 12, actHoursMax: 16 },
+  p90: { jumpMax: 60, actHoursMax: 20 },
+  curveMaxDev: 0.20             // cada tipus dins del +-20 % de la Corba objectiu
+};
+
+// ---------------------------------------------------------------------------
+// Atzar
+
+/** Normal(0, 1) amb Box-Muller: dues tirades de draw. */
+function gauss(state) {
+  const u = Math.max(draw(state), Number.MIN_VALUE);
+  const v = draw(state);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+const clampTo = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+/** Nota d aterratge del jugador mitja. La normal es truncada: es torna a
+ * tirar fins que cau a [0, 100], com diu la seccio 10. */
+function landingScore(state) {
+  const S = H.score;
+  if (draw(state) < S.tailPct) return draw(state) * S.tailMax;
+  for (;;) {
+    const x = S.mean + S.sd * gauss(state);
+    if (x >= 0 && x <= 100) return x;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rutes
+
+/** Distancia i model de demanda d una ruta. world/ si hi es; si no, les coordenades de HARNESS. */
+function route(from, to) {
+  const [a, b] = [H.coords[from], H.coords[to]];
+  const km = distanceKm(a[0], a[1], b[0], b[1]);
+  const model = routeFor(from, to) ?? routeForDistance(from, to, km);
+  return { km, model };
+}
+
+/** Minuts reals que el jugador passa en aquest vol. */
+function realMinutes(km) {
+  const R = H.realMinutes;
+  const t = clampTo(Math.log(km / R.kmMin) / Math.log(R.kmMax / R.kmMin), 0, 1);
+  return R.min + (R.max - R.min) * t;
+}
+
+// ---------------------------------------------------------------------------
+// FlightRecord sintetic
+
+function syntheticRecord(state, typeId, from, to, km, pax) {
+  const P = H.perf[typeId], T = H.touchdown;
+  const blockH = P.fixedH + km / P.kmh;
+  const plannedKg = Math.round(blockH * P.kgPerH);
+  const burntKg = Math.round(plannedKg * (1 + H.fuelSd * gauss(state)));
+  const score = landingScore(state);
+  const fpm = Math.max(T.fpmMin, T.fpmAt0 - T.fpmPerPoint * score + T.fpmSd * gauss(state));
+  const g = 1 + fpm * T.gPerFpm + T.gSd * gauss(state);
+  const tailStrike = draw(state) < H.pTailStrike;
+  const turbulence = draw(state) < H.pTurbulence;
+  const hardWeather = draw(state) < H.pHardWeather;
+  const R = H.record;
+  const record = {
+    aircraftTypeId: typeId, from, to,
+    blockSeconds: Math.round(blockH * SECONDS_PER_HOUR),
+    airborneSeconds: Math.round((blockH - R.taxiH) * SECONDS_PER_HOUR),
+    fuelBurntKg: burntKg, fuelPlannedKg: plannedKg, paxOnBoard: pax,
+    maxAltFt: P.altFt, maxG: Math.max(R.maxGFloor, g), maxBankDeg: R.maxBankDeg, abruptInputs: 0,
+    timeAccelMax: R.timeAccelMax, usedCruiseSkip: false, skippedCruiseFuelKg: 0,
+    arrivalDeltaMin: Math.round(H.arrivalSd * gauss(state)),
+    touchdown: {
+      fpm: -Math.round(fpm), g: Math.round(g * 100) / 100, bounces: 0,
+      onRunway: true, rwy: R.rwy, tdzDist: R.tdzDist, center: R.center, crab: R.crab, remaining: R.remaining,
+      ias: R.ias, pitch: R.pitch, roll: 0, score: Math.round(score), pts: null
+    },
+    rolloutMetres: R.rolloutMetres, tailStrike, crashCause: null, events: []
+  };
+  return { record, turbulence, hardWeather };
+}
+
+// ---------------------------------------------------------------------------
+// Partida
+
+function newAirframe(typeId, n, price, loanId) {
+  return {
+    reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
+    typeId, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
+    condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
+    location: H.base, status: 'ready', groundedUntilMinute: 0,
+    maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours, deferred: [] },
+    finance: { purchasePrice: price, loanId, leaseId: null },
+    value: price
+  };
+}
+
+/** Graduacio de l escola (DESIGN.md): habilitacio commuter, XP i capital inicial amb el credit. */
+function graduate(state) {
+  const xp = BALANCE.school.graduationXp;
+  const bought = purchaseRating({ ...state.pilot, xp, rank: rankForXp(xp) }, 0, 'commuter');
+  state.pilot = bought.pilot;
+  state.school.graduated = true;
+  state.company.cash = BALANCE.startingCash;
+  state.company.bases = [H.base];
+  state.company.loans = [{ id: 'L0', ...makeLoan(BALANCE.startingLoan.principal,
+    BALANCE.startingLoan.ratePerFlight, BALANCE.startingLoan.termFlights) }];
+}
+
+/**
+ * Simula la partida. Retorna les dades en brut; formatReport les imprimeix.
+ * @param {{seed?:number, flights?:number}} opts
+ */
+export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
+  const state = createCareer({ name: 'Harness', seed, createdAt: '' });
+  graduate(state);
+  const co = state.company;
+
+  const log = [], purchases = [], crews = [], ranks = [{ key: state.pilot.rank, flight: 0 }], checks = [];
+  const affordableAt = {};   // primer vol en que hi havia diners per al seguent salt
+  let rung = 0, legIndex = 0, crewCount = 0, loanSeq = 1;
+
+  /** Compra el tipus del graó `i` de l escala. Retorna true si l ha comprat. */
+  function tryBuy(i, flight) {
+    const typeId = H.ladder[i];
+    const price = BALANCE.usedPrice[typeId];
+    const rating = BALANCE.fleetTypes[typeId].rating;
+    const needsRating = !state.pilot.ratings.includes(rating);
+    const ratingCost = needsRating ? BALANCE.ratings[rating].cost : 0;
+    const outright = state.fleet.length === 0;           // el primer avio es paga sencer
+    const fin = outright ? null : financeAircraft(price);
+    const upfront = (outright ? price : fin.downPayment) + ratingCost;
+    if (co.cash < upfront) return false;
+    affordableAt[typeId] ??= flight;
+    if (needsRating) {
+      const r = purchaseRating(state.pilot, co.cash, rating);
+      if (!r.ok) return false;                           // normalment 'rank'
+      state.pilot = r.pilot;
+    }
+    let loanId = null;
+    if (fin) {
+      loanId = 'L' + loanSeq++;
+      co.loans.push({ id: loanId, ...fin.loan });
+    }
+    co.cash -= upfront;
+    state.fleet.push(newAirframe(typeId, state.fleet.length, price, loanId));
+    purchases.push({ typeId, flight, price, downPayment: outright ? price : fin.downPayment, ratingCost });
+    crewCount = 0;                                       // tripulacio nova per a la classe nova
+    legIndex = 0;
+    return true;
+  }
+
+  tryBuy(0, 0);
+
+  for (let f = 1; f <= flights; f++) {
+    const airframe = state.fleet[state.fleet.length - 1];
+    const typeId = airframe.typeId;
+    const cls = BALANCE.fleetTypes[typeId].cls;
+
+    // Tram seguent de la rotacio del tipus
+    const cycle = H.routes[typeId];
+    const from = cycle[legIndex % cycle.length], to = cycle[(legIndex + 1) % cycle.length];
+    legIndex++;
+    const { km, model } = route(from, to);
+
+    const minute = H.departMinutes[0] + draw(state) * (H.departMinutes[1] - H.departMinutes[0]);
+    const seats = BALANCE.fleetTypes[typeId].seats;
+    const hardWeatherDemand = draw(state) < H.pHardWeather;
+    const pax = demandPax({ route: model, price: model.pRef, seats, minute,
+      weatherSeverity: hardWeatherDemand ? H.weatherSeverityMax : 0, reputation: co.reputation });
+
+    const { record, turbulence, hardWeather } = syntheticRecord(state, typeId, from, to, km, pax);
+    const input = { record, mode: 'own', ticketPrice: model.pRef, paxOnBoard: pax };
+    const res = computeFlightResult({ ...input, crewCount });
+    // El mateix vol sense tripulacio i amb la tripulacio completa, per a la Corba objectiu
+    const netSolo = computeFlightResult({ ...input, crewCount: 0 }).net;
+    const netFull = computeFlightResult({ ...input, crewCount: maxCrew(cls) }).net;
+
+    // Desgast, manteniment i danys: euros reals, fora de K
+    const worn = applyFlightWear(airframe, record);
+    let af = worn.airframe;
+    const dmg = assessDamage({ record, airframeValue: af.value, mode: 'own' });
+    let maint = worn.cycleCost;
+    for (const kind of checksDue(af)) {
+      const c = performCheck(af, kind);
+      af = c.airframe; maint += c.cost;
+      checks.push({ flight: f, typeId, kind, cost: c.cost });
+    }
+    if (failureChance(af.condition.engines) > 0) {
+      const c = performCheck(af, 'engine');
+      af = c.airframe; maint += c.cost;
+      checks.push({ flight: f, typeId, kind: 'engine', cost: c.cost });
+    }
+    state.fleet[state.fleet.length - 1] = af;
+
+    // Quotes: totes les dels prestecs vius, una per vol
+    let instalments = 0;
+    co.loans = co.loans.map(l => {
+      const p = payInstalment(l);
+      instalments += p.paid;
+      return { ...p.loan, id: l.id };
+    }).filter(l => l.balance > 0);
+
+    const flightResult = res.net - maint - dmg.playerCost;
+    co.cash += flightResult - instalments;
+    co.flightsFlown++;
+    co.lifetimeRevenue += res.revenue.tickets + res.revenue.punctuality + res.revenue.fuelSaving;
+
+    // XP i rang
+    const xp = flightXp({ landingXp: res.landing.xp, turbulence, hardWeather, destination: to });
+    const up = applyXp(state.pilot, xp);
+    state.pilot = up.pilot;
+    if (!ranks.some(k => k.key === up.rankAfter)) ranks.push({ key: up.rankAfter, flight: f });
+
+    log.push({
+      flight: f, typeId, cls, act: H.acts[cls], from, to, km: Math.round(km), pax,
+      score: record.touchdown.score, net: res.net, netSolo, netFull, crewCount, xpGain: xp,
+      maint, damage: dmg.playerCost, flightResult,
+      instalments, cash: co.cash, debt: co.loans.reduce((s, l) => s + l.balance, 0),
+      xp: state.pilot.xp, rank: state.pilot.rank, realMin: realMinutes(km)
+    });
+
+    // Compres obvies: primer la classe seguent; si no, una tripulacio mes,
+    // si en pagar-la queda la reserva
+    if (rung + 1 < H.ladder.length && tryBuy(rung + 1, f)) rung++;
+    else {
+      const reserve = H.crewReserve * BALANCE.crewHireCost[cls];
+      const h = hireCrew({ cls, crewCount, cash: co.cash - reserve });
+      if (h.ok) {
+        co.cash -= h.cost;
+        crewCount = h.crewCount;
+        crews.push({ flight: f, typeId, crewCount, cost: h.cost });
+      }
+    }
+  }
+
+  const r = { seed, flights, log, purchases, crews, ranks, checks, affordableAt, valid: validate(state), state };
+  r.metrics = metrics(r);
+  return r;
+}
+
+/** Actes que es poden tancar: tots menys l ultim, que queda obert. */
+const CLOSABLE_ACTS = [...new Set(Object.values(H.acts))].slice(0, -1);
+
+/**
+ * Metriques de la seccio 10 d una partida:
+ *   firstCrew    vol de la primera tripulacio contractada, o null
+ *   jumps        vols de cada salt de classe fet (sense els que falten)
+ *   negativePct  % de vols en negatiu (resultat - manteniment - danys, sense quotes)
+ *   actHours     { acte: hores de joc } dels actes tancats
+ */
+export function metrics(r) {
+  const jumps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
+  const neg = r.log.filter(e => e.flightResult < 0).length;
+  const present = [...new Set(r.log.map(e => e.act))];
+  const actHours = {};
+  for (const act of present.slice(0, -1)) {
+    actHours[act] = r.log.filter(e => e.act === act).reduce((s, e) => s + e.realMin, 0) / MINUTES_PER_HOUR;
+  }
+  return {
+    firstCrew: r.crews.length ? r.crews[0].flight : null,
+    jumps, negativePct: 100 * neg / r.log.length, actHours
+  };
+}
+
+/** Mediana (mitjana dels dos centrals si n es parell). Infinity compta com a valor. */
+function median(xs) {
+  const a = [...xs].sort((x, y) => x - y), m = a.length >> 1;
+  return a.length % 2 ? a[m] : a[m - 1] === a[m] ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/** Percentil p (0..100) pel rang mes proper: el valor de la posicio ceil(p/100 * n). */
+function percentile(xs, p) {
+  const a = [...xs].sort((x, y) => x - y);
+  return a[Math.max(0, Math.ceil(p / 100 * a.length) - 1)];
+}
+
+/**
+ * Corre la partida amb `seeds` llavors seguides (seed, seed + 1, ...) i
+ * torna, per a cada metrica, els valors, la mediana i el percentil 90. Un
+ * salt o un acte que no arriba, o una tripulacio que no es contracta, compta
+ * com a Infinity (pitjor que qualsevol valor) i es compta a `missing`.
+ * @param {{seed?:number, seeds?:number, flights?:number}} opts
+ */
+export function runSeeds({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights } = {}) {
+  const results = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights }));
+  const runs = results.map(r => r.metrics);
+  const rows = [];
+  const add = (key, label, values) => rows.push({
+    key, label, values, median: median(values), p90: percentile(values, 90),
+    missing: values.filter(v => v === Infinity).length
+  });
+  add('firstCrew', 'primera tripulacio (vol)', runs.map(m => m.firstCrew ?? Infinity));
+  for (let i = 0; i + 1 < H.ladder.length; i++) {
+    add('jump' + (i + 1), 'salt ' + (i + 1) + ' ' + H.ladder[i] + ' -> ' + H.ladder[i + 1] + ' (vols)',
+      runs.map(m => m.jumps[i] ?? Infinity));
+  }
+  add('negativePct', 'vols en negatiu (%)', runs.map(m => m.negativePct));
+  for (const act of CLOSABLE_ACTS) {
+    add('act' + act, 'acte ' + act + ' (h de joc)', runs.map(m => m.actHours[act] ?? Infinity));
+  }
+
+  // Corba objectiu: net mitja per vol de cada tipus, sumant els vols de totes les llavors
+  const curve = [];
+  for (const t of H.ladder) {
+    const log = results.flatMap(r => r.log.filter(e => e.typeId === t));
+    if (!log.length) continue;
+    const avg = k => log.reduce((sum, e) => sum + e[k], 0) / log.length;
+    const [ts, tf] = H.targets[t];
+    curve.push({ typeId: t, flights: log.length, solo: avg('netSolo'), full: avg('netFull'),
+      devSolo: avg('netSolo') / ts - 1, devFull: avg('netFull') / tf - 1 });
+  }
+
+  return { seed, seeds, flights, rows, curve, criteria: seedCriteria(rows, curve) };
+}
+
+/** Avalua CRITERIA sobre les files de runSeeds. Torna [{ text, ok }]. */
+function seedCriteria(rows, curve) {
+  const M = CRITERIA.median, P = CRITERIA.p90;
+  const row = key => rows.find(r => r.key === key);
+  const jumps = rows.filter(r => r.key.startsWith('jump'));
+  const acts = rows.filter(r => r.key.startsWith('act'));
+  const num = v => v === Infinity ? 'no arriba' : Number.isInteger(v) ? String(v) : v.toFixed(1);
+  const crew = row('firstCrew'), neg = row('negativePct');
+  return [
+    { text: 'mediana: cada salt entre ' + M.jumpMin + ' i ' + M.jumpMax + ' vols (el primer fins a ' + M.firstJumpMax + '): ' +
+        jumps.map(r => num(r.median)).join(', '),
+      ok: jumps.every((r, i) => r.median >= M.jumpMin && r.median <= (i === 0 ? M.firstJumpMax : M.jumpMax)) },
+    { text: 'mediana: primera tripulacio entre el vol ' + M.firstCrewMin + ' i el ' + M.firstCrewMax + ': ' + num(crew.median),
+      ok: crew.median >= M.firstCrewMin && crew.median <= M.firstCrewMax },
+    { text: 'mediana: vols en negatiu < ' + M.negativePctMax + ' %: ' + num(neg.median) + ' %',
+      ok: neg.median < M.negativePctMax },
+    { text: 'mediana: cap acte de mes de ' + M.actHoursMax + ' h: ' + acts.map(r => num(r.median)).join(', '),
+      ok: acts.every(r => r.median <= M.actHoursMax) },
+    { text: 'p90: cap salt de mes de ' + P.jumpMax + ' vols: ' + jumps.map(r => num(r.p90)).join(', '),
+      ok: jumps.every(r => r.p90 <= P.jumpMax) },
+    { text: 'p90: cap acte de mes de ' + P.actHoursMax + ' h: ' + acts.map(r => num(r.p90)).join(', '),
+      ok: acts.every(r => r.p90 <= P.actHoursMax) },
+    { text: 'Corba objectiu dins del +-' + 100 * CRITERIA.curveMaxDev + ' %: ' +
+        curve.map(c => c.typeId + ' ' + Math.round(100 * c.devSolo) + '/' + Math.round(100 * c.devFull)).join(', '),
+      ok: curve.length === H.ladder.length &&
+        curve.every(c => Math.abs(c.devSolo) <= CRITERIA.curveMaxDev && Math.abs(c.devFull) <= CRITERIA.curveMaxDev) }
+  ];
+}
+
+/** Text de l informe de runSeeds. */
+export function formatSeeds(s) {
+  const out = [];
+  const p = x => out.push(x);
+  const num = v => v === Infinity ? 'no arriba' : Number.isInteger(v) ? String(v) : v.toFixed(1);
+  p('Harness economic de Pont Aeri — ' + s.seeds + ' llavors (' + s.seed + ' a ' + (s.seed + s.seeds - 1) + '), ' +
+    s.flights + ' vols, K = ' + BALANCE.K + ', termini ' + BALANCE.financing.termFlights + ' vols');
+  p('');
+  p('  metrica                           mediana        p90   no arriba');
+  for (const r of s.rows) {
+    p('  ' + r.label.padEnd(32) + num(r.median).padStart(9) + num(r.p90).padStart(11) + String(r.missing).padStart(12));
+  }
+  p('');
+  p('Corba objectiu (net mitja per vol de tots els vols de cada tipus; objectiu de DESIGN.md)');
+  p('  tipus     vols        sol    desv.       complet    desv.');
+  const dev = d => (d * 100).toFixed(0).padStart(5) + ' %';
+  for (const c of s.curve) {
+    p('  ' + c.typeId.padEnd(8) + pad(c.flights, 5) + pad(fmt(c.solo), 11) + '  ' + dev(c.devSolo) +
+      pad(fmt(c.full), 14) + '  ' + dev(c.devFull));
+  }
+  p('');
+  p('Criteris (seccio 10, sobre ' + CRITERIA.seeds + ' llavors)' +
+    (s.seeds === CRITERIA.seeds ? '' : ' — ATENCIO: aquesta passada en fa ' + s.seeds));
+  for (const c of s.criteria) p('  ' + c.text + ' -> ' + (c.ok ? 'compleix' : 'NO compleix'));
+  return out.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Informe
+
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const pad = (s, n) => String(s).padStart(n);
+
+/** Text de l informe de runBalance. */
+export function formatReport(r) {
+  const out = [];
+  const p = s => out.push(s);
+  p('Harness economic de Pont Aeri — llavor ' + r.seed + ', ' + r.flights + ' vols, K = ' + BALANCE.K +
+    ', termini ' + BALANCE.financing.termFlights + ' vols');
+  p('');
+
+  p('Corba de cash (cada 10 vols; deute = prestecs vius)');
+  p('   vol  tipus         cash          deute     XP  rang');
+  for (const e of r.log) {
+    if (e.flight % 10 === 0 || e.flight === 1) {
+      p(pad(e.flight, 6) + '  ' + e.typeId.padEnd(8) + pad(fmt(e.cash), 13) + pad(fmt(e.debt), 15) +
+        pad(e.xp, 7) + '  ' + e.rank);
+    }
+  }
+  const minCash = r.log.reduce((m, e) => Math.min(m, e.cash), Infinity);
+  p('  cash minim: ' + fmt(minCash));
+  p('');
+
+  p('Compres (vol 0 = en sortir de l escola)');
+  let prev = null;
+  for (const c of r.purchases) {
+    const gap = prev === null ? '' : '  (+' + (c.flight - prev) + ' vols)';
+    const aff = r.affordableAt[c.typeId];
+    const waited = aff !== undefined && aff < c.flight ? '  diners des del vol ' + aff + ', esperant rang' : '';
+    p('  vol ' + pad(c.flight, 3) + '  ' + c.typeId.padEnd(8) + ' preu ' + pad(fmt(c.price), 11) +
+      '  entrada ' + pad(fmt(c.downPayment), 11) + '  habilitacio ' + pad(fmt(c.ratingCost), 8) + gap + waited);
+    prev = c.flight;
+  }
+  const bought = new Set(r.purchases.map(c => c.typeId));
+  for (const t of H.ladder) {
+    if (!bought.has(t)) {
+      const aff = r.affordableAt[t];
+      p('  no comprat: ' + t + (aff !== undefined ? ' (diners des del vol ' + aff + ', sense el rang)' : ''));
+      break;
+    }
+  }
+  p('');
+
+  p('Tripulacions contractades');
+  for (const t of H.ladder) {
+    const c = r.crews.filter(x => x.typeId === t);
+    if (c.length) p('  ' + t.padEnd(8) + ' ' + c.map(x => 'vol ' + x.flight + ' (' + fmt(x.cost) + ')').join(', '));
+  }
+  p('');
+
+  p('Corba objectiu (net mitja per vol del mateix vol sol i amb tripulacio completa; objectiu de DESIGN.md)');
+  p('  tipus     vols        sol   objectiu    desv.       complet   objectiu    desv.');
+  for (const t of H.ladder) {
+    const rows = r.log.filter(e => e.typeId === t);
+    if (!rows.length) continue;
+    const avg = k => rows.reduce((s, e) => s + e[k], 0) / rows.length;
+    const [ts, tf] = H.targets[t];
+    const dev = (v, tgt) => ((v / tgt - 1) * 100).toFixed(0).padStart(5) + ' %';
+    p('  ' + t.padEnd(8) + pad(rows.length, 5) + pad(fmt(avg('netSolo')), 11) + pad(fmt(ts), 11) + '  ' + dev(avg('netSolo'), ts) +
+      pad(fmt(avg('netFull')), 14) + pad(fmt(tf), 11) + '  ' + dev(avg('netFull'), tf));
+  }
+  const xpAvg = r.log.reduce((s, e) => s + e.xpGain, 0) / r.log.length;
+  p('  XP mitjana per vol: ' + xpAvg.toFixed(1));
+  p('');
+
+  p('Rangs');
+  for (const k of r.ranks) p('  ' + k.key.padEnd(11) + ' vol ' + k.flight);
+  const reached = new Set(r.ranks.map(k => k.key));
+  const next = BALANCE.ranks.find(k => !reached.has(k.key));
+  if (next) {
+    const last = r.log[r.log.length - 1];
+    p('  ' + next.key.padEnd(11) + ' no arriba (' + last.xp + ' de ' + next.xp + ' XP)');
+  }
+  p('');
+
+  const neg = r.log.filter(e => e.flightResult < 0).length;
+  p('Vols en negatiu (resultat del vol - manteniment - danys, sense quotes): ' + neg + ' de ' + r.log.length +
+    ' (' + (100 * neg / r.log.length).toFixed(1) + ' %)');
+  const negCash = r.log.filter(e => e.flightResult - e.instalments < 0).length;
+  p('Vols en negatiu comptant les quotes: ' + negCash + ' (' + (100 * negCash / r.log.length).toFixed(1) + ' %)');
+  p('');
+
+  p('Actes (hores de joc = minuts reals de cada vol, 12-25 segons la ruta)');
+  p('  acte  vols   hores   resultat/h   net/vol   net mitja per tipus');
+  const acts = [...new Set(r.log.map(e => e.act))];
+  const actHours = {};
+  for (const act of acts) {
+    const rows = r.log.filter(e => e.act === act);
+    const hours = rows.reduce((s, e) => s + e.realMin, 0) / MINUTES_PER_HOUR;
+    actHours[act] = hours;
+    const sum = rows.reduce((s, e) => s + e.flightResult, 0);
+    const types = [...new Set(rows.map(e => e.typeId))]
+      .map(t => { const x = rows.filter(e => e.typeId === t); return t + ' ' + fmt(x.reduce((s, e) => s + e.net, 0) / x.length); });
+    const open = act === acts[acts.length - 1] ? '  (obert: la simulacio acaba aqui)' : '';
+    p(pad(act, 6) + pad(rows.length, 6) + pad(hours.toFixed(1), 8) + pad(fmt(sum / hours), 13) +
+      pad(fmt(sum / rows.length), 10) + '   ' + types.join(', ') + open);
+  }
+  p('');
+
+  // Criteris de la seccio 10, pero d una sola llavor: nomes orientatiu
+  const M = CRITERIA.median;
+  const gaps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
+  const allJumps = r.purchases.length === H.ladder.length;
+  const jumpsOk = allJumps && gaps.every((g, i) =>
+    g >= M.jumpMin && g <= (i === 0 ? M.firstJumpMax : M.jumpMax));
+  const negOk = 100 * neg / r.log.length < M.negativePctMax;
+  const closed = acts.slice(0, -1);
+  const actsOk = closed.every(a => actHours[a] <= M.actHoursMax);
+  const yes = ok => ok ? 'compleix' : 'NO compleix';
+  p('Llindars de la mediana en aquesta llavor (orientatiu: el criteri de la seccio 10 es sobre ' +
+    CRITERIA.seeds + ' llavors, npm run balance -- --seeds ' + CRITERIA.seeds + ')');
+  p('  salts de classe entre ' + M.jumpMin + ' i ' + M.jumpMax + ' vols (el primer fins a ' +
+    M.firstJumpMax + '): ' + (gaps.join(', ') || '-') +
+    (allJumps ? '' : ' (falten ' + (H.ladder.length - r.purchases.length) + ' salts)') + ' -> ' + yes(jumpsOk));
+  p('  vols en negatiu < ' + M.negativePctMax + ' %: ' + (100 * neg / r.log.length).toFixed(1) + ' % -> ' + yes(negOk));
+  p('  actes tancats de ' + M.actHoursMax + ' h o menys: ' +
+    (closed.map(a => a + ': ' + actHours[a].toFixed(1) + ' h').join(', ') || '-') + ' -> ' + yes(actsOk));
+  p('');
+
+  const bills = r.checks.map(c => c.kind + '@' + c.flight + ' ' + fmt(c.cost));
+  p('Revisions: ' + (bills.length ? bills.join(', ') : 'cap'));
+  p('Estat final valid: ' + (r.valid.ok ? 'si' : 'NO — ' + r.valid.errors.join('; ')));
+  return out.join('\n');
+}
+
+/** Arguments de la linia d ordres: [llavor] [vols] i --seeds N. Amb
+ * npm run balance --seeds N (sense --), npm es queda el --seeds
+ * (npm_config_seeds = 'true') i passa nomes la N: es el primer posicional. */
+function parseArgs(argv, env) {
+  const pos = [];
+  let seeds = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--seeds') seeds = Number(argv[++i]);
+    else if (argv[i].startsWith('--seeds=')) seeds = Number(argv[i].slice('--seeds='.length));
+    else pos.push(argv[i]);
+  }
+  if (seeds === null && env.npm_config_seeds !== undefined) {
+    seeds = Number(env.npm_config_seeds === 'true' ? pos.shift() : env.npm_config_seeds);
+  }
+  if (seeds !== null && !(Number.isInteger(seeds) && seeds >= 1)) throw new Error('--seeds ha de ser un enter >= 1');
+  return {
+    seed: pos[0] !== undefined ? Number(pos[0]) : H.seed,
+    flights: pos[1] !== undefined ? Number(pos[1]) : H.flights,
+    seeds
+  };
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const { seed, flights, seeds } = parseArgs(process.argv.slice(2), process.env);
+  console.log(seeds === null ? formatReport(runBalance({ seed, flights })) : formatSeeds(runSeeds({ seed, seeds, flights })));
+}

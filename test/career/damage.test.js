@@ -127,28 +127,28 @@ describe('assessDamage: accident', () => {
     assess(record(td, { crashCause: 'hardImpact', ...over }), { crashSeverity: s });
 
   test('severitat 0: el minim', () => {
-    // 0.15 * 8M = 1.200.000; 14 dies; 200 XP
+    // 0.15 * 8M = 1.200.000; 14 dies; 30 XP
     assert.deepEqual(crash(0), {
       items: [{ id: 'crash', cost: 1200000, groundedDays: 14 }],
-      cost: 1200000, playerCost: 1200000, groundedDays: 14, xpLoss: 200
+      cost: 1200000, playerCost: 1200000, groundedDays: 14, xpLoss: 30
     });
   });
 
   test('severitat 1: el maxim', () => {
-    // 0.60 * 8M = 4.800.000; 45 dies; 1500 XP
+    // 0.60 * 8M = 4.800.000; 45 dies; 200 XP
     assert.deepEqual(crash(1), {
       items: [{ id: 'crash', cost: 4800000, groundedDays: 45 }],
-      cost: 4800000, playerCost: 4800000, groundedDays: 45, xpLoss: 1500
+      cost: 4800000, playerCost: 4800000, groundedDays: 45, xpLoss: 200
     });
   });
 
   test('severitat 0.5: interpolat i arrodonit', () => {
     // pct = 0.15 + 0.45 * 0.5 = 0.375 -> 3.000.000
-    // dies = 14 + 31 * 0.5 = 29.5 -> 30; XP = 200 + 1300 * 0.5 = 850
+    // dies = 14 + 31 * 0.5 = 29.5 -> 30; XP = 30 + 170 * 0.5 = 115
     const r = crash(0.5);
     assert.equal(r.cost, 3000000);
     assert.equal(r.groundedDays, 30);
-    assert.equal(r.xpLoss, 850);
+    assert.equal(r.xpLoss, 115);
   });
 
   test('sense crashSeverity o fora de [0, 1]: Error', () => {
@@ -177,7 +177,7 @@ describe('assessDamage: mode', () => {
   test('contract amb accident: playerCost 0, XP perduda igual', () => {
     const r = assess(record({}, { crashCause: 'water' }), { mode: 'contract', crashSeverity: 1 });
     assert.equal(r.playerCost, 0);
-    assert.equal(r.xpLoss, 1500);
+    assert.equal(r.xpLoss, 200);
   });
 
   test('mode desconegut o valor invalid: Error', () => {
