@@ -49,7 +49,7 @@ export const METRICS = [
   'landed', 'crashed', 'score', 'onRunway', 'maxAltFt', 'tailStrike', 'bounces',
   'fuelBurntKg', 'fuelPlannedKg', 'fuelWithinPlan', 'viewsVisited',
   'controlsIdentified', 'reachedThreshold', 'gearUp', 'altDeviationMaxFt',
-  'stabilizedOnFinal', 'ilsFlown'
+  'stabilizedOnFinal', 'ilsFlown', 'headingChangeDeg'
 ];
 
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
