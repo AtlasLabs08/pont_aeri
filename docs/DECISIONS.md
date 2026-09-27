@@ -165,3 +165,45 @@ evaluateCheckRide(ratingId, facts) diu si s'ha passat i prou. Donar l'habilitaci
 - discardCareer() sempre intenta backupCareer() primer. Si la copia falla (Storage ple o refusant) i hi havia partida, no esborra res: es prefereix deixar una partida bruta pero recuperable a perdre-la sense cap rastre.
 - emit() amb un tema fora de TOPICS llanca (error de programacio d'un mòdul, no una entrada de l'usuari); un subscriptor que llanca no bloqueja els altres ni fa llancar emit: es un error de la UI, no del bus.
 - loadCareer() distingeix 'migrated' de 'ok' comparant schemaVersion de l'estat cru amb SCHEMA_VERSION abans de migrar. Avui career/state.js nomes accepta schemaVersion === 1 (MIGRATIONS hi es buit), aixi que aquest estat no te encara cap prova amb una migracio real: queda preparat per quan n'hi hagi una.
+
+## 2026-09-27 - C3+C4: D1-D8, encarrec de l escola de vol
+
+Decisions d'en Marc per a C3 (executor de llicons) i C4 (ajudes de l escola).
+
+- D1. Mentre no existeixi el C5, les llicons es llancen des del panell DEV
+  (nomes IS_DEV). El panell DEV queda fora d'i18n (decisio ja existent, vegeu
+  "Noms propis i panell DEV fora d'i18n"). Hi ha un boto DEV "desbloqueja-les
+  totes" que nomes marca les llicons com a aprovades a la memoria (school),
+  sense passar per recordLessonAttempt.
+- D2. El progres de l escola (l objecte school de CareerState) viu nomes en
+  memoria. No es desa. La persistencia la decideix el C5.
+- D3. Un vol abandonat (cancelFlight) no compta com a intent. Un crash si que
+  compta, i sempre es un suspens: els fets en viu inclouen sempre crashed, i
+  un crash sense crashed aprovaria la llico.
+- D4. Totes les llicons es fan a LEBL, amb meteo calma (sense turbulencia,
+  vent 0). maxAltFt de la llico 4 (takeoff) es AGL: app/lesson-run.js el
+  calcula en viu i substitueix el maxAltFt (MSL) del FlightRecord en combinar
+  els fets.
+- D5. Llico 5 (maneuvers): comenca en vol, anivellat. Altitud de referencia =
+  altitud inicial de l intent. S'avalua en complir 120 s (durationS a
+  lessons.js), no continuament. Criteri nou: canvi de rumb total acumulat
+  >= 180 graus (metrica nova headingChangeDeg, afegida a METRICS de
+  school.js, amb prova).
+- D6. Llico 6 (circuit), "final estabilitzat": en creuar 500 ft AGL a menys
+  de 3 nm del llindar, i mantingut 10 s: rumb a +-10 graus de la pista, tren
+  avall, flaps d'aterratge, IAS entre Vref-5 i Vref+20 kt, sink <= 1000 fpm.
+  Llindars a LESSONS['circuit'].finalStabilized.
+- D7. Barra d'arrodoniment (C4): sink desitjada lineal de 500 fpm a 50 ft AGL
+  fins a 150 fpm al contacte. Visible des de 50 ft AGL fins al contacte.
+  Llindars a LESSONS['landing'].flareBar.
+- D8. Barra d'arrodoniment i debrief automatic: nomes a la llico 7, marcats
+  com a dades a lessons.js (aids: { flareBar: true, autoDebrief: true }), mai
+  com a condicio al codi.
+
+Consequencia tecnica no discutida per en Marc, nomes registrada: Game.scoreReport
+(index.html) no exposava els punts maxims de cada component (sink, g, zone,
+center, attitude), nomes els aconseguits. app/debrief.js els necessita per
+decidir "OK" / "Needs improvement" (regla 8 de la seccio 0: no copiar-los a
+ma). S'ha afegit un camp ptsMax al retorn de scoreReport amb els mateixos
+coeficients que ja hi havia a la formula (35, 15, 20, 20, 10): cap fisica
+nova, nomes exposar el que ja hi era. Vegeu la descripcio del PR.
