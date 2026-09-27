@@ -1329,11 +1329,12 @@ const AircraftModel = {
     c.fillStyle = '#10161f'; for (const s of [0, 1]) { const a = s ? 1 - cw[3] : cw[2], b = s ? 1 - cw[2] : cw[3]; c.fillRect(cw[0] * W, a * H, (cw[1] - cw[0]) * W, (b - a) * H); }
     c.fillRect(cw[0] * W, cw[3] * H, (cw[1] - cw[0]) * W * 0.6, (1 - 2 * cw[3]) * H);
     c.fillStyle = lv.base; for (const s of [0, 1]) { const a = s ? 1 - cw[3] : cw[2]; c.fillRect(cw[0] * W, (a + (cw[3] - cw[2]) * 0.5) * H - 1, (cw[1] - cw[0]) * W, 2); }
-    // airline titles (left side upright, right side rotated so it also reads correctly)
+    // airline titles: the two bands need different flips to read correctly from their own side
+    // (the fuselage body of revolution and the v-flipped CanvasTexture combine differently on each)
     c.font = 'bold ' + Math.round(H * 0.085) + 'px Georgia, serif'; c.textBaseline = 'middle'; c.fillStyle = lv.main;
     const tx = (cfg.model.hump ? 0.34 : 0.17) * W;
-    c.fillText(cfg.airline, tx, H * 0.635);
-    c.save(); c.translate(tx + c.measureText(cfg.airline).width, H * 0.365); c.rotate(Math.PI); c.fillText(cfg.airline, 0, 0); c.restore();
+    c.save(); c.translate(tx + c.measureText(cfg.airline).width, H * 0.635); c.scale(-1, 1); c.fillText(cfg.airline, 0, 0); c.restore();
+    c.save(); c.translate(tx, H * 0.365); c.scale(1, -1); c.fillText(cfg.airline, 0, 0); c.restore();
     const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t;
   },
 
@@ -1413,7 +1414,9 @@ const AircraftModel = {
     }
     if (M.wing === 'low') { const f = add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), std(lv.belly, 0.5))); f.scale.set(M.fuseR * 1.02, M.fuseR * 0.42, cr * 0.95); f.position.set(0, -M.fuseR * 0.78, -xLE + cr * 0.55); }
     else { const f = add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), std(lv.base, 0.5))); f.scale.set(M.fuseR * 0.8, M.fuseR * 0.3, cr * 0.9); f.position.set(0, M.fuseR * 0.92, -xLE + cr * 0.5);
-      for (const s of [1, -1]) { const sp = add(new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), std(lv.belly, 0.5))); sp.scale.set(0.75, 0.62, 3.4); sp.position.set(s * (M.fuseR * 0.86 + 0.25), -M.fuseR * 0.62, 1.0); } }
+      // gear-pod fairings: capped so they never reach down past the top of the (down) main wheel, whatever the aircraft's scale
+      const gzFair = cfg.gear.zStatic + cfg.gear.staticDefl, mainWheelTopY = 2 * G.wheelR - gzFair, fairYc = -M.fuseR * 0.62, fairYh = Math.max(0.10, fairYc - mainWheelTopY - 0.05);
+      for (const s of [1, -1]) { const sp = add(new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), std(lv.belly, 0.5))); sp.scale.set(M.fuseR * 0.543, fairYh, M.fuseR * 2.464); sp.position.set(s * M.fuseR * 1.041, fairYc, M.fuseR * 0.725); } }
     // ---------- tail ----------
     const tailZ = -M.noseX + M.length, finRootZ = tailZ - G.finChord * 1.12, finBaseY = M.fuseR * 0.62 + M.fuseR * 0.35;
     const F = this.surface({ span: G.finH, cr: G.finChord, ct: G.finChord * 0.36, sweepLE: G.finSweep, dihedral: 0, thick: 0.10, boxEnd: 0.68 });
@@ -1439,11 +1442,13 @@ const AircraftModel = {
         const py = add(new THREE.Mesh(new THREE.BoxGeometry(0.32, r * 0.9 + 0.7, l * 0.85), mNac), eg); py.position.set(0, r * 0.9, l * 0.12);
         parts.engines.push({ blades, group: eg });
       } else {
-        const nac = add(new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mNac), eg); nac.scale.set(G.nacR, G.nacR * 1.05, G.nacL * 0.5); nac.position.set(0, -0.25, 1.3);
-        const spin = add(new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.95, 12), mDark), eg); spin.rotation.x = -Math.PI / 2; spin.position.z = -1.35;
-        const blades = new THREE.Group(); for (let k = 0; k < 6; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.26, 0.04), mDark); bl.position.x = 1.05; bl.rotation.x = 0.5; const h = new THREE.Group(); h.rotation.z = k / 6 * 6.283; h.add(bl); blades.add(h); bl.castShadow = true; }
-        blades.position.z = -1.2; eg.add(blades);
-        const disc = new THREE.Mesh(new THREE.CircleGeometry(1.95, 28), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })); disc.position.z = -1.2; eg.add(disc);
+        // spinner/blades/disc proportions fixed at the tp category's nacR/nacL (0.62 / 4.6): scale by r,l so smaller/larger airframes keep the same ratio
+        const r = G.nacR, l = G.nacL;
+        const nac = add(new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mNac), eg); nac.scale.set(r, r * 1.05, l * 0.5); nac.position.set(0, -0.4032 * r, 0.2826 * l);
+        const spin = add(new THREE.Mesh(new THREE.ConeGeometry(0.5806 * r, 0.2065 * l, 12), mDark), eg); spin.rotation.x = -Math.PI / 2; spin.position.z = -0.2935 * l;
+        const blades = new THREE.Group(); for (let k = 0; k < 6; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(2.8226 * r, 0.4194 * r, 0.0645 * r), mDark); bl.position.x = 1.6935 * r; bl.rotation.x = 0.5; const h = new THREE.Group(); h.rotation.z = k / 6 * 6.283; h.add(bl); blades.add(h); bl.castShadow = true; }
+        blades.position.z = -0.2609 * l; eg.add(blades);
+        const disc = new THREE.Mesh(new THREE.CircleGeometry(3.1452 * r, 28), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })); disc.position.z = -0.2609 * l; eg.add(disc);
         parts.engines.push({ blades, disc, group: eg });
       }
     });

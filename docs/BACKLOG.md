@@ -11,3 +11,4 @@ Idees aparcades. No es toca res d aqui fins que el bucle economic hagi demostrat
 | Passatgers pujant i baixant renderitzats | Car i aporta poc. Barra d embarcament que consumeix temps real. |
 | Suport per comandament | Mes endavant. |
 | Unificar la funcio eur (duplicada a economy.js, wear.js i damage.js) en un modul compartit de career/ | Refactor, no es funcionalitat: va en un PR a part. |
+| Models 3D definitius per al llancament: primer GLB parametrics generats des d aircraft-data.js (nodes amb noms fixos, UV per a la lliurea, prova automatica contra la fisica), despres un artista en refa l aspecte | Va despres de M2: primer el render ha de sortir d index.html. |
