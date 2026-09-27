@@ -26,6 +26,9 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 4. **Cap constant econòmica fora de `src/career/balance.js`.** A la resta de
    `career/` només es permeten constants d'unitats amb nom
    (`SECONDS_PER_HOUR`, `KG_PER_TONNE`, escales 0–100), mai valors econòmics.
+   Excepció: `src/career/lessons.js` és un fitxer de dades amb els llindars de
+   pilotatge de les lliçons i dels check-rides (ft, vistes, notes); els valors
+   econòmics i `passScore`/`mercyScore`/`mercyAttempt` continuen a `balance.js`.
 5. **Cap `Math.random()` a `src/career/`.** Vegeu §7.
 6. **Respecta la taula de dependències de §3.** `career/` no toca el navegador.
 7. **Cap text visible nou fora de `src/i18n/`.** Vegeu §9.
@@ -326,6 +329,9 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
 Un sol objecte exportat. Cap altre fitxer de `career/` pot contenir un número
 que no sigui 0, 1, un índex o una constant d'unitats amb nom
 (`SECONDS_PER_HOUR`, `KG_PER_TONNE`, escales 0–100); mai un valor econòmic.
+L'única excepció és `career/lessons.js`, un fitxer de dades amb els llindars de
+pilotatge de l'escola i dels check-rides (vegeu la regla 4 de §0 i
+`docs/DECISIONS.md`, 27/09/2026).
 `version` es queda a 1 fins que el mode Airline arribi a `main`: mentre no hi
 hagi partides reals de jugadors, afegir o canviar valors no puja `version` ni
 afegeix migració. A partir del primer merge d'Airline a `main`, qualsevol canvi
@@ -639,7 +645,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
-| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | Afegir una lliçó no toca codi. Inclou els check-rides de les habilitacions (criteris a DESIGN.md, Habilitacions de tipus) |
+| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | **Fet.** `career/lessons.js` (8 lliçons i 4 check-rides, només dades) i `career/school.js` (`METRICS`, `factsFromRecord`, `evaluate`, `isLessonAvailable`, `recordLessonAttempt`, `canGraduate`, `evaluateCheckRide`). Afegir una lliçó no toca codi. La gràcia de la lliçó 7 (nota ≥ 30) s'aplica a partir del tercer intent inclòs. Els check-rides només avaluen: l'habilitació es compra a `progression.js`. 68 proves noves (66 a `school.test.js`, 2 de `purity.test.js`), 960 en total |
 | C2 | `app/`: bus, `setFlightLauncher`, `onFlightFinished` | A2, A5 | Un vol llançat des d'`app` torna el seu `FlightRecord` |
 | C3 | Executor de lliçons a `index.html`: instructor al HUD, criteris en viu | C1, C2, A4 | Les 8 lliçons es poden completar |
 | C4 | Ajudes de l'escola: barra d'arrodoniment, debrief automàtic | C3 | Només visibles dins l'escola |
