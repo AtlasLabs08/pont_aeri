@@ -13,3 +13,4 @@ export * from './progression.js';
 export * from './finance.js';
 export * from './rng.js';
 export * from './crew.js';
+export * from './lessons.js';
