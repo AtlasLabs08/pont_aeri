@@ -158,3 +158,10 @@ recordLessonAttempt rep i retorna nomes CareerState.school ({ lessonsPassed, att
 
 ## 2026-09-27 - C1: els check-rides nomes avaluen
 evaluateCheckRide(ratingId, facts) diu si s'ha passat i prou. Donar l'habilitacio, comprovar el rang i cobrar-ne el cost son de purchaseRating a progression.js. El setup de cada check-ride (vent creuat, ILS, massa) es informacio per al C3 i el D3: school.js no l'interpreta.
+
+## 2026-09-27 - C2: app/, bus i final de vol
+- onFlightFinished cridat sense cap vol en marxa (Free Flight, o una segona crida sobre el mateix vol) no fa res i retorna false, en comptes de llancar: index.html no sap si el vol que acaba de tocar terra era d'Airline o no, i preguntar-ho abans de cridar seria imports circulars amb Game.
+- cancelFlight() resol la promesa de launchFlight amb null (vol abandonat, no un error): qui l'ha demanat ja sap que no hi haura FlightRecord i pot netejar la UI en el then, no en un catch.
+- discardCareer() sempre intenta backupCareer() primer. Si la copia falla (Storage ple o refusant) i hi havia partida, no esborra res: es prefereix deixar una partida bruta pero recuperable a perdre-la sense cap rastre.
+- emit() amb un tema fora de TOPICS llanca (error de programacio d'un mòdul, no una entrada de l'usuari); un subscriptor que llanca no bloqueja els altres ni fa llancar emit: es un error de la UI, no del bus.
+- loadCareer() distingeix 'migrated' de 'ok' comparant schemaVersion de l'estat cru amb SCHEMA_VERSION abans de migrar. Avui career/state.js nomes accepta schemaVersion === 1 (MIGRATIONS hi es buit), aixi que aquest estat no te encara cap prova amb una migracio real: queda preparat per quan n'hi hagi una.

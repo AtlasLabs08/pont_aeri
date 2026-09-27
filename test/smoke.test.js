@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import * as core from '../src/core/index.js';
 import * as world from '../src/world/index.js';
+import * as app from '../src/app/index.js';
 
 test('core exporta el que ha d exportar', () => {
   for (const name of [
@@ -28,6 +29,16 @@ test('core exporta el que ha d exportar', () => {
 test('world exporta el que ha d exportar', () => {
   for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm']) {
     assert.ok(name in world, `falta l export: ${name}`);
+  }
+});
+
+test('app exporta el que ha d exportar', () => {
+  for (const name of [
+    'TOPICS', 'on', 'off', 'emit',
+    'setFlightLauncher', 'launchFlight', 'onFlightFinished', 'cancelFlight', 'isFlightInProgress',
+    'CAREER_KEY', 'loadCareer', 'saveCareer', 'backupCareer', 'discardCareer'
+  ]) {
+    assert.ok(name in app, `falta l export: ${name}`);
   }
 });
 
