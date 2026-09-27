@@ -314,6 +314,25 @@ describe('factsFromRecord', () => {
     assert.equal(factsFromRecord(record({ fuelBurntKg: 351 })).fuelWithinPlan, false);
   });
 
+  test('fuelWithinPlan sense skippedCruiseFuelKg compta 0, al limit', () => {
+    const r = record({ fuelBurntKg: 350 });
+    delete r.skippedCruiseFuelKg;
+    assert.equal(factsFromRecord(r).fuelWithinPlan, true);
+    assert.equal(factsFromRecord({ ...r, fuelBurntKg: 351 }).fuelWithinPlan, false);
+  });
+
+  test('fuelWithinPlan compta el creuer saltat amb la penalitzacio', () => {
+    // 300 kg cremats de 350 planificats: dins. Amb 50 kg saltats:
+    // 300 + 50 * (1 + 0,08) = 354 > 350: fora.
+    assert.equal(BALANCE.cruiseSkipFuelPenalty, 0.08);
+    assert.equal(factsFromRecord(record({ fuelBurntKg: 300 })).fuelWithinPlan, true);
+    const f = factsFromRecord(record({ fuelBurntKg: 300, skippedCruiseFuelKg: 50, usedCruiseSkip: true }));
+    assert.equal(f.fuelWithinPlan, false);
+    assert.equal(f.fuelBurntKg, 300);
+    // 46 kg saltats: 300 + 49,68 = 349,68, encara dins
+    assert.equal(factsFromRecord(record({ fuelBurntKg: 300, skippedCruiseFuelKg: 46 })).fuelWithinPlan, true);
+  });
+
   test('no toca el record', () => {
     const r = record(), before = clone(r);
     factsFromRecord(r);

@@ -13,7 +13,9 @@
  *     FlightRecord: landed (touchdown != null), crashed (crashCause != null),
  *     score, onRunway i bounces (del touchdown; null si no n hi ha),
  *     maxAltFt, tailStrike, fuelBurntKg, fuelPlannedKg i fuelWithinPlan
- *     (fuelBurntKg <= fuelPlannedKg). La resta de METRICS els omple el C3 en
+ *     (fuelBurntKg + skippedCruiseFuelKg * (1 + cruiseSkipFuelPenalty)
+ *     <= fuelPlannedKg, el combustible efectiu d economy.js; sense
+ *     skippedCruiseFuelKg compta 0). La resta de METRICS els omple el C3 en
  *     viu.
  *   evaluate(criteria, facts, schoolPass = BALANCE.school.passScore)
  *     -> { passed, results: [{ metric, op, target, value, ok }] }
@@ -61,6 +63,9 @@ const OPS = {
 export function factsFromRecord(record) {
   const td = record.touchdown ?? null;
   const burnt = record.fuelBurntKg, planned = record.fuelPlannedKg;
+  const skipped = record.skippedCruiseFuelKg ?? 0;
+  // mateixa formula que el combustible efectiu de computeFlightResult (economy.js)
+  const effective = burnt + skipped * (1 + BALANCE.cruiseSkipFuelPenalty);
   return {
     landed: td !== null,
     crashed: record.crashCause != null,
@@ -71,7 +76,7 @@ export function factsFromRecord(record) {
     tailStrike: record.tailStrike,
     fuelBurntKg: burnt,
     fuelPlannedKg: planned,
-    fuelWithinPlan: isNum(burnt) && isNum(planned) ? burnt <= planned : null
+    fuelWithinPlan: isNum(effective) && isNum(planned) ? effective <= planned : null
   };
 }
 
