@@ -128,6 +128,17 @@ describe('validate', () => {
     assert.match(errorsOf(s), /fleet\[1\]\.reg: matricula repetida EC-AAA/);
   });
 
+  test('cada prestec porta un id unic', () => {
+    for (const bad of [undefined, '', 7, null]) {
+      const s = fullCareer(); s.company.loans[0].id = bad;
+      assert.match(errorsOf(s), /company\.loans\[0\]\.id/, String(bad));
+    }
+    const s = fullCareer(); s.company.loans.push({ id: 'L1' });
+    assert.match(errorsOf(s), /company\.loans\[1\]\.id: prestec repetit L1/);
+    const t = fullCareer(); t.company.loans.push('L2');
+    assert.match(errorsOf(t), /company\.loans\[1\]: no es un objecte/);
+  });
+
   test('routesFlown en format AAAA-BBBB i ordre alfabetic', () => {
     for (const ok of ['LEBL-LEPA', 'GCLP-LEMD', 'LEBL-LEBL']) {
       const s = fullCareer(); s.network.routesFlown = [ok];

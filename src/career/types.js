@@ -56,7 +56,9 @@
  * nomes exigeix que siguin objectes. */
 
 /** @typedef {Object} LogEntry   una linia del quadern de vol, append-only */
-/** @typedef {{principal:number, balance:number, ratePerFlight:number,
+/** @typedef {{id:string, principal:number, balance:number, ratePerFlight:number,
  *             termFlights:number, instalment:number, flightsPaid:number}} Loan
- *   prestec de la companyia o d un avio; es crea amb makeLoan (finance.js, B5) */
+ *   prestec de la companyia o d un avio; es crea amb makeLoan (finance.js, B5),
+ *   que no posa id: l id (unic dins de company.loans) el posa qui el desa, i
+ *   Airframe.finance.loanId hi apunta */
 /** @typedef {Object} Insurance  polissa d un avio, per matricula */

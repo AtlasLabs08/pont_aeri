@@ -108,7 +108,23 @@ describe('payInstalment', () => {
     assert.equal(loan.balance, 0);
   });
 
-  test('un prestec tornat no cobra res', () => {
+  test('a mig pagar, l ultima quota del termini salda un balanc mes gran que la quota', () => {
+    // 10.000 a 10 vols i 0,01: quota 1.056. Despres de 5 quotes queda la
+    // meitat, i el prestec arriba al vol 10 (flightsPaid 9) amb aquest saldo
+    let loan = { id: 'L7', ...makeLoan(10000, 0.01, 10) };
+    for (let i = 0; i < 5; i++) loan = payInstalment(loan).loan;
+    loan = { ...loan, flightsPaid: 9 };
+    assert.ok(loan.balance > loan.instalment, 'saldo ' + loan.balance + ' > quota ' + loan.instalment);
+    const r = payInstalment(loan);
+    assert.equal(r.interest, Math.round(loan.balance * 0.01));
+    assert.equal(r.paid, loan.balance + r.interest);
+    assert.ok(r.paid > loan.instalment);
+    assert.equal(r.loan.balance, 0);
+    assert.equal(r.loan.flightsPaid, 10);
+    assert.equal(r.loan.id, 'L7', 'conserva l id');
+  });
+
+    test('un prestec tornat no cobra res', () => {
     const r = payInstalment({ ...makeLoan(1000, 0, 1), balance: 0, flightsPaid: 1 });
     assert.deepEqual([r.paid, r.interest, r.loan.balance], [0, 0, 0]);
   });
