@@ -37,7 +37,8 @@ test('app exporta el que ha d exportar', () => {
     'TOPICS', 'on', 'off', 'emit',
     'setFlightLauncher', 'launchFlight', 'onFlightFinished', 'cancelFlight', 'isFlightInProgress',
     'CAREER_KEY', 'loadCareer', 'saveCareer', 'backupCareer', 'discardCareer',
-    'LessonRun', 'lessonGoalParams', 'attemptMessage'
+    'LessonRun', 'lessonGoalParams', 'attemptMessage',
+    'debriefRows', 'BOUNCE_PENALTY_PTS', 'TAIL_STRIKE_PENALTY_PTS'
   ]) {
     assert.ok(name in app, `falta l export: ${name}`);
   }
