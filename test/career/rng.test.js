@@ -41,4 +41,24 @@ describe('draw', () => {
     draw(s);
     assert.deepEqual({ ...s, rngCounter: before.rngCounter }, before);
   });
+
+  test('valor de referencia: llavor 20260927 i comptador 5', () => {
+    // Formula de la seccio 7: llavor de mulberry32 =
+    // (20260927 ^ imul(5, 0x9E3779B1)) >>> 0 = 371214410. La primera sortida
+    // de mulberry32 amb aquesta llavor es 1031695712 / 2^32 (calculat una
+    // vegada amb la formula; si canvia, ha canviat draw o makeRng i les
+    // partides desades deixen de reproduir-se)
+    assert.equal((20260927 ^ Math.imul(5, 0x9E3779B1)) >>> 0, 371214410);
+    const s = { rngSeed: 20260927, rngCounter: 5 };
+    assert.equal(draw(s), 1031695712 / 4294967296);
+    assert.equal(1031695712 / 4294967296, 0.2402103766798973);
+    assert.equal(s.rngCounter, 6);
+  });
+
+  test('tirades consecutives donen valors diferents', () => {
+    const s = createCareer({ name: 'x', seed: 20260927, createdAt: '' });
+    const values = Array.from({ length: 1000 }, () => draw(s));
+    assert.equal(new Set(values).size, values.length);
+    for (let i = 1; i < values.length; i++) assert.notEqual(values[i], values[i - 1]);
+  });
 });
