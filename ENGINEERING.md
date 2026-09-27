@@ -645,9 +645,9 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
 | Id | Tasca | Depèn de | Fet quan |
 | --- | --- | --- | --- |
-| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | **Fet.** `career/lessons.js` (8 lliçons i 4 check-rides, només dades) i `career/school.js` (`METRICS`, `factsFromRecord`, `evaluate`, `isLessonAvailable`, `recordLessonAttempt`, `canGraduate`, `evaluateCheckRide`). Afegir una lliçó no toca codi. La gràcia de la lliçó 7 (nota ≥ 30) s'aplica a partir del tercer intent inclòs. Els check-rides només avaluen: l'habilitació es compra a `progression.js`. 68 proves noves (66 a `school.test.js`, 2 de `purity.test.js`), 960 en total |
+| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | **Fet.** `career/lessons.js` (8 lliçons i 4 check-rides, només dades) i `career/school.js` (`METRICS`, `factsFromRecord`, `evaluate`, `isLessonAvailable`, `recordLessonAttempt`, `canGraduate`, `evaluateCheckRide`). Afegir una lliçó no toca codi. La gràcia de la lliçó 7 (nota ≥ 30) s'aplica a partir del tercer intent inclòs. Els check-rides només avaluen: l'habilitació es compra a `progression.js`. `fuelWithinPlan` compta el creuer saltat amb la penalització, com `economy.js`, i `recordLessonAttempt` només accepta lliçons disponibles. 77 proves noves (75 a `school.test.js`, 2 de `purity.test.js`), 969 en total |
 | C2 | `app/`: bus, `setFlightLauncher`, `onFlightFinished` | A2, A5 | Un vol llançat des d'`app` torna el seu `FlightRecord` |
-| C3 | Executor de lliçons a `index.html`: instructor al HUD, criteris en viu | C1, C2, A4 | Les 8 lliçons es poden completar |
+| C3 | Executor de lliçons a `index.html`: instructor al HUD, criteris en viu | C1, C2, A4 | Les 8 lliçons es poden completar. Els fets en viu han d'incloure sempre `crashed` (un crash sense `crashed` aprovaria la lliçó). `maxAltFt` de la lliçó 4 és AGL, o les lliçons es fan a aeroports a nivell del mar. |
 | C4 | Ajudes de l'escola: barra d'arrodoniment, debrief automàtic | C3 | Només visibles dins l'escola |
 | C5 | Pantalla d'escola i graduació | C3 | Graduar-se crea el `CareerState` inicial |
 
