@@ -80,6 +80,28 @@ export const HARNESS = Object.freeze({
   weatherSeverityMax: 0.6,   // severitat per a demandPax quan hi ha meteo dura
   pTailStrike: 0.004,
 
+  // Camps fixos del FlightRecord sintetic: el jugador mitja fa sempre el
+  // mateix contacte a la pista, i nomes l fpm, la g i la nota varien.
+  // rolloutMetres (1100) < remaining (1800): amb aquests valors mai no hi ha
+  // excursion (damage.js: rolloutMetres > touchdown.remaining).
+  record: {
+    remaining: 1800,         // metres de pista que queden en el contacte
+    rolloutMetres: 1100,     // metres de frenada fins a velocitat de rodatge
+    taxiH: 0.2,              // hores de bloc a terra (airborne = block - taxiH)
+    maxGFloor: 1.3,          // maxG minima del vol: maniobres i turbulencia lleu
+    maxBankDeg: 25,          // inclinacio maxima, dins del confort de cabina
+    timeAccelMax: 16,        // l acceleracio maxima que ja existeix (Game.cycleAccel)
+    rwy: '24R',              // pista d arribada (nomes informativa)
+    tdzDist: 400,            // metres del llindar al punt de contacte, dins la TDZ
+    center: 2,               // metres de desviacio de l eix
+    crab: 1,                 // graus de crab en el contacte
+    ias: 130,                // nusos en el contacte
+    pitch: 4                 // graus de cabrejada en el contacte
+  },
+
+  // Any de fabricacio dels avions d ocasio que compra el jugador
+  yearBuilt: 2010,
+
   // Reserva que el jugador guarda en contractar tripulacio: el cash que li
   // queda despres de pagar-la ha de valer almenys crewReserve contractacions
   crewReserve: 1.2,
@@ -162,21 +184,21 @@ function syntheticRecord(state, typeId, from, to, km, pax) {
   const tailStrike = draw(state) < H.pTailStrike;
   const turbulence = draw(state) < H.pTurbulence;
   const hardWeather = draw(state) < H.pHardWeather;
-  const remaining = 1800;
+  const R = H.record;
   const record = {
     aircraftTypeId: typeId, from, to,
     blockSeconds: Math.round(blockH * SECONDS_PER_HOUR),
-    airborneSeconds: Math.round((blockH - 0.2) * SECONDS_PER_HOUR),
+    airborneSeconds: Math.round((blockH - R.taxiH) * SECONDS_PER_HOUR),
     fuelBurntKg: burntKg, fuelPlannedKg: plannedKg, paxOnBoard: pax,
-    maxAltFt: P.altFt, maxG: Math.max(1.3, g), maxBankDeg: 25, abruptInputs: 0,
-    timeAccelMax: 16, usedCruiseSkip: false, skippedCruiseFuelKg: 0,
+    maxAltFt: P.altFt, maxG: Math.max(R.maxGFloor, g), maxBankDeg: R.maxBankDeg, abruptInputs: 0,
+    timeAccelMax: R.timeAccelMax, usedCruiseSkip: false, skippedCruiseFuelKg: 0,
     arrivalDeltaMin: Math.round(H.arrivalSd * gauss(state)),
     touchdown: {
       fpm: -Math.round(fpm), g: Math.round(g * 100) / 100, bounces: 0,
-      onRunway: true, rwy: '24R', tdzDist: 400, center: 2, crab: 1, remaining,
-      ias: 130, pitch: 4, roll: 0, score: Math.round(score), pts: null
+      onRunway: true, rwy: R.rwy, tdzDist: R.tdzDist, center: R.center, crab: R.crab, remaining: R.remaining,
+      ias: R.ias, pitch: R.pitch, roll: 0, score: Math.round(score), pts: null
     },
-    rolloutMetres: 1100, tailStrike, crashCause: null, events: []
+    rolloutMetres: R.rolloutMetres, tailStrike, crashCause: null, events: []
   };
   return { record, turbulence, hardWeather };
 }
@@ -187,7 +209,7 @@ function syntheticRecord(state, typeId, from, to, km, pax) {
 function newAirframe(typeId, n, price, loanId) {
   return {
     reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
-    typeId, yearBuilt: 2010, hours: 0, cycles: 0,
+    typeId, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
     condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
     location: H.base, status: 'ready', groundedUntilMinute: 0,
     maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours, deferred: [] },
