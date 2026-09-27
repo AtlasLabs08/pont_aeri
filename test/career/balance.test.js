@@ -1,4 +1,4 @@
-/* Proves de career/balance.js (tasca B1): coherencia interna de BALANCE.
+/* Proves de career/balance.js (tasques B1, B4 i B5): coherencia interna de BALANCE.
  * No comproven els valors concrets, sino que les taules tinguin sentit:
  * ordres, monotonia, numeros finits i objecte congelat.
  *
@@ -138,5 +138,23 @@ describe('BALANCE', () => {
     assert.throws(() => { BALANCE.crash.groundedDays[0] = 1; }, TypeError);
     assert.throws(() => { BALANCE.reputation.start = 0; }, TypeError);
     assert.equal(JSON.stringify(BALANCE), before);
+  });
+});
+
+describe('BALANCE: coherencia de progressio (B4)', () => {
+  test('ratings i endorsements demanen rangs que existeixen i costen enters >= 0', () => {
+    const ranks = BALANCE.ranks.map(r => r.key);
+    for (const table of ['ratings', 'endorsements']) {
+      for (const [key, item] of Object.entries(BALANCE[table])) {
+        assert.ok(ranks.includes(item.rank), table + '.' + key + '.rank');
+        assert.ok(Number.isInteger(item.cost) && item.cost >= 0, table + '.' + key + '.cost');
+      }
+    }
+  });
+
+  test('cada fleetType demana una rating que existeix', () => {
+    for (const [id, ft] of Object.entries(BALANCE.fleetTypes)) {
+      assert.ok(Object.hasOwn(BALANCE.ratings, ft.rating), id + '.rating');
+    }
   });
 });
