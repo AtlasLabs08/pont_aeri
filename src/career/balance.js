@@ -81,7 +81,7 @@ export const BALANCE = deepFreeze({
     { id: 'excursion',                        pctOfValue: 0.03,   groundedDays: 7 }
   ],
   // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
-  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [200, 1500] },
+  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [35, 230] },
 
   // B3 (wear.js): valors provisionals, es calibren a B5
   operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
@@ -107,11 +107,11 @@ export const BALANCE = deepFreeze({
 
   ranks: [
     { key: 'student',    xp: 0,     payMult: 1.00, slots: 0, dispatchPct: 0    },
-    { key: 'private',    xp: 500,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
-    { key: 'commercial', xp: 2000,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
-    { key: 'atpl',       xp: 6000,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
-    { key: 'captain',    xp: 15000, payMult: 2.20, slots: 7, dispatchPct: 0.50 },
-    { key: 'instructor', xp: 35000, payMult: 2.50, slots: 9, dispatchPct: 0.60 }
+    { key: 'private',    xp: 650,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
+    { key: 'commercial', xp: 1250,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
+    { key: 'atpl',       xp: 1950,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
+    { key: 'captain',    xp: 2450,  payMult: 2.20, slots: 7, dispatchPct: 0.50 },
+    { key: 'instructor', xp: 3200,  payMult: 2.50, slots: 9, dispatchPct: 0.60 }
   ],
 
   ratings: {                                // habilitacions de tipus (DESIGN.md)
