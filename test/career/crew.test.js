@@ -1,8 +1,8 @@
 /* Proves de career/crew.js (tasca B5): nombre maxim de tripulacions per
  * classe i contractacio. Els valors esperats son literals calculats a ma a
  * partir de BALANCE.rotation (perCrew 0,5; cap commuter 2,6, turboprop 2,6,
- * narrowbody 2,7, widebody 1,8) i BALANCE.crewHireCost (commuter 42.000,
- * turboprop 60.000, narrowbody 180.000, widebody 200.000).
+ * narrowbody 2,7, widebody 1,8) i BALANCE.crewHireCost (commuter 44.000,
+ * turboprop 60.000, narrowbody 100.000, widebody 200.000).
  *
  * Correr:  npm test
  */
@@ -41,9 +41,9 @@ describe('maxCrew', () => {
 });
 
 describe('hireCrew', () => {
-  test('cas bo: la primera tripulacio del commuter costa 42.000', () => {
+  test('cas bo: la primera tripulacio del commuter costa 44.000', () => {
     assert.deepEqual(hireCrew({ cls: 'commuter', crewCount: 0, cash: 50000 }),
-      { ok: true, cost: 42000, crewCount: 1 });
+      { ok: true, cost: 44000, crewCount: 1 });
   });
 
   test('diners justos: 200.000 per a un widebody', () => {

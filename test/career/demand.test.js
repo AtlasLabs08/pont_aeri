@@ -2,7 +2,7 @@
  * elasticitat. Cap valor esperat es calcula amb la mateixa formula: son
  * literals fets a ma, amb el calcul al comentari.
  *
- * Valors de BALANCE fets servir: pRef { base 90, perKm 0.6 }, dBase { scale 260,
+ * Valors de BALANCE fets servir: pRef { base 290, perKm 0.10 }, dBase { scale 260,
  * distanceKm 3000 }, sizeWeight { hub 1, major 0.7, regional 0.35, small 0.15 },
  * elasticity { leisure 1.6, business 1.1 }, hourFactor { peak 1.15, off 0.7 },
  * hours peak [420,600) [1080,1260), off [0,360), weatherFactorMin 0.8,
@@ -29,22 +29,22 @@ describe('routeKey', () => {
 
 describe('routeModel', () => {
   test('ruta inventada: 1500 km entre dos major', () => {
-    // pRef = 260 + 0.09 * 1500 = 395
+    // pRef = 290 + 0.10 * 1500 = 440
     // dBase = 260 * sqrt(0.7 * 0.7) * (1 + 1500 / 3000) = 260 * 0.7 * 1.5 = 273
     const m = routeModel({ distanceKm: 1500, sizeA: 'major', sizeB: 'major' });
-    near(m.pRef, 395); near(m.dBase, 273); assert.equal(m.kind, 'leisure');
+    near(m.pRef, 440); near(m.dBase, 273); assert.equal(m.kind, 'leisure');
   });
 
   test('ruta inventada: 600 km entre hub i small', () => {
-    // pRef = 260 + 0.09 * 600 = 314
+    // pRef = 290 + 0.10 * 600 = 350
     // dBase = 260 * sqrt(1 * 0.15) * 1.2 = 260 * 0.3872983 * 1.2 = 120.8371
     const m = routeModel({ distanceKm: 600, sizeA: 'hub', sizeB: 'small' });
-    near(m.pRef, 314); near(m.dBase, 120.8371, 1e-4);
+    near(m.pRef, 350); near(m.dBase, 120.8371, 1e-4);
   });
 
   test('una excepcio que nomes porta kind substitueix nomes kind', () => {
     const m = routeModel({ distanceKm: 1500, sizeA: 'major', sizeB: 'major', exception: { kind: 'business' } });
-    near(m.pRef, 395); near(m.dBase, 273); assert.equal(m.kind, 'business');
+    near(m.pRef, 440); near(m.dBase, 273); assert.equal(m.kind, 'business');
   });
 
   test('una excepcio que porta pRef substitueix nomes pRef', () => {
@@ -56,8 +56,8 @@ describe('routeModel', () => {
     // LEMD encara no es a world/: routeFor no la pot fer, es prova amb routeModel
     const m = routeModel({ distanceKm: 483, sizeA: 'hub', sizeB: 'hub', exception: BALANCE.routeExceptions['LEBL-LEMD'] });
     assert.equal(m.kind, 'business');
-    // pRef = 260 + 0.09 * 483 = 303.47; dBase = 260 * 1 * (1 + 483 / 3000) = 301.86
-    near(m.pRef, 303.47); near(m.dBase, 301.86);
+    // pRef = 290 + 0.10 * 483 = 338.3; dBase = 260 * 1 * (1 + 483 / 3000) = 301.86
+    near(m.pRef, 338.3); near(m.dBase, 301.86);
   });
 
   test('mida desconeguda: error clar', () => {
@@ -68,10 +68,10 @@ describe('routeModel', () => {
 describe('routeFor', () => {
   test('LEBL-LEPA: hub i major, ~202 km, leisure', () => {
     // distancia 201.966 km (test/geo.test.js)
-    // pRef = 260 + 0.09 * 201.966 = 278.18
+    // pRef = 290 + 0.10 * 201.966 = 310.20
     // dBase = 260 * sqrt(1 * 0.7) * (1 + 201.966 / 3000) = 260 * 0.83666 * 1.067322 = 232.18
     const m = routeFor('LEBL', 'LEPA');
-    near(m.pRef, 278.18, 1e-2); near(m.dBase, 232.18, 1e-2); assert.equal(m.kind, 'leisure');
+    near(m.pRef, 310.20, 1e-2); near(m.dBase, 232.18, 1e-2); assert.equal(m.kind, 'leisure');
   });
 
   test('es simetrica', () => {
@@ -86,17 +86,17 @@ describe('routeFor', () => {
 });
 
 describe('routeForDistance', () => {
-  test('LEBL-LEPA amb la distancia de world/ dona el mateix que routeFor', () => {
-    assert.deepEqual(routeForDistance('LEBL', 'LEPA', 201.966), routeModel({ distanceKm: 201.966, sizeA: 'hub', sizeB: 'major' }));
+  test('LEBL-LEPA amb la distancia de world/ (201.966 km): el mateix que routeFor', () => {
+    const m = routeForDistance('LEBL', 'LEPA', 201.966);
+    near(m.pRef, 310.20, 1e-2); near(m.dBase, 232.18, 1e-2); assert.equal(m.kind, 'leisure');
     const r = routeFor('LEBL', 'LEPA');
-    const d = routeForDistance('LEBL', 'LEPA', (r.pRef - BALANCE.demand.pRef.base) / BALANCE.demand.pRef.perKm);
-    near(d.pRef, r.pRef); near(d.dBase, r.dBase); assert.equal(d.kind, r.kind);
+    near(m.pRef, r.pRef, 1e-2); near(m.dBase, r.dBase, 1e-2);
   });
 
   test('aeroports que no son a world/: excepcio i simetria', () => {
     const m = routeForDistance('LEMD', 'LEBL', 483);
     assert.equal(m.kind, 'business');
-    near(m.pRef, 303.47); near(m.dBase, 301.86);
+    near(m.pRef, 338.3); near(m.dBase, 301.86);
     assert.deepEqual(m, routeForDistance('LEBL', 'LEMD', 483));
   });
 

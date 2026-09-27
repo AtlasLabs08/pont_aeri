@@ -129,8 +129,15 @@ export const HARNESS = Object.freeze({
 
 const H = HARNESS;
 
-/** Criteris de la seccio 10 d ENGINEERING.md, amb el canvi del B5 (docs/DECISIONS.md). */
-const CRITERIA = { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, negativeMax: 0.12, actHoursMax: 16 };
+/** Criteris de la seccio 10 d ENGINEERING.md (criteri robust del B5, docs/DECISIONS.md):
+ * sobre `seeds` llavors, la mediana i el percentil 90 de cada metrica. */
+const CRITERIA = {
+  seeds: 50,
+  median: { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, firstCrewMin: 8, firstCrewMax: 12,
+            negativePctMax: 12, actHoursMax: 16 },
+  p90: { jumpMax: 60, actHoursMax: 20 },
+  curveMaxDev: 0.20             // cada tipus dins del +-20 % de la Corba objectiu
+};
 
 // ---------------------------------------------------------------------------
 // Atzar
@@ -408,8 +415,9 @@ function percentile(xs, p) {
  * com a Infinity (pitjor que qualsevol valor) i es compta a `missing`.
  * @param {{seed?:number, seeds?:number, flights?:number}} opts
  */
-export function runSeeds({ seed = H.seed, seeds = 50, flights = H.flights } = {}) {
-  const runs = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights }).metrics);
+export function runSeeds({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights } = {}) {
+  const results = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights }));
+  const runs = results.map(r => r.metrics);
   const rows = [];
   const add = (key, label, values) => rows.push({
     key, label, values, median: median(values), p90: percentile(values, 90),
@@ -424,7 +432,48 @@ export function runSeeds({ seed = H.seed, seeds = 50, flights = H.flights } = {}
   for (const act of CLOSABLE_ACTS) {
     add('act' + act, 'acte ' + act + ' (h de joc)', runs.map(m => m.actHours[act] ?? Infinity));
   }
-  return { seed, seeds, flights, rows };
+
+  // Corba objectiu: net mitja per vol de cada tipus, sumant els vols de totes les llavors
+  const curve = [];
+  for (const t of H.ladder) {
+    const log = results.flatMap(r => r.log.filter(e => e.typeId === t));
+    if (!log.length) continue;
+    const avg = k => log.reduce((sum, e) => sum + e[k], 0) / log.length;
+    const [ts, tf] = H.targets[t];
+    curve.push({ typeId: t, flights: log.length, solo: avg('netSolo'), full: avg('netFull'),
+      devSolo: avg('netSolo') / ts - 1, devFull: avg('netFull') / tf - 1 });
+  }
+
+  return { seed, seeds, flights, rows, curve, criteria: seedCriteria(rows, curve) };
+}
+
+/** Avalua CRITERIA sobre les files de runSeeds. Torna [{ text, ok }]. */
+function seedCriteria(rows, curve) {
+  const M = CRITERIA.median, P = CRITERIA.p90;
+  const row = key => rows.find(r => r.key === key);
+  const jumps = rows.filter(r => r.key.startsWith('jump'));
+  const acts = rows.filter(r => r.key.startsWith('act'));
+  const num = v => v === Infinity ? 'no arriba' : Number.isInteger(v) ? String(v) : v.toFixed(1);
+  const crew = row('firstCrew'), neg = row('negativePct');
+  return [
+    { text: 'mediana: cada salt entre ' + M.jumpMin + ' i ' + M.jumpMax + ' vols (el primer fins a ' + M.firstJumpMax + '): ' +
+        jumps.map(r => num(r.median)).join(', '),
+      ok: jumps.every((r, i) => r.median >= M.jumpMin && r.median <= (i === 0 ? M.firstJumpMax : M.jumpMax)) },
+    { text: 'mediana: primera tripulacio entre el vol ' + M.firstCrewMin + ' i el ' + M.firstCrewMax + ': ' + num(crew.median),
+      ok: crew.median >= M.firstCrewMin && crew.median <= M.firstCrewMax },
+    { text: 'mediana: vols en negatiu < ' + M.negativePctMax + ' %: ' + num(neg.median) + ' %',
+      ok: neg.median < M.negativePctMax },
+    { text: 'mediana: cap acte de mes de ' + M.actHoursMax + ' h: ' + acts.map(r => num(r.median)).join(', '),
+      ok: acts.every(r => r.median <= M.actHoursMax) },
+    { text: 'p90: cap salt de mes de ' + P.jumpMax + ' vols: ' + jumps.map(r => num(r.p90)).join(', '),
+      ok: jumps.every(r => r.p90 <= P.jumpMax) },
+    { text: 'p90: cap acte de mes de ' + P.actHoursMax + ' h: ' + acts.map(r => num(r.p90)).join(', '),
+      ok: acts.every(r => r.p90 <= P.actHoursMax) },
+    { text: 'Corba objectiu dins del +-' + 100 * CRITERIA.curveMaxDev + ' %: ' +
+        curve.map(c => c.typeId + ' ' + Math.round(100 * c.devSolo) + '/' + Math.round(100 * c.devFull)).join(', '),
+      ok: curve.length === H.ladder.length &&
+        curve.every(c => Math.abs(c.devSolo) <= CRITERIA.curveMaxDev && Math.abs(c.devFull) <= CRITERIA.curveMaxDev) }
+  ];
 }
 
 /** Text de l informe de runSeeds. */
@@ -439,6 +488,18 @@ export function formatSeeds(s) {
   for (const r of s.rows) {
     p('  ' + r.label.padEnd(32) + num(r.median).padStart(9) + num(r.p90).padStart(11) + String(r.missing).padStart(12));
   }
+  p('');
+  p('Corba objectiu (net mitja per vol de tots els vols de cada tipus; objectiu de DESIGN.md)');
+  p('  tipus     vols        sol    desv.       complet    desv.');
+  const dev = d => (d * 100).toFixed(0).padStart(5) + ' %';
+  for (const c of s.curve) {
+    p('  ' + c.typeId.padEnd(8) + pad(c.flights, 5) + pad(fmt(c.solo), 11) + '  ' + dev(c.devSolo) +
+      pad(fmt(c.full), 14) + '  ' + dev(c.devFull));
+  }
+  p('');
+  p('Criteris (seccio 10, sobre ' + CRITERIA.seeds + ' llavors)' +
+    (s.seeds === CRITERIA.seeds ? '' : ' — ATENCIO: aquesta passada en fa ' + s.seeds));
+  for (const c of s.criteria) p('  ' + c.text + ' -> ' + (c.ok ? 'compleix' : 'NO compleix'));
   return out.join('\n');
 }
 
@@ -544,21 +605,23 @@ export function formatReport(r) {
   }
   p('');
 
-  // Criteris de la seccio 10
+  // Criteris de la seccio 10, pero d una sola llavor: nomes orientatiu
+  const M = CRITERIA.median;
   const gaps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
   const allJumps = r.purchases.length === H.ladder.length;
   const jumpsOk = allJumps && gaps.every((g, i) =>
-    g >= CRITERIA.jumpMin && g <= (i === 0 ? CRITERIA.firstJumpMax : CRITERIA.jumpMax));
-  const negOk = neg / r.log.length < CRITERIA.negativeMax;
+    g >= M.jumpMin && g <= (i === 0 ? M.firstJumpMax : M.jumpMax));
+  const negOk = 100 * neg / r.log.length < M.negativePctMax;
   const closed = acts.slice(0, -1);
-  const actsOk = closed.every(a => actHours[a] <= CRITERIA.actHoursMax);
+  const actsOk = closed.every(a => actHours[a] <= M.actHoursMax);
   const yes = ok => ok ? 'compleix' : 'NO compleix';
-  p('Criteris (seccio 10)');
-  p('  salts de classe entre ' + CRITERIA.jumpMin + ' i ' + CRITERIA.jumpMax + ' vols (el primer fins a ' +
-    CRITERIA.firstJumpMax + '): ' + (gaps.join(', ') || '-') +
+  p('Llindars de la mediana en aquesta llavor (orientatiu: el criteri de la seccio 10 es sobre ' +
+    CRITERIA.seeds + ' llavors, npm run balance -- --seeds ' + CRITERIA.seeds + ')');
+  p('  salts de classe entre ' + M.jumpMin + ' i ' + M.jumpMax + ' vols (el primer fins a ' +
+    M.firstJumpMax + '): ' + (gaps.join(', ') || '-') +
     (allJumps ? '' : ' (falten ' + (H.ladder.length - r.purchases.length) + ' salts)') + ' -> ' + yes(jumpsOk));
-  p('  vols en negatiu < ' + 100 * CRITERIA.negativeMax + ' %: ' + (100 * neg / r.log.length).toFixed(1) + ' % -> ' + yes(negOk));
-  p('  actes tancats de ' + CRITERIA.actHoursMax + ' h o menys: ' +
+  p('  vols en negatiu < ' + M.negativePctMax + ' %: ' + (100 * neg / r.log.length).toFixed(1) + ' % -> ' + yes(negOk));
+  p('  actes tancats de ' + M.actHoursMax + ' h o menys: ' +
     (closed.map(a => a + ': ' + actHours[a].toFixed(1) + ' h').join(', ') || '-') + ' -> ' + yes(actsOk));
   p('');
 

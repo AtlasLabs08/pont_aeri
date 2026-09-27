@@ -1,7 +1,7 @@
 /* Proves de career/finance.js (tasca B5): entrada, quota per vol i
  * amortitzacio dels prestecs. Els valors esperats son literals calculats a
  * ma a partir de BALANCE.financing (downPct 0,30, ratePerFlight 0,004,
- * termFlights 260), amb el calcul al comentari. Les proves d amortitzacio
+ * termFlights 340), amb el calcul al comentari. Les proves d amortitzacio
  * fan servir un termini explicit de 60 vols.
  *
  * Correr:  npm test
@@ -74,9 +74,9 @@ describe('financeAircraft', () => {
     const { downPayment: down, loan } = financeAircraft(8000000);
     assert.equal(down, 2400000);
     assert.equal(loan.principal, 5600000);
-    // termini de BALANCE.financing: 5.600.000 * 0,004 / (1 - 1,004^-260) = 34.685,05 -> 34.685
-    assert.equal(loan.termFlights, 260);
-    assert.equal(loan.instalment, 34685);
+    // termini de BALANCE.financing: 5.600.000 * 0,004 / (1 - 1,004^-340) = 30.162,58 -> 30.163
+    assert.equal(loan.termFlights, 340);
+    assert.equal(loan.instalment, 30163);
   });
 });
 

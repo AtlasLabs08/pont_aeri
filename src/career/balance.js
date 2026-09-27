@@ -24,10 +24,10 @@ function deepFreeze(obj) {
 
 export const BALANCE = deepFreeze({
   version: 1,
-  K: 2.6,                                   // factor global: l unica palanca de ritme
+  K: 2.4,                                   // factor global: l unica palanca de ritme
 
   startingCash: 400000,
-  startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 260 },   // termini = financing
+  startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 340 },   // termini = financing
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
@@ -54,7 +54,7 @@ export const BALANCE = deepFreeze({
   },
   // B5: compra a terminis. Entrada downPct del preu; la resta en quotes per vol,
   // mai pel pas del temps (DESIGN.md, "Escala economica")
-  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 260 },
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340 },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
@@ -81,7 +81,7 @@ export const BALANCE = deepFreeze({
     { id: 'excursion',                        pctOfValue: 0.03,   groundedDays: 7 }
   ],
   // Sense perdua total: BACKLOG.md la descarta. Un accident es car i llarg, mai definitiu.
-  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [35, 230] },
+  crash: { minPct: 0.15, maxPct: 0.60, groundedDays: [14, 45], xpLoss: [30, 200] },
 
   // B3 (wear.js): valors provisionals, es calibren a B5
   operations: { dayHours: { commuter: 8, turboprop: 9, narrowbody: 11, widebody: 14 },
@@ -107,11 +107,11 @@ export const BALANCE = deepFreeze({
 
   ranks: [
     { key: 'student',    xp: 0,     payMult: 1.00, slots: 0, dispatchPct: 0    },
-    { key: 'private',    xp: 650,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
-    { key: 'commercial', xp: 1250,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
-    { key: 'atpl',       xp: 1950,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
-    { key: 'captain',    xp: 2450,  payMult: 2.20, slots: 7, dispatchPct: 0.50 },
-    { key: 'instructor', xp: 3200,  payMult: 2.50, slots: 9, dispatchPct: 0.60 }
+    { key: 'private',    xp: 600,   payMult: 1.25, slots: 2, dispatchPct: 0.20 },
+    { key: 'commercial', xp: 1100,  payMult: 1.55, slots: 3, dispatchPct: 0.30 },
+    { key: 'atpl',       xp: 1500,  payMult: 1.85, slots: 5, dispatchPct: 0.40 },
+    { key: 'captain',    xp: 1950,  payMult: 2.20, slots: 7, dispatchPct: 0.50 },
+    { key: 'instructor', xp: 2550,  payMult: 2.50, slots: 9, dispatchPct: 0.60 }
   ],
 
   ratings: {                                // habilitacions de tipus (DESIGN.md)
@@ -130,14 +130,14 @@ export const BALANCE = deepFreeze({
   },
 
   // B5: cost unic de contractar una tripulacio, per classe (el sou ja es als costos del tram)
-  crewHireCost: { commuter: 42000, turboprop: 60000, narrowbody: 180000, widebody: 200000 },
+  crewHireCost: { commuter: 44000, turboprop: 60000, narrowbody: 100000, widebody: 200000 },
   rotation: { perCrew: 0.5, cap: { commuter: 2.6, turboprop: 2.6, narrowbody: 2.7, widebody: 1.8 } },
 
   demand: { elasticity: { leisure: 1.6, business: 1.1 },
             hourFactor: { peak: 1.15, off: 0.70 }, weatherFactorMin: 0.8,
             reputation: { base: 0.6, span: 0.8 },
             hours: { peak: [[420, 600], [1080, 1260]], off: [[0, 360]] },  // minuts del dia, [inici, fi)
-            pRef: { base: 260, perKm: 0.09 },            // LEBL-LEPA 201,97 km -> 278,18 EUR
+            pRef: { base: 290, perKm: 0.10 },            // LEBL-LEPA 201,97 km -> 310,20 EUR
             dBase: { scale: 260, distanceKm: 3000 },
             sizeWeight: { hub: 1.0, major: 0.7, regional: 0.35, small: 0.15 },
             defaultKind: 'leisure',               // tipus de les rutes sense excepcio

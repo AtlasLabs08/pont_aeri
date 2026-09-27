@@ -24,15 +24,15 @@ const pilot = (over = {}) => ({
 const clone = o => JSON.parse(JSON.stringify(o));
 
 describe('rankForXp', () => {
-  // Llindars: student 0, private 650, commercial 1.250, atpl 1.950,
-  // captain 2.450, instructor 3.200
+  // Llindars: student 0, private 600, commercial 1.100, atpl 1.500,
+  // captain 1.950, instructor 2.550
   const cases = [
-    [0, 'student'], [100, 'student'], [649, 'student'],
-    [650, 'private'], [1249, 'private'],
-    [1250, 'commercial'], [1949, 'commercial'],
-    [1950, 'atpl'], [2449, 'atpl'],
-    [2450, 'captain'], [3199, 'captain'],
-    [3200, 'instructor'], [100000, 'instructor']
+    [0, 'student'], [100, 'student'], [599, 'student'],
+    [600, 'private'], [1099, 'private'],
+    [1100, 'commercial'], [1499, 'commercial'],
+    [1500, 'atpl'], [1949, 'atpl'],
+    [1950, 'captain'], [2549, 'captain'],
+    [2550, 'instructor'], [100000, 'instructor']
   ];
   for (const [xp, key] of cases) {
     test(xp + ' XP -> ' + key, () => assert.equal(rankForXp(xp), key));
@@ -46,22 +46,22 @@ describe('rankForXp', () => {
 });
 
 describe('nextRank', () => {
-  test('1.000 XP (private) -> commercial, falten 250', () => {
-    // 1.250 - 1.000 = 250
-    assert.deepEqual(nextRank(1000), { key: 'commercial', xp: 1250, remaining: 250 });
+  test('1.000 XP (private) -> commercial, falten 100', () => {
+    // 1.100 - 1.000 = 100
+    assert.deepEqual(nextRank(1000), { key: 'commercial', xp: 1100, remaining: 100 });
   });
 
-  test('0 XP -> private, falten 650', () => {
-    assert.deepEqual(nextRank(0), { key: 'private', xp: 650, remaining: 650 });
+  test('0 XP -> private, falten 600', () => {
+    assert.deepEqual(nextRank(0), { key: 'private', xp: 600, remaining: 600 });
   });
 
   test('just al llindar: el seguent, no el mateix', () => {
-    // 1.950 es atpl; el seguent es captain, 2.450 - 1.950 = 500
-    assert.deepEqual(nextRank(1950), { key: 'captain', xp: 2450, remaining: 500 });
+    // 1.500 es atpl; el seguent es captain, 1.950 - 1.500 = 450
+    assert.deepEqual(nextRank(1500), { key: 'captain', xp: 1950, remaining: 450 });
   });
 
   test('rang mes alt -> null', () => {
-    assert.equal(nextRank(3200), null);
+    assert.equal(nextRank(2550), null);
     assert.equal(nextRank(100000), null);
   });
 
@@ -151,9 +151,9 @@ describe('flightXp', () => {
 });
 
 describe('applyXp', () => {
-  test('pujada: 640 + 16 = 656, de student a private', () => {
-    const r = applyXp(pilot({ xp: 640 }), 16);
-    assert.equal(r.pilot.xp, 656);
+  test('pujada: 590 + 16 = 606, de student a private', () => {
+    const r = applyXp(pilot({ xp: 590 }), 16);
+    assert.equal(r.pilot.xp, 606);
     assert.equal(r.pilot.rank, 'private');
     assert.equal(r.rankBefore, 'student');
     assert.equal(r.rankAfter, 'private');
@@ -166,50 +166,50 @@ describe('applyXp', () => {
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['private', 'private', null]);
   });
 
-  test('pujada de mes d un rang de cop: 600 + 700 = 1.300, de student a commercial', () => {
-    const r = applyXp(pilot({ xp: 600 }), 700);
-    assert.equal(r.pilot.xp, 1300);
+  test('pujada de mes d un rang de cop: 590 + 600 = 1.190, de student a commercial', () => {
+    const r = applyXp(pilot({ xp: 590 }), 600);
+    assert.equal(r.pilot.xp, 1190);
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['student', 'commercial', 'up']);
   });
 
-  test('baixada just al llindar: 1.300 - 50 = 1.250 es queda a commercial', () => {
-    const r = applyXp(pilot({ xp: 1300, rank: 'commercial' }), -50);
-    assert.equal(r.pilot.xp, 1250);
+  test('baixada just al llindar: 1.150 - 50 = 1.100 es queda a commercial', () => {
+    const r = applyXp(pilot({ xp: 1150, rank: 'commercial' }), -50);
+    assert.equal(r.pilot.xp, 1100);
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['commercial', 'commercial', null]);
   });
 
-  test('un punt per sota del llindar: 1.300 - 51 = 1.249 baixa a private', () => {
-    const r = applyXp(pilot({ xp: 1300, rank: 'commercial' }), -51);
-    assert.equal(r.pilot.xp, 1249);
+  test('un punt per sota del llindar: 1.150 - 51 = 1.099 baixa a private', () => {
+    const r = applyXp(pilot({ xp: 1150, rank: 'commercial' }), -51);
+    assert.equal(r.pilot.xp, 1099);
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['commercial', 'private', 'down']);
   });
 
-  test('baixada per accident: 1.300 - 230 = 1.070, de commercial a private', () => {
-    const r = applyXp(pilot({ xp: 1300, rank: 'commercial' }), -230);
-    assert.equal(r.pilot.xp, 1070);
+  test('baixada per accident: 1.250 - 200 = 1.050, de commercial a private', () => {
+    const r = applyXp(pilot({ xp: 1250, rank: 'commercial' }), -200);
+    assert.equal(r.pilot.xp, 1050);
     assert.equal(r.pilot.rank, 'private');
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['commercial', 'private', 'down']);
   });
 
-  test('baixada proporcional: 2.500 - 230 = 2.270, de captain a atpl (no mes avall)', () => {
-    const r = applyXp(pilot({ xp: 2500, rank: 'captain' }), -230);
-    assert.equal(r.pilot.xp, 2270);
+  test('baixada proporcional: 2.000 - 200 = 1.800, de captain a atpl (no mes avall)', () => {
+    const r = applyXp(pilot({ xp: 2000, rank: 'captain' }), -200);
+    assert.equal(r.pilot.xp, 1800);
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['captain', 'atpl', 'down']);
   });
 
-  test('perdua d assessDamage: severitat 1 -> xpLoss 230, igual als dos modes', () => {
-    // BALANCE.crash.xpLoss = [35, 230]; severitat 1 -> 230
+  test('perdua d assessDamage: severitat 1 -> xpLoss 200, igual als dos modes', () => {
+    // BALANCE.crash.xpLoss = [30, 200]; severitat 1 -> 200
     const record = { aircraftTypeId: 'nb', tailStrike: false, crashCause: 'fuselage', touchdown: null };
     for (const mode of ['own', 'contract']) {
       const { xpLoss } = assessDamage({ record, airframeValue: 8000000, mode, crashSeverity: 1 });
-      assert.equal(xpLoss, 230, mode);
-      const r = applyXp(pilot({ xp: 1300, rank: 'commercial' }), -xpLoss);
-      assert.deepEqual([r.pilot.xp, r.pilot.rank], [1070, 'private'], mode);
+      assert.equal(xpLoss, 200, mode);
+      const r = applyXp(pilot({ xp: 1250, rank: 'commercial' }), -xpLoss);
+      assert.deepEqual([r.pilot.xp, r.pilot.rank], [1050, 'private'], mode);
     }
   });
 
-  test('no baixa de 0: 100 - 230 -> 0, student', () => {
-    const r = applyXp(pilot({ xp: 100 }), -230);
+  test('no baixa de 0: 100 - 200 -> 0, student', () => {
+    const r = applyXp(pilot({ xp: 100 }), -200);
     assert.equal(r.pilot.xp, 0);
     assert.deepEqual([r.rankBefore, r.rankAfter, r.change], ['student', 'student', null]);
   });
@@ -299,7 +299,7 @@ describe('purchaseRating', () => {
   });
 
   test('rank: widebody demana atpl i el pilot es commercial', () => {
-    const p = pilot({ xp: 1949, rank: 'commercial' });
+    const p = pilot({ xp: 1499, rank: 'commercial' });
     assert.deepEqual(purchaseRating(p, 1e9, 'widebody'), { ok: false, reason: 'rank' });
   });
 
