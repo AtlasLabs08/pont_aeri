@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText } from '../../src/app/lesson-run.js';
+import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance } from '../../src/app/lesson-run.js';
 import { LESSONS, BALANCE, evaluate } from '../../src/career/index.js';
 import { setLang } from '../../src/i18n/index.js';
 import en from '../../src/i18n/en.js';
@@ -351,6 +351,70 @@ describe('llico circuit: D6, cada condicio per separat', () => {
     assert.equal(run.readyToEnd(), false);
     const facts = run.finish(record());
     assert.equal(passed('circuit', facts), false);
+  });
+});
+
+describe('llico circuit: guia per fases, a banda i banda de la pista', () => {
+  const L = LESSONS.find(l => l.id === 'circuit');
+  const G = L.guidance, RWY = 250;
+  const lateral = L.spawn.lateralNm * 1852;
+  // side = +1: a l esquerra de l eix (circuit per l esquerra); -1: a la dreta
+  const cases = side => {
+    const baseHdg = (RWY + side * 90 + 360) % 360, turn = side > 0 ? 'left' : 'right';
+    return [
+      ['vent en cua, al travers del llindar (spawn)', { alongM: 0, latM: side * lateral, hdgDeg: 70 }, 'downwind', null, false],
+      ['vent en cua, llindar 30 graus enrere', { alongM: -lateral * Math.tan(30 * Math.PI / 180), latM: side * lateral, hdgDeg: 70 }, 'downwind', null, false],
+      ['vent en cua, llindar 46 graus enrere', { alongM: -lateral * Math.tan(46 * Math.PI / 180), latM: side * lateral, hdgDeg: 70 }, 'base', turn, true],
+      ['virant a base, a mig gir', { alongM: -3200, latM: side * 2600, hdgDeg: (70 - side * 45 + 360) % 360 }, 'base', turn, true],
+      ['establert en base', { alongM: -3300, latM: side * 2000, hdgDeg: baseHdg }, 'base', null, false],
+      ['base, l eix a prop', { alongM: -3300, latM: side * (G.finalTurnLatM - 1), hdgDeg: baseHdg }, 'finalTurn', turn, true],
+      ['a final, alineat', { alongM: -2500, latM: side * 40, hdgDeg: RWY + 2 }, 'final', null, false]
+    ];
+  };
+  for (const [label, side] of [['esquerra', 1], ['dreta', -1]]) {
+    for (const [name, pos, phase, turn, turnNow] of cases(side)) {
+      test(label + ': ' + name, () => {
+        const g = circuitGuidance({ ...pos, rwyHdgDeg: RWY }, G);
+        assert.equal(g.phase, phase);
+        assert.equal(g.side, turn);
+        assert.equal(g.turnNow, turnNow);
+      });
+    }
+  }
+
+  test('els llindars surten de lessons.js: just abans de baseTurnDeg encara es vent en cua', () => {
+    const behind = deg => ({ alongM: -1000 * Math.tan(deg * Math.PI / 180), latM: 1000 * 3, hdgDeg: 70, rwyHdgDeg: RWY });
+    const a = circuitGuidance({ ...behind(G.baseTurnDeg - 0.5), latM: 1000 }, G);
+    const b = circuitGuidance({ ...behind(G.baseTurnDeg + 0.5), latM: 1000 }, G);
+    assert.equal(a.phase, 'downwind');
+    assert.equal(b.phase, 'finalTurn');
+  });
+
+  const snapAt = (pos, over = {}) => snap({ aglFt: 1500, asgAlongM: pos.alongM, asgLatM: pos.latM, asgHdgDeg: RWY, hdgDeg: pos.hdgDeg, ...over });
+
+  test('un missatge per fase, amb el costat del gir traduit', () => {
+    const run = new LessonRun('circuit');
+    setLang('en');
+    run.sample(snapAt({ alongM: 0, latM: lateral, hdgDeg: 70 }));
+    assert.equal(messageText(run.instructorMessage()), 'Downwind: hold 1,500 ft, lower the gear and set flaps.');
+    run.sample(snapAt({ alongM: -lateral * 1.1, latM: lateral, hdgDeg: 70 }));
+    assert.equal(messageText(run.instructorMessage()), 'Turn left onto base now and start descending.');
+    run.sample(snapAt({ alongM: -3300, latM: 2000, hdgDeg: 340 }));
+    assert.equal(messageText(run.instructorMessage()), 'On base: keep descending.');
+    run.sample(snapAt({ alongM: -3300, latM: 800, hdgDeg: 340 }));
+    assert.equal(messageText(run.instructorMessage()), 'Turn left onto final now.');
+    run.sample(snapAt({ alongM: -2500, latM: 20, hdgDeg: 250 }));
+    assert.equal(messageText(run.instructorMessage()), 'On final: be stabilised before 500 ft.');
+    setLang('ca');
+    run.sample(snapAt({ alongM: -3300, latM: -800, hdgDeg: 160 }));
+    assert.equal(messageText(run.instructorMessage()), 'Gira a la dreta cap a final ara.');
+    setLang('en');
+  });
+
+  test('sense geometria de la pista assignada, el missatge es l objectiu', () => {
+    const run = new LessonRun('circuit');
+    run.sample(snap());
+    assert.equal(run.instructorMessage().key, L.goalKey);
   });
 });
 

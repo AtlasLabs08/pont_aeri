@@ -29,6 +29,15 @@
  *       finalStabilized (llico 'circuit') llindars de D6 per a
  *                        stabilizedOnFinal: { maxDistNm, aglFt, sustainedS,
  *                        hdgToleranceDeg, sinkMaxFpm, vrefLowKt, vrefHighKt }.
+ *       guidance        (llico 'circuit') llindars de la guia per fases de
+ *                        l instructor (app/lesson-run.js, circuitGuidance),
+ *                        tots respecte de la pista assignada: { baseTurnDeg,
+ *                        finalTurnLatM, alignedDeg }. baseTurnDeg: angle a
+ *                        que el llindar queda enrere de la linia del travers
+ *                        per girar a base. finalTurnLatM: distancia lateral a
+ *                        l eix per girar a final. alignedDeg: diferencia de
+ *                        rumb per considerar-se establert en un tram (base o
+ *                        final).
  *       ilsTolerance    (llico 'ils') { locDots, gsDots, sustainedS } per a
  *                        ilsFlown.
  *       flareBar        (llico 'landing') llindars de D7 de la barra
@@ -86,7 +95,8 @@ export const LESSONS = [
     criteria: [{ metric: 'stabilizedOnFinal', op: 'eq', value: true }],
     finalStabilized: { maxDistNm: 3, aglFt: 500, sustainedS: 10,
       hdgToleranceDeg: 10, sinkMaxFpm: 1000, vrefLowKt: -5, vrefHighKt: 20 },
-    spawn: { aglFt: 1500, lateralNm: 1.5, flaps: 'approach' } },
+    spawn: { aglFt: 1500, lateralNm: 1.5, flaps: 'approach' },
+    guidance: { baseTurnDeg: 45, finalTurnLatM: 1000, alignedDeg: 30 } },
   { id: 'landing', aircraftTypeId: 'commuter', mercy: true,
     titleKey: 'school.lesson.landing.title', goalKey: 'school.lesson.landing.goal',
     criteria: [{ metric: 'landed', op: 'eq', value: true },

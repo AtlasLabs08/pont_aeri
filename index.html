@@ -1971,7 +1971,9 @@ function lessonSnapshot() {
     locDots: nav ? nav.locDots : null,
     gsDots: nav ? nav.gsDots : null,
     locValid: nav ? nav.locValid : false,
-    gsValid: nav ? nav.gsValid : false
+    gsValid: nav ? nav.gsValid : false,
+    // pista assignada, no la sintonitzada: en vent en cua l ILS agafa el capcal contrari (guia de la llico 'circuit')
+    ...(Game.activeEnd ? (g => ({ asgAlongM: g.s, asgLatM: g.t, asgHdgDeg: Game.activeEnd.hdg }))(ILS.geom(Game.airport, Game.activeEnd, f.e, f.n, f.h)) : {})
   };
 }
 /** desa l intent que startLesson acaba de tancar amb el FlightRecord de Game (crash o report.shown) */

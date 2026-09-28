@@ -6,6 +6,7 @@
  * d Input que Game.onKey ja gestiona).
  *
  * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
+ *          circuitGuidance
  *
  * IMPORTA: LESSONS, factsFromRecord i evaluate de career/; t de i18n/.
  *
@@ -22,6 +23,11 @@
  *     locDots, gsDots, locValid, gsValid) poden ser null si no hi ha cap
  *     pista sintonitzada (Game.nav null): les llicons que els fan servir
  *     no avancen fins que n hi hagi.
+ *     Opcionals, respecte de la pista ASSIGNADA (Game.activeEnd, ILS.geom),
+ *     no de la sintonitzada: asgAlongM (metres en el sentit d aterratge,
+ *     negatiu abans del llindar), asgLatM (metres, positiu = a l esquerra
+ *     de l eix), asgHdgDeg (rumb de la pista). Els fa servir la guia de la
+ *     llico 'circuit': en vent en cua l ILS sintonitza el capcal contrari.
  *   run.onView(view)   la camera activa ha canviat (Cameras.mode)
  *   run.onCommand(name)   el jugador ha accionat un comandament. name es
  *     un dels noms de LESSONS['cockpit'].controls
@@ -57,8 +63,11 @@
  *   run.instructorMessage() -> { key, params, tParams? }   text mentre
  *     l intent es en marxa: l objectiu de la llico, o a la llico 'cockpit'
  *     quin comandament toca provar (params.control = nom, params.key =
- *     tecla, tParams.controlName = clau i18n del nom). Es pinta amb
- *     messageText().
+ *     tecla, tParams.controlName = clau i18n del nom), o a la llico
+ *     'circuit' el missatge de la fase del circuit (circuitGuidance). Es
+ *     pinta amb messageText().
+ *   run.circuit -> { phase, side, turnNow } | null   darrera guia de la
+ *     llico 'circuit'; null fins a la primera instantania amb asg*.
  *
  * lessonGoalParams(lesson) -> params per a t(lesson.goalKey, params): el
  *   numero surt sempre de LESSONS, mai escrit al text d i18n.
@@ -67,6 +76,18 @@
  * messageText({ key, params, tParams }) -> text amb t(): cada tParams[nom]
  *   es una clau i18n que es tradueix i s interpola com a {nom}. Els params
  *   numerics (menys count, que tria el plural) es formaten amb fmtNumber.
+ * circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, guidance)
+ *   -> { phase, side, turnNow }   fase del circuit segons la posicio respecte
+ *   de la pista (els angles i distancies son a LESSONS['circuit'].guidance):
+ *     'downwind'  el llindar encara no es baseTurnDeg enrere del travers
+ *     'base'      ja ho es, i l eix queda mes lluny de finalTurnLatM
+ *     'finalTurn' l eix queda a finalTurnLatM o menys
+ *     'final'     abans del llindar i amb rumb de pista (+-alignedDeg)
+ *   side: 'left' | 'right', cap a on girar per anar al rumb del tram
+ *   seguent (base: perpendicular a la pista cap a l eix; final: rumb de
+ *   pista), pel cami curt; null si no cal girar ('downwind', 'final', o
+ *   ja establert en base). turnNow: el rumb encara es a mes d alignedDeg
+ *   del d aquest tram (base o final).
  * attemptMessage({ passed, mercy, crashed, reason }) -> { key, params }
  *   missatge final un cop recordLessonAttempt (career/school.js) ja ha
  *   decidit el resultat (inclosa la gracia). No decideix passed/mercy:
@@ -104,6 +125,28 @@ export function lessonGoalParams(lesson) {
   }
 }
 
+/** diferencia de rumb amb signe (b - a), -180..180: positiu = cap a la dreta */
+function headingDiff(a, b) {
+  const d = ((b - a) % 360 + 540) % 360 - 180;
+  return d === -180 ? 180 : d;
+}
+
+export function circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, G) {
+  const RAD = 180 / Math.PI;
+  const toFinal = headingDiff(hdgDeg, rwyHdgDeg);
+  if (alongM < 0 && Math.abs(toFinal) <= G.alignedDeg) return { phase: 'final', side: null, turnNow: false };
+  const behindDeg = Math.atan2(-alongM, Math.abs(latM)) * RAD;
+  if (behindDeg < G.baseTurnDeg) return { phase: 'downwind', side: null, turnNow: false };
+  const sideOf = d => (d >= 0 ? 'right' : 'left');
+  if (Math.abs(latM) > G.finalTurnLatM) {
+    // base: perpendicular a la pista, cap a l eix (latM positiu = a l esquerra)
+    const toBase = headingDiff(hdgDeg, rwyHdgDeg + (latM > 0 ? 90 : -90));
+    const turnNow = Math.abs(toBase) > G.alignedDeg;
+    return { phase: 'base', side: turnNow ? sideOf(toBase) : null, turnNow };
+  }
+  return { phase: 'finalTurn', side: sideOf(toFinal), turnNow: true };
+}
+
 export function keyLabel(code) {
   return code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, '');
 }
@@ -134,6 +177,7 @@ export class LessonRun {
     this._lastHdg = null;
     this._elapsed = 0;
     this._streak = 0;
+    this.circuit = null;
     if (this.lesson.id === 'exterior') this.facts.viewsVisited = 0;
     if (this.lesson.id === 'cockpit') this.facts.controlsIdentified = 0;
     if (this.lesson.id === 'taxi') this.facts.reachedThreshold = false;
@@ -207,6 +251,10 @@ export class LessonRun {
         break;
       }
       case 'circuit': {
+        if (snap.asgAlongM != null && snap.asgLatM != null && snap.asgHdgDeg != null) {
+          this.circuit = circuitGuidance({ alongM: snap.asgAlongM, latM: snap.asgLatM,
+            hdgDeg: snap.hdgDeg, rwyHdgDeg: snap.asgHdgDeg }, this.lesson.guidance);
+        }
         const T = this.lesson.finalStabilized;
         const gateOk = snap.aglFt <= T.aglFt && snap.distThrNm != null && snap.distThrNm <= T.maxDistNm;
         const hdgOk = snap.rwyHdgDeg != null && headingDelta(snap.hdgDeg, snap.rwyHdgDeg) <= T.hdgToleranceDeg;
@@ -253,7 +301,20 @@ export class LessonRun {
         params: { control: next, key: keyLabel(this.lesson.controlKeys[next][0]) },
         tParams: { controlName: 'school.control.' + next } };
     }
+    if (this.lesson.id === 'circuit' && this.circuit) return this._circuitMessage();
     return { key: this.lesson.goalKey, params: lessonGoalParams(this.lesson) };
+  }
+
+  /** missatge de l instructor per a la fase del circuit en curs */
+  _circuitMessage() {
+    const { phase, side, turnNow } = this.circuit;
+    const sideKey = { tParams: { side: 'school.side.' + side } };
+    switch (phase) {
+      case 'downwind': return { key: 'school.circuit.downwind', params: { ft: this.lesson.spawn.aglFt } };
+      case 'base': return turnNow ? { key: 'school.circuit.turnBase', ...sideKey } : { key: 'school.circuit.descend' };
+      case 'finalTurn': return { key: 'school.circuit.turnFinal', ...sideKey };
+      default: return { key: 'school.circuit.final', params: { ft: this.lesson.finalStabilized.aglFt } };
+    }
   }
 
   finish(record) {
