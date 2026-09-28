@@ -600,3 +600,31 @@ describe('tips: explicacions de l instructor', () => {
     assert.equal(run.facts.controlsIdentified, 0);
   });
 });
+
+describe('llico 3 (taxi): l instructor explica com es roda', () => {
+  test('Q i E giren la roda de morro, potencia, frens i fre d aparcament, amb les tecles de CONTROL_KEYS', () => {
+    const [tip] = new LessonRun('taxi').tips();
+    assert.deepEqual(tip, { key: 'school.tip.taxi',
+      params: { left: 'Q', right: 'E', more: 'Shift', less: '-', brake: 'B', park: 'P' } });
+    assert.deepEqual([CONTROL_KEYS.steerLeft[0], CONTROL_KEYS.steerRight[0]], ['KeyQ', 'KeyE']);
+    setLang('en');
+    assert.equal(messageText(tip), 'Taxiing: Q and E steer the nosewheel, Shift adds power and - takes it off, '
+      + 'hold B to brake. P sets or releases the parking brake.');
+    setLang('ca');
+    assert.equal(messageText(tip), "Rodatge: Q i E giren la roda de morro, Shift dona potència i - en treu, "
+      + "mantén B per frenar. P posa o treu el fre d'aparcament.");
+    setLang('en');
+  });
+
+  test('keyLabel: el menys i el mes es mostren com a simbol', () => {
+    assert.equal(keyLabel('Minus'), '-');
+    assert.equal(keyLabel('NumpadSubtract'), '-');
+    assert.equal(keyLabel('NumpadAdd'), '+');
+  });
+
+  test('la zona objectiu (rodona) nomes existeix a la llico taxi, i el centre es al llindar', () => {
+    const m = new LessonRun('taxi').thresholdMark();
+    assert.equal((m.fromM + m.toM) / 2, 0);
+    assert.equal(m.halfWidthM, LESSONS.find(l => l.id === 'taxi').taxi.maxLatOffsetM);
+  });
+});

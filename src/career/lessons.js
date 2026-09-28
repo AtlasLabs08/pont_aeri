@@ -81,7 +81,12 @@ export const CONTROL_KEYS = {
   flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
   throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
   reverse: ['KeyR'], spoiler: ['KeyK'],
-  cameraReset: ['Home']
+  cameraReset: ['Home'],
+  // rodatge: Q i E fan girar la roda de morro a terra (Input.update: ctl.steer = yaw)
+  steerLeft: ['KeyQ'], steerRight: ['KeyE'],
+  // throttleDown: Input llegeix el '-' per e.key (qualsevol teclat); 'Minus' en dona el nom
+  throttleUp: ['ShiftLeft', 'ShiftRight', 'NumpadAdd'], throttleDown: ['Minus', 'NumpadSubtract'],
+  brake: ['KeyB']
 };
 
 export const LESSONS = [
@@ -97,7 +102,9 @@ export const LESSONS = [
   { id: 'taxi', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.taxi.title', goalKey: 'school.lesson.taxi.goal',
     criteria: [{ metric: 'reachedThreshold', op: 'eq', value: true }],
-    taxi: { maxDistToThrM: 60, maxLatOffsetM: 25, maxGroundKt: 20 } },
+    taxi: { maxDistToThrM: 60, maxLatOffsetM: 25, maxGroundKt: 20 },
+    tips: [{ key: 'school.tip.taxi', keys: { left: 'steerLeft', right: 'steerRight', more: 'throttleUp',
+      less: 'throttleDown', brake: 'brake', park: 'parkBrake' } }] },
   { id: 'takeoff', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.takeoff.title', goalKey: 'school.lesson.takeoff.goal',
     criteria: [{ metric: 'maxAltFt', op: 'gte', value: 3000 },

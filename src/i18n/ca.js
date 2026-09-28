@@ -81,6 +81,7 @@ export default {
   'school.objective.score': 'Nota: {value} (mín. {target})',
   'school.objective.onRunway': 'Dins de la pista',
   'school.tip.cameraDrag': 'Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. {reset} la torna a l\'angle per defecte.',
+  'school.tip.taxi': 'Rodatge: {left} i {right} giren la roda de morro, {more} dona potència i {less} en treu, mantén {brake} per frenar. {park} posa o treu el fre d\'aparcament.',
   'school.side.left': 'a l\'esquerra',
   'school.side.right': 'a la dreta',
   'school.control.flaps': 'flaps',

@@ -84,6 +84,7 @@ export default {
   'school.objective.score': 'Score: {value} (min {target})',
   'school.objective.onRunway': 'On the runway',
   'school.tip.cameraDrag': 'Outside views: hold the right mouse button and drag to turn the camera. {reset} puts it back to the default angle.',
+  'school.tip.taxi': 'Taxiing: {left} and {right} steer the nosewheel, {more} adds power and {less} takes it off, hold {brake} to brake. {park} sets or releases the parking brake.',
   'school.side.left': 'left',
   'school.side.right': 'right',
   'school.control.flaps': 'flaps',

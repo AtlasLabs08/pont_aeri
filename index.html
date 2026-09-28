@@ -2301,14 +2301,34 @@ const HUD = {
     if (!want) { if (this.drawn) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.cv.width, this.cv.height); this.drawn = false; } return; }
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); this.drawn = true;
     if (cockpit) { if (this.on) this.drawHUD(c, S); } else if (box) this.drawBox(c, S);
-    if (mark) this.drawMark(c, mark);
+    if (mark) this.drawTarget(c, mark, f);
   },
-  /** escola: ressalta un tram de la pista assignada (Game.activeEnd) amb el mateix verd que el contorn de pista del HUD, en qualsevol camera */
-  drawMark(c, m) {
+  /** escola, llico 'taxi': rodona verda fluorescent a terra al punt objectiu (centre del tram de thresholdMark sobre l eix de la
+   *  pista assignada, Game.activeEnd; radi halfWidthM) i linia recta discontinua del mateix color des de l avio fins a la rodona.
+   *  Linia recta, no el cami per les taxiways. Es redibuixa a cada frame, en qualsevol camera */
+  targetGreen: '#39ff14',
+  drawTarget(c, m, f) {
     const A = Game.airport, en = Game.activeEnd; if (!A || !en) return;
-    const q = this.runwayQuad(A, en, m.fromM, m.toM, m.halfWidthM); if (!q.every(Boolean)) return;
-    c.save(); c.strokeStyle = this.green; c.lineWidth = 2.4; c.shadowColor = 'rgba(90,255,150,0.55)'; c.shadowBlur = 3; c.lineJoin = 'round';
-    c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke(); c.restore();
+    const y = A.elev + 0.3, s = (m.fromM + m.toM) / 2, r = m.halfWidthM, P = A.toWorld(en.thr[0] + en.dir[0] * s, en.thr[1] + en.dir[1] * s);
+    c.save(); c.strokeStyle = this.targetGreen; c.shadowColor = 'rgba(57,255,20,0.7)'; c.shadowBlur = 6; c.lineJoin = 'round'; c.lineCap = 'round';
+    // rodona: un poligon a terra; si una part queda darrere la camera, nomes el contorn visible
+    const ring = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * 2 * Math.PI; ring.push(this.world(P[0] + Math.cos(a) * r, P[1] + Math.sin(a) * r, y)); }
+    c.beginPath(); let pen = false; for (const p of ring) { if (!p) { pen = false; continue; } if (pen) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); pen = true; }
+    if (ring.every(Boolean)) { c.closePath(); c.fillStyle = 'rgba(57,255,20,0.28)'; c.fill(); }
+    c.lineWidth = 3; c.stroke();
+    // linia: de l avio (a terra) fins a la vora de la rodona
+    const dx = P[0] - f.e, dy = P[1] - f.n, d = Math.hypot(dx, dy);
+    if (d > r) { const k = (d - r) / d, seg = this.groundSegment(f.e, f.n, f.e + dx * k, f.n + dy * k, y);
+      if (seg) { c.setLineDash([12, 9]); c.lineWidth = 2.5; this.line(c, seg[0], seg[1]); } }
+    c.restore();
+  },
+  /** extrems en pantalla d un segment a l altura y, retallat davant de la camera (a la cabina l avio queda darrere); null si no se n veu res */
+  groundSegment(e0, n0, e1, n1, y) {
+    const cam = R3.camera, F = Cameras.fwd, depth = (e, n) => (rx(e) - cam.position.x) * F[0] + (y - cam.position.y) * F[1] + (rz(n) - cam.position.z) * F[2];
+    const NEAR = 6, d0 = depth(e0, n0), d1 = depth(e1, n1); if (d0 < NEAR && d1 < NEAR) return null;
+    const cut = (ea, na, da, eb, nb, db) => { const k = (NEAR - da) / (db - da); return [ea + (eb - ea) * k, na + (nb - na) * k]; };
+    if (d0 < NEAR) [e0, n0] = cut(e0, n0, d0, e1, n1, d1); else if (d1 < NEAR) [e1, n1] = cut(e1, n1, d1, e0, n0, d0);
+    const a = this.world(e0, n0, y), b = this.world(e1, n1, y); return a && b ? [a, b] : null;
   },
   /* ---- projection helpers (render axes: x east, y up, z south) ---- */
   dir(dx, dy, dz) {

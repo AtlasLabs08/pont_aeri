@@ -38,9 +38,12 @@
  *     Si code es a LESSONS['cockpit'].controlKeys, crida onCommand.
  *   run.crash()   Game.crashNow ha saltat: marca crashed i tanca l intent
  *
- *   run.thresholdMark() -> { fromM, toM, halfWidthM } | null   tram de la
- *     pista assignada que index.html ressalta en verd mentre l intent es en
- *     marxa: nomes les llicons amb dades taxi (lessons.js). fromM i toM son
+ *   run.thresholdMark() -> { fromM, toM, halfWidthM } | null   zona objectiu
+ *     de la pista assignada mentre l intent es en marxa: nomes les llicons
+ *     amb dades taxi (lessons.js). index.html hi pinta una rodona verda
+ *     fluorescent a terra, centrada al mig del tram sobre l eix i de radi
+ *     halfWidthM, i una linia recta discontinua des de l avio fins a la
+ *     rodona (docs/DECISIONS.md, 29/09/2026). fromM i toM son
  *     metres respecte del llindar en el sentit d aterratge (negatiu = abans),
  *     halfWidthM a cada banda de l eix. Surt dels llindars de reachedThreshold:
  *     maxDistToThrM a cada banda del llindar i maxLatOffsetM d amplada.
@@ -86,7 +89,8 @@
  * lessonGoalParams(lesson) -> params per a t(lesson.goalKey, params): el
  *   numero surt sempre de LESSONS, mai escrit al text d i18n.
  * keyLabel(code) -> etiqueta curta d una tecla: 'KeyG' -> 'G', 'ShiftLeft'
- *   -> 'Shift'. Noms de tecla, no text traduible.
+ *   -> 'Shift', 'Minus' i 'NumpadSubtract' -> '-'. Noms de tecla, no text
+ *   traduible.
  * messageText({ key, params, tParams }) -> text amb t(): cada tParams[nom]
  *   es una clau i18n que es tradueix i s interpola com a {nom}. Els params
  *   numerics (menys count, que tria el plural) es formaten amb fmtNumber.
@@ -212,7 +216,10 @@ function objectiveRows(run) {
   return rows;
 }
 
+const KEY_SYMBOLS = { Minus: '-', NumpadSubtract: '-', NumpadAdd: '+' };
+
 export function keyLabel(code) {
+  if (Object.hasOwn(KEY_SYMBOLS, code)) return KEY_SYMBOLS[code];
   return code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, '');
 }
 
