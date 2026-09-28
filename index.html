@@ -2308,6 +2308,12 @@ const HUD = {
     if ((px - cam.position.x) * F[0] + (y - cam.position.y) * F[1] + (pz - cam.position.z) * F[2] < 5) return null;
     const v = this._v.set(px, y, pz).project(cam); return [(v.x + 1) * 0.5 * this.w, (1 - v.y) * 0.5 * this.h];
   },
+  /** screen corners of a stretch of runway on the ground, from s0 to s1 metres past the threshold and w2 metres each side of the centreline */
+  runwayQuad(A, en, s0, s1, w2) {
+    const d = en.dir, pp = [-d[1], d[0]], y = A.elev + 0.3, T = en.thr;
+    const W = (s, t) => { const p = A.toWorld(T[0] + d[0] * s + pp[0] * t, T[1] + d[1] * s + pp[1] * t); return this.world(p[0], p[1], y); };
+    return [W(s0, w2), W(s1, w2), W(s1, -w2), W(s0, -w2)];
+  },
   bodyFwd(f) { const w = f.q0, x = f.q1, y = f.q2, z = f.q3; return [2 * (x * y + w * z), -2 * (x * z - w * y), -(1 - 2 * (y * y + z * z))]; },
   line(c, a, b) { if (!a || !b) return; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); },
 
@@ -2346,7 +2352,7 @@ const HUD = {
     if (nav && nav.locValid && nav.distThr < 15) { const A = AIRPORTS[nav.apt], en = A && A.allEnds[nav.idx];
       if (en) { const d = en.dir, pp = [-d[1], d[0]], w2 = en.rw.wid / 2, L = en.rw.len, y = A.elev + 0.3, T = en.thr;
         const W = (a, cc) => { const p = A.toWorld(a, cc); return this.world(p[0], p[1], y); };
-        const q = [W(T[0] + pp[0] * w2, T[1] + pp[1] * w2), W(T[0] + d[0] * L + pp[0] * w2, T[1] + d[1] * L + pp[1] * w2), W(T[0] + d[0] * L - pp[0] * w2, T[1] + d[1] * L - pp[1] * w2), W(T[0] - pp[0] * w2, T[1] - pp[1] * w2)];
+        const q = this.runwayQuad(A, en, 0, L, w2);
         if (q.every(Boolean)) { c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke();
           const a1 = W(T[0] + d[0] * 420 + pp[0] * w2 * 0.6, T[1] + d[1] * 420 + pp[1] * w2 * 0.6), a2 = W(T[0] + d[0] * 420 - pp[0] * w2 * 0.6, T[1] + d[1] * 420 - pp[1] * w2 * 0.6); c.lineWidth = 2.4; this.line(c, a1, a2); c.lineWidth = 1.6; }
         for (let k = 1; k <= 18; k++) { const s0 = -k * 300, a = W(T[0] + d[0] * s0, T[1] + d[1] * s0), b = W(T[0] + d[0] * (s0 + 120), T[1] + d[1] * (s0 + 120)); this.line(c, a, b); } } }
