@@ -3,42 +3,52 @@
  * ORIGEN: launchLesson, concludeLesson i la variable activeLesson
  * d index.html (C3).
  *
- * EXPORTA: startLesson currentLesson currentLessonId abandonLesson
+ * EXPORTA: startLesson currentLesson currentLessonId lastLessonId abandonLesson
  *
  * IMPORTA: LessonRun de ./lesson-run.js, launchFlight i cancelFlight de
  * ./flight.js.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
- *   startLesson(lessonId, flightOpts) -> Promise<{ lessonId, facts, record }>
+ *   startLesson(lessonId, flightOpts) -> Promise<{ lessonId, facts, record } | null>
  *     crea la LessonRun (que passa a ser currentLesson()) i llanca el vol
- *     amb launchFlight(flightOpts). Quan torna el FlightRecord, tanca la
- *     llico amb finish(record) i resol amb els fets combinats.
+ *     amb launchFlight(flightOpts). Si launchFlight llanca (ja hi ha un vol
+ *     en marxa), no canvia res. Quan torna el FlightRecord, tanca aquesta
+ *     LessonRun, i nomes aquesta, amb finish(record) i resol amb els fets
+ *     combinats. Si el vol es cancel la (record null), resol null sense
+ *     tocar cap LessonRun: reiniciar (cancelFlight i startLesson) no pot
+ *     tancar la llico nova amb la promesa de la vella.
  *   currentLesson() -> LessonRun | null   intent en marxa
  *   currentLessonId() -> string | null
- *   abandonLesson()   cancelFlight() i deixa l estat lliure
+ *   lastLessonId() -> string | null   la darrera llico llancada, encara que
+ *     ja hagi acabat (crash, nota o 120 s): la que torna a llancar Restart.
+ *     null despres d abandonLesson().
+ *   abandonLesson()   cancelFlight() i deixa l estat lliure (tornar al menu)
  */
 
 import { LessonRun } from './lesson-run.js';
 import { launchFlight, cancelFlight } from './flight.js';
 
-let active = null, activeId = null;
+let active = null, activeId = null, lastId = null;
 
 export function currentLesson() { return active; }
 export function currentLessonId() { return activeId; }
+export function lastLessonId() { return lastId; }
 
 export function startLesson(lessonId, flightOpts) {
-  activeId = lessonId; active = new LessonRun(lessonId);
-  return launchFlight(flightOpts)
-    .then(record => {
-      const facts = active.finish(record);
-      const outcome = { lessonId: activeId, facts, record };
-      active = null; activeId = null;
-      return outcome;
-    })
-    .catch(err => { active = null; activeId = null; throw err; });
+  const run = new LessonRun(lessonId);
+  // la promesa es d aquest vol: nomes pot tancar aquesta run, mai la que
+  // hagi pres el relleu despres d un Restart
+  const release = () => { if (active === run) { active = null; activeId = null; } };
+  const flight = launchFlight(flightOpts);
+  active = run; activeId = lessonId; lastId = lessonId;
+  return flight.then(record => {
+    release();
+    if (record === null) return null;
+    return { lessonId, facts: run.finish(record), record };
+  }, err => { release(); throw err; });
 }
 
 export function abandonLesson() {
   cancelFlight();
-  active = null; activeId = null;
+  active = null; activeId = null; lastId = null;
 }

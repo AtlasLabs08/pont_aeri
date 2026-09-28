@@ -146,7 +146,7 @@ import { LESSONS, isLessonAvailable, recordLessonAttempt } from './src/career/in
 import {
   lessonGoalParams, attemptMessage, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
-  startLesson, currentLesson, currentLessonId, abandonLesson
+  startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson
 } from './src/app/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
@@ -2006,7 +2006,7 @@ async function launchLesson(lessonId, unlockAll) {
     quality: Game.opts.quality, difficulty: 'normal', autoTrim: true, ...spawnOpts });
   await Main.preloadTerrain();
   UI.loading(1); UI.el.report.hidden = true; UI.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
-  lessonDone.then(outcome => concludeLesson(outcome)).catch(err => { if (IS_DEV) console.error(err); });
+  lessonDone.then(outcome => { if (outcome) concludeLesson(outcome); }).catch(err => { if (IS_DEV) console.error(err); });
 }
 /* Panell DEV de l escola (D1, docs/DECISIONS.md 27/09/2026): fora d i18n,
  * nomes visible amb IS_DEV. El boto "unlock all" nomes marca les llicons
@@ -2718,8 +2718,8 @@ const UI = {
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
-  restart() { this.el.crash.hidden = true; this.el.report.hidden = true; if (currentLesson()) { const id = currentLessonId(); cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
-  toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; if (currentLesson()) abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },
+  restart() { this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
+  toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },
   pause(on) { if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
   /** photo scenery: a line in the menu and the data credits in a corner */
