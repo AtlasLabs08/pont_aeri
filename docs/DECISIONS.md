@@ -242,3 +242,34 @@ geometria respecte de la pista assignada (Game.activeEnd), no de l ILS
 autosintonitzat, perque en vent en cua el receptor sintonitza el capcal
 contrari. La instantania de lesson-run.js te tres camps opcionals nous
 (asgAlongM, asgLatM, asgHdgDeg).
+
+## 2026-09-29 - C3: llicons 1 a 5 per donar-les per acabades
+
+En Marc ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
+
+- Tecla de reinici de camera: Home. Torna la camera a l angle (i la
+  distancia i el zoom) per defecte, a totes les cameres exteriors, a la
+  cabina i a Free Flight (Cameras.resetView a index.html). Es l unica tecla
+  lliure: totes les lletres ja son d Input o de Game.onKey. Viu a
+  CONTROL_KEYS.cameraReset (lessons.js), el mapa de tecles de comandament
+  que la llico 2 fa servir com a controlKeys. L instructor ho ensenya a la
+  llico 1 (arrossegar amb el clic dret gira la camera, Home la torna), sense
+  cap criteri nou. Les explicacions de l instructor son dades (tips a
+  lessons.js) i les tecles surten sempre de CONTROL_KEYS.
+- Llico 3 (taxi): una rodona verda fluorescent a terra, al punt objectiu
+  (el llindar de la pista assignada, sobre l eix; radi = maxLatOffsetM), i
+  una linia recta discontinua del mateix color des de l avio fins a la
+  rodona, redibuixada a cada frame. Linia recta, no el cami per les
+  taxiways. Substitueix el ressaltat del capcal. Nomes en aquesta llico.
+- Distancia a l aeroport: totes les vistes la mesuren fins al capcal de la
+  pista de destinacio (thresholdDistNm a world/ils.js), en linia recta. El
+  capcal es el de l ILS sintonitzat si es de l aeroport de destinacio, si
+  no el de la pista assignada (destinationEnd). Abans la cabina (PFD i HUD)
+  mostrava el DME, que es a l antena del localitzador, a l altre extrem de
+  la pista (uns 2 nm mes), i l ND i el vol cronometrat mesuraven fins al
+  centre de l aeroport. Error antic: tambe passava a Free Flight a dev.
+  Les llicons continuen fent servir distThr de l ILS: no canvien.
+- Llico 4 (takeoff): el comptador d altura de la llista d objectius no va
+  amb retard. Compta AGL (D4, alcada del tren sobre el terreny), i
+  l altimetre del HUD es MSL: la diferencia es l elevacio de l aeroport mes
+  l alcada del tren. L etiqueta de la llista ara diu "ft AGL".
