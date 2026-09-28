@@ -164,6 +164,24 @@ describe('llico taxi: reachedThreshold', () => {
   });
 });
 
+describe('thresholdMark: ressaltat del capcal nomes a la llico taxi', () => {
+  test('taxi: tram del capcal a partir dels llindars de reachedThreshold', () => {
+    const T = LESSONS.find(l => l.id === 'taxi').taxi;
+    const run = new LessonRun('taxi');
+    assert.deepEqual(run.thresholdMark(), { fromM: -T.maxDistToThrM, toM: T.maxDistToThrM, halfWidthM: T.maxLatOffsetM });
+  });
+
+  test('cap altra llico no en te', () => {
+    for (const l of LESSONS.filter(x => x.id !== 'taxi')) assert.equal(new LessonRun(l.id).thresholdMark(), null, l.id);
+  });
+
+  test('desapareix quan l intent acaba', () => {
+    const run = new LessonRun('taxi');
+    run.finish(record());
+    assert.equal(run.thresholdMark(), null);
+  });
+});
+
 describe('llico takeoff: maxAltFt es AGL i gearUp', () => {
   test('agafa l AGL de la instantania, no el MSL', () => {
     const run = new LessonRun('takeoff');

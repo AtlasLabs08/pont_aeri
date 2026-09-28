@@ -32,6 +32,12 @@
  *     Si code es a LESSONS['cockpit'].controlKeys, crida onCommand.
  *   run.crash()   Game.crashNow ha saltat: marca crashed i tanca l intent
  *
+ *   run.thresholdMark() -> { fromM, toM, halfWidthM } | null   tram de la
+ *     pista assignada que index.html ressalta en verd mentre l intent es en
+ *     marxa: nomes les llicons amb dades taxi (lessons.js). fromM i toM son
+ *     metres respecte del llindar en el sentit d aterratge (negatiu = abans),
+ *     halfWidthM a cada banda de l eix. Surt dels llindars de reachedThreshold:
+ *     maxDistToThrM a cada banda del llindar i maxLatOffsetM d amplada.
  *   run.facts   fets en viu acumulats fins ara (sempre inclou crashed)
  *   run.done   true un cop tancat (crash o finish)
  *   run.readyToEnd()   true si toca tancar l intent: crashed, criteris en
@@ -147,6 +153,12 @@ export class LessonRun {
   crash() {
     if (this.done) return;
     this.facts.crashed = true;
+  }
+
+  thresholdMark() {
+    const T = this.lesson.taxi;
+    if (!T || this.done) return null;
+    return { fromM: -T.maxDistToThrM, toM: T.maxDistToThrM, halfWidthM: T.maxLatOffsetM };
   }
 
   /** proper comandament que l instructor demana (llico 'cockpit'), o null */

@@ -2281,7 +2281,7 @@ const Game = {
    synthetic runway outline sit exactly on the outside world (conformal).
    ============================================================================ */
 const HUD = {
-  on: true, cv: null, c: null, w: 0, h: 0, dpr: 1, drawn: false, _v: null,
+  green: '#63ff9c', on: true, cv: null, c: null, w: 0, h: 0, dpr: 1, drawn: false, _v: null,
   init() { this.cv = document.getElementById('hudcv'); this.c = this.cv.getContext('2d'); this._v = new THREE.Vector3(); },
   size() {
     const d = Math.min(window.devicePixelRatio || 1, 2), w = window.innerWidth, h = window.innerHeight;
@@ -2291,10 +2291,19 @@ const HUD = {
     if (!this.c) return; this.size(); const c = this.c, f = S.fdm, st = Game.state, nav = S.nav;
     const cockpit = Cameras.mode === 'cockpit';
     const box = !cockpit && nav && nav.locValid && !f.wow && nav.distThr < 15 && f.out.aglFt < 6000;
-    const want = st === 'flying' && ((cockpit && this.on) || box);
+    const lesson = st === 'flying' ? currentLesson() : null, mark = lesson && lesson.thresholdMark();   // escola, llico 'taxi'
+    const want = st === 'flying' && ((cockpit && this.on) || box || mark);
     if (!want) { if (this.drawn) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.cv.width, this.cv.height); this.drawn = false; } return; }
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); this.drawn = true;
-    if (cockpit) this.drawHUD(c, S); else this.drawBox(c, S);
+    if (cockpit) { if (this.on) this.drawHUD(c, S); } else if (box) this.drawBox(c, S);
+    if (mark) this.drawMark(c, mark);
+  },
+  /** escola: ressalta un tram de la pista assignada (Game.activeEnd) amb el mateix verd que el contorn de pista del HUD, en qualsevol camera */
+  drawMark(c, m) {
+    const A = Game.airport, en = Game.activeEnd; if (!A || !en) return;
+    const q = this.runwayQuad(A, en, m.fromM, m.toM, m.halfWidthM); if (!q.every(Boolean)) return;
+    c.save(); c.strokeStyle = this.green; c.lineWidth = 2.4; c.shadowColor = 'rgba(90,255,150,0.55)'; c.shadowBlur = 3; c.lineJoin = 'round';
+    c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke(); c.restore();
   },
   /* ---- projection helpers (render axes: x east, y up, z south) ---- */
   dir(dx, dy, dz) {
@@ -2318,7 +2327,7 @@ const HUD = {
   line(c, a, b) { if (!a || !b) return; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); },
 
   drawHUD(c, S) {
-    const f = S.fdm, o = f.out, ap = S.ap, nav = S.nav, G = '#63ff9c', cfg = f.cfg;
+    const f = S.fdm, o = f.out, ap = S.ap, nav = S.nav, G = this.green, cfg = f.cfg;
     const bf = this.bodyFwd(f), B = this.dir(bf[0], bf[1], bf[2]); if (!B) return;
     const F = Cameras.fwd, ang = Math.acos(clamp(bf[0] * F[0] + bf[1] * F[1] + bf[2] * F[2], -1, 1)), alpha = 1 - smoothstep(0.30, 0.55, ang); if (alpha < 0.02) return;
     const ppr = (this.h / 2) / Math.tan(R3.camera.fov * DEG / 2), hw = Math.tan(15 * DEG) * ppr, hh = Math.tan(11 * DEG) * ppr;
