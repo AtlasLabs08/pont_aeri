@@ -5,9 +5,9 @@
  * els esdeveniments de vista (canvi de camera) i de comandament (una tecla
  * d Input que Game.onKey ja gestiona).
  *
- * EXPORTA: LessonRun lessonGoalParams attemptMessage
+ * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
  *
- * IMPORTA: LESSONS, factsFromRecord i evaluate de career/.
+ * IMPORTA: LESSONS, factsFromRecord i evaluate de career/; t de i18n/.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   new LessonRun(lessonId)   llanca amb l id si es desconegut a LESSONS
@@ -25,6 +25,11 @@
  *   run.onView(view)   la camera activa ha canviat (Cameras.mode)
  *   run.onCommand(name)   el jugador ha accionat un comandament. name es
  *     un dels noms de LESSONS['cockpit'].controls
+ *   run.onKey(code)   el jugador ha premut una tecla (KeyboardEvent.code).
+ *     index.html la crida a Game.onKey ABANS de qualsevol comprovacio que
+ *     impedeixi l accio (tren a terra, inversors en vol): a la llico
+ *     'cockpit' l objectiu es identificar el comandament, no fer-lo servir.
+ *     Si code es a LESSONS['cockpit'].controlKeys, crida onCommand.
  *   run.crash()   Game.crashNow ha saltat: marca crashed i tanca l intent
  *
  *   run.facts   fets en viu acumulats fins ara (sempre inclou crashed)
@@ -37,12 +42,18 @@
  *     retorna els fets combinats: factsFromRecord(record) mes els fets en
  *     viu, que guanyen en cas de xoc de clau (per exemple maxAltFt de la
  *     llico 4, en AGL, substitueix el del FlightRecord, que es en MSL)
- *   run.instructorMessage() -> { key, params }   text mentre l intent es
- *     en marxa: l objectiu de la llico, o a la llico 'cockpit' quin
- *     comandament toca provar. Es fa servir amb t() a index.html
+ *   run.instructorMessage() -> { key, params, tParams? }   text mentre
+ *     l intent es en marxa: l objectiu de la llico, o a la llico 'cockpit'
+ *     quin comandament toca provar (params.control = nom, params.key =
+ *     tecla, tParams.controlName = clau i18n del nom). Es pinta amb
+ *     messageText().
  *
  * lessonGoalParams(lesson) -> params per a t(lesson.goalKey, params): el
  *   numero surt sempre de LESSONS, mai escrit al text d i18n.
+ * keyLabel(code) -> etiqueta curta d una tecla: 'KeyG' -> 'G', 'ShiftLeft'
+ *   -> 'Shift'. Noms de tecla, no text traduible.
+ * messageText({ key, params, tParams }) -> text amb t(): cada tParams[nom]
+ *   es una clau i18n que es tradueix i s interpola com a {nom}.
  * attemptMessage({ passed, mercy, crashed }) -> { key, params }   missatge
  *   final un cop recordLessonAttempt (career/school.js) ja ha decidit el
  *   resultat (inclosa la gracia). No decideix passed/mercy: nomes tria el
@@ -50,6 +61,7 @@
  */
 
 import { LESSONS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
+import { t } from '../i18n/index.js';
 
 function lessonById(lessonId) {
   const lesson = LESSONS.find(l => l.id === lessonId);
@@ -73,6 +85,16 @@ export function lessonGoalParams(lesson) {
     case 'landing': return { score: BALANCE.school.passScore };
     default: return {};
   }
+}
+
+export function keyLabel(code) {
+  return code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, '');
+}
+
+export function messageText({ key, params, tParams }) {
+  const all = { ...params };
+  for (const [name, k] of Object.entries(tParams || {})) all[name] = t(k);
+  return t(key, all);
 }
 
 export function attemptMessage({ passed, mercy, crashed }) {
@@ -114,6 +136,12 @@ export class LessonRun {
       this._seenCommands.add(name);
       this.facts.controlsIdentified = this._seenCommands.size;
     }
+  }
+
+  onKey(code) {
+    if (this.done || !this.lesson.controlKeys) return;
+    const name = this.lesson.controls.find(c => this.lesson.controlKeys[c].includes(code));
+    if (name) this.onCommand(name);
   }
 
   crash() {
@@ -186,7 +214,9 @@ export class LessonRun {
   instructorMessage() {
     if (this.lesson.id === 'cockpit') {
       const next = this.nextControl();
-      if (next) return { key: 'school.instructor.askControl', params: { control: next } };
+      if (next) return { key: 'school.instructor.askControl',
+        params: { control: next, key: keyLabel(this.lesson.controlKeys[next][0]) },
+        tParams: { controlName: 'school.control.' + next } };
     }
     return { key: this.lesson.goalKey, params: lessonGoalParams(this.lesson) };
   }

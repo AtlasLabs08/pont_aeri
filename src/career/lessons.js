@@ -18,6 +18,11 @@
  *     app/debrief.js, mai per school.js:
  *       controls        (llico 'cockpit') llista ordenada dels comandaments
  *                        que l instructor demana un a un (noms d Input/Game).
+ *       controlKeys     (llico 'cockpit') { comandament: [codis KeyboardEvent.code] }
+ *                        de cada element de controls. El primer codi es la
+ *                        tecla que l instructor anomena. Premer qualsevol
+ *                        d aquests codis identifica el comandament, abans de
+ *                        cap comprovacio de Game (correccio del PR #22).
  *       taxi            (llico 'taxi') { maxDistToThrM, maxLatOffsetM,
  *                        maxGroundKt }: llindars de reachedThreshold.
  *       durationS       (llico 'maneuvers') segons de D5 abans d avaluar.
@@ -58,7 +63,10 @@ export const LESSONS = [
   { id: 'cockpit', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.cockpit.title', goalKey: 'school.lesson.cockpit.goal',
     criteria: [{ metric: 'controlsIdentified', op: 'gte', value: 6 }],
-    controls: ['flaps', 'gear', 'parkBrake', 'throttle', 'reverse', 'spoiler'] },
+    controls: ['flaps', 'gear', 'parkBrake', 'throttle', 'reverse', 'spoiler'],
+    controlKeys: { flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
+      throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
+      reverse: ['KeyR'], spoiler: ['KeyK'] } },
   { id: 'taxi', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.taxi.title', goalKey: 'school.lesson.taxi.goal',
     criteria: [{ metric: 'reachedThreshold', op: 'eq', value: true }],

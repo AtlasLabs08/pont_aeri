@@ -8,8 +8,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LessonRun, lessonGoalParams, attemptMessage } from '../../src/app/lesson-run.js';
+import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText } from '../../src/app/lesson-run.js';
 import { LESSONS, BALANCE, evaluate } from '../../src/career/index.js';
+import { setLang } from '../../src/i18n/index.js';
+import en from '../../src/i18n/en.js';
+import ca from '../../src/i18n/ca.js';
 
 /** FlightRecord minim; over sobreescriu camps */
 const record = (over = {}) => ({
@@ -81,9 +84,65 @@ describe('llico cockpit: controlsIdentified un a un', () => {
     assert.equal(run.instructorMessage().key, 'school.lesson.cockpit.goal');
   });
 
+  test('el missatge diu el nom (clau i18n) i la tecla del comandament', () => {
+    const run = new LessonRun('cockpit');
+    const msg = run.instructorMessage();
+    assert.equal(msg.params.key, 'F');
+    assert.equal(msg.tParams.controlName, 'school.control.flaps');
+    run.onCommand('flaps');
+    assert.equal(run.instructorMessage().params.key, 'G');
+    setLang('en');
+    assert.equal(messageText(run.instructorMessage()), 'Identify this control: landing gear (key G).');
+    setLang('ca');
+    assert.equal(messageText(run.instructorMessage()), "Identifica aquest comandament: tren d'aterratge (tecla G).");
+    setLang('en');
+  });
+
+  test('keyLabel: nom curt de la tecla', () => {
+    assert.equal(keyLabel('KeyG'), 'G');
+    assert.equal(keyLabel('ShiftLeft'), 'Shift');
+    assert.equal(keyLabel('Digit0'), '0');
+  });
+
   test('un comandament fora de la llista no compta', () => {
     const run = new LessonRun('cockpit');
     run.onCommand('brake');
+    assert.equal(run.facts.controlsIdentified, 0);
+  });
+});
+
+describe('llico cockpit: amb l avio aturat a terra, premer cada comandament compta', () => {
+  const L = LESSONS.find(l => l.id === 'cockpit');
+  const stopped = snap({ onGround: true, gsKt: 0, iasKt: 0, vsFpm: 0, altFt: 15, aglFt: 0, gearDown: true });
+  for (const name of L.controls) {
+    test(name, () => {
+      const codes = L.controlKeys[name];
+      assert.ok(Array.isArray(codes) && codes.length > 0, 'cal almenys una tecla per a ' + name);
+      assert.ok(Object.hasOwn(en, 'school.control.' + name) && Object.hasOwn(ca, 'school.control.' + name));
+      for (const code of codes) {
+        const run = new LessonRun('cockpit');
+        run.sample(stopped);
+        run.onKey(code);
+        assert.equal(run.facts.controlsIdentified, 1, code);
+        assert.notEqual(run.nextControl(), name, code);
+      }
+    });
+  }
+
+  test('tota la llico es pot fer aturat, premint la tecla que diu l instructor', () => {
+    const run = new LessonRun('cockpit');
+    run.sample(stopped);
+    for (let i = 0; i < L.controls.length; i++) {
+      const next = run.nextControl();
+      run.onKey(L.controlKeys[next][0]);
+      run.sample(stopped);
+    }
+    assert.equal(run.readyToEnd(), true);
+  });
+
+  test('una tecla que no es de cap comandament no compta', () => {
+    const run = new LessonRun('cockpit');
+    run.onKey('KeyC');
     assert.equal(run.facts.controlsIdentified, 0);
   });
 });

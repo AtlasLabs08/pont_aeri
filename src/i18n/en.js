@@ -55,7 +55,7 @@ export default {
   'checkride.narrowbody.title': 'Narrow-body',
   'checkride.widebody.title': 'Wide-body',
   'checkride.quad.title': 'Four-engine',
-  'school.instructor.askControl': 'Try the {control} control.',
+  'school.instructor.askControl': 'Identify this control: {controlName} (key {key}).',
   'school.instructor.crashed': 'That ended badly. Take a breath and try the lesson again.',
   'school.instructor.passed': 'Well done, lesson passed.',
   'school.instructor.mercyPassed': 'Provisional pass. You can come back to the school whenever you like.',

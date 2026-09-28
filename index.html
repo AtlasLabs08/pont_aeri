@@ -144,7 +144,7 @@ import { IS_DEV } from './src/platform/index.js';
 import { t } from './src/i18n/index.js';
 import { LESSONS, isLessonAvailable, recordLessonAttempt } from './src/career/index.js';
 import {
-  lessonGoalParams, attemptMessage, debriefRows,
+  lessonGoalParams, attemptMessage, messageText, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson
 } from './src/app/index.js';
@@ -1979,7 +1979,7 @@ function concludeLesson({ lessonId, facts, record }) {
   const result = recordLessonAttempt(school, lessonId, facts);
   school = result.school;
   const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed });
-  UI.toast(t(msg.key, msg.params), 6);
+  UI.toast(messageText(msg), 6);
   const lesson = LESSONS.find(l => l.id === lessonId);
   if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record);
   if (IS_DEV && DevSchoolPanel.el) DevSchoolPanel.render();
@@ -2106,13 +2106,16 @@ const Game = {
     if (this.state === 'replay') { if (code === 'KeyC') { this.rp.manualCam = true; Cameras.mode = Cameras.mode === 'tower' ? 'chase' : 'tower'; } else if (code === 'Escape' || code === 'Space' || code === 'Enter') this.stopReplay(); return; }
     if (code === 'Escape') { if (this.state === 'flying') UI.pause(true); else if (this.state === 'paused') UI.pause(false); return; }
     if (this.state !== 'flying') return;
+    // escola, llico 'cockpit': identificar el comandament compta en premer la tecla, abans de
+    // qualsevol comprovacio que impedeixi l accio (tren a terra, inversors en vol)
+    if (currentLesson()) currentLesson().onKey(code);
     switch (code) {
-      case 'KeyF': c.flaps = Math.min(f.cfg.flaps.length - 1, c.flaps + 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); if (currentLesson()) currentLesson().onCommand('flaps'); break;
-      case 'KeyV': c.flaps = Math.max(0, c.flaps - 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); if (currentLesson()) currentLesson().onCommand('flaps'); break;
-      case 'KeyG': if (f.wow) this.msg('Gear lever locked on the ground'); else { c.gearDown = !c.gearDown; this.msg(c.gearDown ? 'Gear down' : 'Gear up'); if (currentLesson()) currentLesson().onCommand('gear'); } break;
-      case 'KeyP': c.parkBrake = !c.parkBrake; this.msg(c.parkBrake ? 'Parking brake set' : 'Parking brake released'); if (currentLesson()) currentLesson().onCommand('parkBrake'); break;
-      case 'KeyK': c.spoiler = c.spoiler ? 0 : 1; this.msg(c.spoiler ? 'Speedbrake extended' : 'Speedbrake retracted'); if (currentLesson()) currentLesson().onCommand('spoiler'); break;
-      case 'KeyR': if (f.wow) { c.reverse = !c.reverse; if (c.reverse) c.throttle = Math.min(c.throttle, 0.05); this.msg(c.reverse ? 'Reverse thrust: Shift adds reverse power, minus reduces it' : 'Reversers stowed'); if (currentLesson()) currentLesson().onCommand('reverse'); } else this.msg('Reverse is only available on the ground'); break;
+      case 'KeyF': c.flaps = Math.min(f.cfg.flaps.length - 1, c.flaps + 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;
+      case 'KeyV': c.flaps = Math.max(0, c.flaps - 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;
+      case 'KeyG': if (f.wow) this.msg('Gear lever locked on the ground'); else { c.gearDown = !c.gearDown; this.msg(c.gearDown ? 'Gear down' : 'Gear up'); } break;
+      case 'KeyP': c.parkBrake = !c.parkBrake; this.msg(c.parkBrake ? 'Parking brake set' : 'Parking brake released'); break;
+      case 'KeyK': c.spoiler = c.spoiler ? 0 : 1; this.msg(c.spoiler ? 'Speedbrake extended' : 'Speedbrake retracted'); break;
+      case 'KeyR': if (f.wow) { c.reverse = !c.reverse; if (c.reverse) c.throttle = Math.min(c.throttle, 0.05); this.msg(c.reverse ? 'Reverse thrust: Shift adds reverse power, minus reduces it' : 'Reversers stowed'); } else this.msg('Reverse is only available on the ground'); break;
       case 'KeyJ': if (this.ap.on) { this.ap.disengage(); this.msg('Autopilot off'); } else if (f.wow || f.out.aglFt < 400) this.msg('Autopilot needs 400 ft AGL'); else { this.ap.engage(); this.ap.tripped = false; this.msg('Autopilot on: HDG ' + this.ap.selHdg + ' / ' + this.ap.vert); } break;
       case 'KeyT': this.ap.setAthr(!this.ap.athr); this.msg(this.ap.athr ? 'Autothrottle on: ' + this.ap.selSpd + ' kt' : 'Autothrottle off'); break;
       case 'KeyN': this.cycleAccel(); break;
@@ -2756,7 +2759,7 @@ const UI = {
     if (!currentLesson()) { if (this._lessonEl) this._lessonEl.style.display = 'none'; if (this._flareEl) this._flareEl.style.display = 'none'; return; }
     if (!this._lessonEl) { const el = document.createElement('div'); el.id = 'lessonHud'; el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;font:600 13px system-ui;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;pointer-events:none;text-align:center'; document.body.appendChild(el); this._lessonEl = el; }
     const msg = currentLesson().instructorMessage();
-    this._lessonEl.style.display = 'block'; this._lessonEl.textContent = t(msg.key, msg.params);
+    this._lessonEl.style.display = 'block'; this._lessonEl.textContent = messageText(msg);
     const lesson = LESSONS.find(l => l.id === currentLessonId());
     if (lesson && lesson.aids && lesson.aids.flareBar && !f.wow && f.out.aglFt <= lesson.flareBar.startAglFt) {
       const T = lesson.flareBar, k = clamp(f.out.aglFt / T.startAglFt, 0, 1), target = T.sinkAtContactFpm + (T.sinkAtStartFpm - T.sinkAtContactFpm) * k;

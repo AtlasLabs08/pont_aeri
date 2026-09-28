@@ -52,7 +52,7 @@ export default {
   'checkride.narrowbody.title': 'Narrowbody',
   'checkride.widebody.title': 'Widebody',
   'checkride.quad.title': 'Quadrimotor',
-  'school.instructor.askControl': 'Prova el comandament: {control}.',
+  'school.instructor.askControl': 'Identifica aquest comandament: {controlName} (tecla {key}).',
   'school.instructor.crashed': 'Ha acabat malament. Respira i torna-ho a provar.',
   'school.instructor.passed': 'Molt bé, lliçó aprovada.',
   'school.instructor.mercyPassed': 'Aprovat provisional. Pots tornar a l\'escola quan vulguis.',
