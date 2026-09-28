@@ -147,6 +147,18 @@ export function circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, G) {
   return { phase: 'finalTurn', side: sideOf(toFinal), turnNow: true };
 }
 
+/** condicions de D6 (finalStabilized de lessons.js) en una instantania */
+function stabilizedChecks(snap, T) {
+  return {
+    gate: snap.aglFt <= T.aglFt && snap.distThrNm != null && snap.distThrNm <= T.maxDistNm,
+    alignment: snap.rwyHdgDeg != null && headingDelta(snap.hdgDeg, snap.rwyHdgDeg) <= T.hdgToleranceDeg,
+    gear: snap.gearDown === true,
+    flaps: snap.flapsLanding === true,
+    speed: snap.vrefKt != null && snap.iasKt >= snap.vrefKt + T.vrefLowKt && snap.iasKt <= snap.vrefKt + T.vrefHighKt,
+    sink: snap.vsFpm >= -T.sinkMaxFpm
+  };
+}
+
 export function keyLabel(code) {
   return code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, '');
 }
@@ -256,11 +268,7 @@ export class LessonRun {
             hdgDeg: snap.hdgDeg, rwyHdgDeg: snap.asgHdgDeg }, this.lesson.guidance);
         }
         const T = this.lesson.finalStabilized;
-        const gateOk = snap.aglFt <= T.aglFt && snap.distThrNm != null && snap.distThrNm <= T.maxDistNm;
-        const hdgOk = snap.rwyHdgDeg != null && headingDelta(snap.hdgDeg, snap.rwyHdgDeg) <= T.hdgToleranceDeg;
-        const speedOk = snap.vrefKt != null && snap.iasKt >= snap.vrefKt + T.vrefLowKt && snap.iasKt <= snap.vrefKt + T.vrefHighKt;
-        const sinkOk = snap.vsFpm >= -T.sinkMaxFpm;
-        const ok = gateOk && hdgOk && snap.gearDown && snap.flapsLanding && speedOk && sinkOk;
+        const ok = Object.values(stabilizedChecks(snap, T)).every(Boolean);
         this._streak = ok ? this._streak + (snap.dt || 0) : 0;
         if (this._streak >= T.sustainedS) this.facts.stabilizedOnFinal = true;
         break;
