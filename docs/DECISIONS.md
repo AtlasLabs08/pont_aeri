@@ -207,3 +207,38 @@ decidir "OK" / "Needs improvement" (regla 8 de la seccio 0: no copiar-los a
 ma). S'ha afegit un camp ptsMax al retorn de scoreReport amb els mateixos
 coeficients que ja hi havia a la formula (35, 15, 20, 20, 10): cap fisica
 nova, nomes exposar el que ja hi era. Vegeu la descripcio del PR.
+
+## 2026-09-28 - C3: correccions de l escola de vol despres de la prova d en Marc
+
+En Marc ha provat les llicons al navegador (PR #22). Decisions:
+
+- Llico 5 (maneuvers): en superar la desviacio d altitud del criteri
+  altDeviationMaxFt (200 ft a lessons.js), l intent suspen a l instant, sense
+  esperar els 120 s, i l instructor diu quants peus t has desviat. Els 120 s
+  de D5 continuen sent la condicio per aprovar. Substitueix el "s avalua en
+  complir 120 s, no continuament" de D5 nomes per al suspens per desviacio.
+  El text de l objectiu diu el que s ha de fer de debo: virar almenys 180
+  graus en total mantenint l altitud dins de +-200 ft durant 2 min, amb els
+  tres numeros com a parametres de lessons.js.
+- Llico 1 (exterior): comenca a la pista (mode 'runway': alineat, fre
+  d aparcament posat, motors al ralenti), no a la porta: a la porta els
+  edificis de la terminal tapaven una de les cameres.
+- Llico 2 (cockpit): l objectiu es IDENTIFICAR el comandament, no fer-lo
+  servir. onCommand s emet quan el jugador prem la tecla, abans de qualsevol
+  comprovacio que impedeixi l accio (tren bloquejat a terra, inversors nomes
+  a terra). Tota la llico s ha de poder fer amb l avio aturat. Les tecles de
+  cada comandament son dades a lessons.js (controlKeys) i el missatge de
+  l instructor diu el nom i la tecla, com a parametres i18n.
+- Llico 6 (circuit): l instructor guia per fases, un missatge per fase: vent
+  en cua (mantenir l altitud del spawn, tren i flaps), gir a base quan el
+  llindar queda baseTurnDeg (45 graus) enrere del travers (i comencar a
+  baixar), gir a final quan l eix queda a finalTurnLatM, i a final
+  (estabilitzar-se abans de finalStabilized.aglFt). El costat del gir surt de
+  la geometria real (posicio i rumb respecte de la pista assignada), mai
+  escrit a ma. Llindars a LESSONS['circuit'].guidance.
+
+Consequencia tecnica, nomes registrada: la guia de la llico 6 fa servir la
+geometria respecte de la pista assignada (Game.activeEnd), no de l ILS
+autosintonitzat, perque en vent en cua el receptor sintonitza el capcal
+contrari. La instantania de lesson-run.js te tres camps opcionals nous
+(asgAlongM, asgLatM, asgHdgDeg).
