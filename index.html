@@ -1990,8 +1990,9 @@ function concludeLesson({ lessonId, facts, record }) {
 async function launchLesson(lessonId, unlockAll) {
   if (!unlockAll && !isLessonAvailable(school, lessonId)) { UI.toast('Lesson not available yet', 3); return; }
   const lesson = LESSONS.find(l => l.id === lessonId);
-  const start = lesson.id === 'exterior' || lesson.id === 'cockpit' || lesson.id === 'taxi' ? 'gate'
-    : lesson.id === 'takeoff' ? 'runway'
+  // exterior a la pista (correccio del PR #22): a la porta, els edificis de la terminal tapaven una camera
+  const start = lesson.id === 'cockpit' || lesson.id === 'taxi' ? 'gate'
+    : lesson.id === 'exterior' || lesson.id === 'takeoff' ? 'runway'
     : lesson.id === 'maneuvers' ? 'airborne'
     : lesson.id === 'circuit' ? 'downwind'
     : 'final';
