@@ -4,7 +4,7 @@
  * Nomes dades: els avalua school.js (criteris) o app/lesson-run.js i
  * app/debrief.js (la resta de camps, llegits en viu durant el vol).
  *
- * EXPORTA: SCHOOL_PASS LESSONS CHECK_RIDES
+ * EXPORTA: SCHOOL_PASS CONTROL_KEYS LESSONS CHECK_RIDES
  *
  * INTERFICIE (no la canviis, school.js, el C3, el C5, el D3 i els tests en depenen):
  *   Criteri: { metric, op, value }. metric es un nom de METRICS (school.js);
@@ -18,11 +18,18 @@
  *     app/debrief.js, mai per school.js:
  *       controls        (llico 'cockpit') llista ordenada dels comandaments
  *                        que l instructor demana un a un (noms d Input/Game).
- *       controlKeys     (llico 'cockpit') { comandament: [codis KeyboardEvent.code] }
- *                        de cada element de controls. El primer codi es la
+ *       controlKeys     (llico 'cockpit') CONTROL_KEYS: { comandament:
+ *                        [codis KeyboardEvent.code] }, amb almenys cada
+ *                        element de controls. El primer codi es la
  *                        tecla que l instructor anomena. Premer qualsevol
  *                        d aquests codis identifica el comandament, abans de
  *                        cap comprovacio de Game (correccio del PR #22).
+ *                        Nomes compten els comandaments de controls.
+ *       tips            (qualsevol llico) explicacions de l instructor, en
+ *                        ordre: [{ key, keys }]. key es la clau i18n; keys es
+ *                        { parametre: comandament de CONTROL_KEYS }: el
+ *                        parametre val la primera tecla del comandament
+ *                        (app/lesson-run.js, LessonRun.tips).
  *       taxi            (llico 'taxi') { maxDistToThrM, maxLatOffsetM,
  *                        maxGroundKt }: llindars de reachedThreshold.
  *       durationS       (llico 'maneuvers') segons de D5 abans d avaluar.
@@ -65,17 +72,28 @@
 /** Marca del llindar de nota de l escola, resolt per school.js. */
 export const SCHOOL_PASS = 'schoolPass';
 
+/** Tecles de cada comandament (KeyboardEvent.code), les mateixes que llegeixen
+ * Input i Game.onKey (index.html). El primer codi es el que anomena
+ * l instructor. cameraReset torna la camera a l angle per defecte
+ * (docs/DECISIONS.md, 29/09/2026): Home, l unica tecla que no fa servir cap
+ * altre comandament. */
+export const CONTROL_KEYS = {
+  flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
+  throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
+  reverse: ['KeyR'], spoiler: ['KeyK'],
+  cameraReset: ['Home']
+};
+
 export const LESSONS = [
   { id: 'exterior', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.exterior.title', goalKey: 'school.lesson.exterior.goal',
-    criteria: [{ metric: 'viewsVisited', op: 'gte', value: 4 }] },
+    criteria: [{ metric: 'viewsVisited', op: 'gte', value: 4 }],
+    tips: [{ key: 'school.tip.cameraDrag', keys: { reset: 'cameraReset' } }] },
   { id: 'cockpit', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.cockpit.title', goalKey: 'school.lesson.cockpit.goal',
     criteria: [{ metric: 'controlsIdentified', op: 'gte', value: 6 }],
     controls: ['flaps', 'gear', 'parkBrake', 'throttle', 'reverse', 'spoiler'],
-    controlKeys: { flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
-      throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
-      reverse: ['KeyR'], spoiler: ['KeyK'] } },
+    controlKeys: CONTROL_KEYS },
   { id: 'taxi', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.taxi.title', goalKey: 'school.lesson.taxi.goal',
     criteria: [{ metric: 'reachedThreshold', op: 'eq', value: true }],

@@ -80,6 +80,7 @@ export default {
   'school.objective.landed': 'Aterrar',
   'school.objective.score': 'Nota: {value} (mín. {target})',
   'school.objective.onRunway': 'Dins de la pista',
+  'school.tip.cameraDrag': 'Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. {reset} la torna a l\'angle per defecte.',
   'school.side.left': 'a l\'esquerra',
   'school.side.right': 'a la dreta',
   'school.control.flaps': 'flaps',
@@ -98,5 +99,6 @@ export default {
   'debrief.component.attitude': 'Actitud',
   'debrief.component.bounces': 'Rebots',
   'debrief.component.tailStrike': 'Tail strike',
-  'school.flareBar': 'Sink {sink} / objectiu {target} fpm'
+  'school.flareBar': 'Sink {sink} / objectiu {target} fpm',
+  'camera.reset': 'Càmera a l\'angle per defecte'
 };

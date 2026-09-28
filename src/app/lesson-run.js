@@ -8,7 +8,7 @@
  * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
  *          circuitGuidance
  *
- * IMPORTA: LESSONS, factsFromRecord i evaluate de career/; t de i18n/.
+ * IMPORTA: LESSONS, CONTROL_KEYS, factsFromRecord i evaluate de career/; t de i18n/.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   new LessonRun(lessonId)   llanca amb l id si es desconegut a LESSONS
@@ -66,6 +66,11 @@
  *     tecla, tParams.controlName = clau i18n del nom), o a la llico
  *     'circuit' el missatge de la fase del circuit (circuitGuidance). Es
  *     pinta amb messageText().
+ *   run.tips() -> [{ key, params }]   explicacions de l instructor que
+ *     index.html mostra sota el missatge durant tot l intent, en l ordre de
+ *     LESSONS[..].tips. params: cada tecla es keyLabel del primer codi del
+ *     comandament a CONTROL_KEYS (lessons.js), mai escrita al text. [] si
+ *     la llico no en te. Es pinten amb messageText().
  *   run.objectives() -> [{ id, labelKey, params, ok }]   llista d objectius
  *     per al HUD, generada dels criteris de la llico (lessons.js), mai
  *     escrita a ma per llico: una fila per criteri, amb el valor actual
@@ -104,7 +109,7 @@
  *   ha suspes sense crash, es el missatge.
  */
 
-import { LESSONS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
+import { LESSONS, CONTROL_KEYS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
 import { t, fmtNumber } from '../i18n/index.js';
 
 const SECONDS_PER_MINUTE = 60;
@@ -337,6 +342,11 @@ export class LessonRun {
   }
 
   objectives() { return objectiveRows(this); }
+
+  tips() {
+    return (this.lesson.tips || []).map(({ key, keys }) => ({ key,
+      params: Object.fromEntries(Object.entries(keys).map(([name, control]) => [name, keyLabel(CONTROL_KEYS[control][0])])) }));
+  }
 
   /** llindar d un criteri de la llico (value), o undefined */
   _target(metric) { return this.lesson.criteria.find(c => c.metric === metric)?.value; }

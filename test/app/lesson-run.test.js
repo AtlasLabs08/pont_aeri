@@ -9,7 +9,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance } from '../../src/app/lesson-run.js';
-import { LESSONS, BALANCE, evaluate } from '../../src/career/index.js';
+import { LESSONS, CONTROL_KEYS, BALANCE, evaluate } from '../../src/career/index.js';
 import { setLang } from '../../src/i18n/index.js';
 import en from '../../src/i18n/en.js';
 import ca from '../../src/i18n/ca.js';
@@ -558,5 +558,45 @@ describe('attemptMessage', () => {
     const reason = { key: 'school.instructor.altDeviation', params: { ft: 250 } };
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: false, reason }), reason);
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: true, reason }).key, 'school.instructor.crashed');
+  });
+});
+
+describe('tips: explicacions de l instructor', () => {
+  test('cada tip te text a en i ca i nomes fa servir comandaments de CONTROL_KEYS', () => {
+    for (const l of LESSONS) for (const tip of l.tips || []) {
+      assert.ok(Object.hasOwn(en, tip.key) && Object.hasOwn(ca, tip.key), tip.key);
+      for (const control of Object.values(tip.keys)) assert.ok(Object.hasOwn(CONTROL_KEYS, control), control);
+    }
+  });
+
+  test('una llico sense tips en torna cap', () => {
+    assert.deepEqual(new LessonRun('cockpit').tips(), []);
+  });
+
+  test('cameraReset: una tecla que no fa servir cap altre comandament', () => {
+    const others = Object.entries(CONTROL_KEYS).filter(([k]) => k !== 'cameraReset').flatMap(([, v]) => v);
+    for (const code of CONTROL_KEYS.cameraReset) assert.ok(!others.includes(code), code);
+  });
+
+  test('llico 1: l instructor ensenya a girar la camera i la tecla de reinici, que surt de CONTROL_KEYS', () => {
+    const tips = new LessonRun('exterior').tips();
+    assert.deepEqual(tips, [{ key: 'school.tip.cameraDrag', params: { reset: keyLabel(CONTROL_KEYS.cameraReset[0]) } }]);
+    setLang('en');
+    assert.equal(messageText(tips[0]),
+      'Outside views: hold the right mouse button and drag to turn the camera. Home puts it back to the default angle.');
+    setLang('ca');
+    assert.equal(messageText(tips[0]),
+      "Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. Home la torna a l'angle per defecte.");
+    setLang('en');
+  });
+
+  test('llico 1: cap criteri nou', () => {
+    assert.deepEqual(LESSONS.find(l => l.id === 'exterior').criteria, [{ metric: 'viewsVisited', op: 'gte', value: 4 }]);
+  });
+
+  test('llico cockpit: la tecla de reinici de camera no identifica cap comandament', () => {
+    const run = new LessonRun('cockpit');
+    for (const code of CONTROL_KEYS.cameraReset) run.onKey(code);
+    assert.equal(run.facts.controlsIdentified, 0);
   });
 });
