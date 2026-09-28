@@ -2774,10 +2774,14 @@ const UI = {
   runHarness() { let i = 0; const next = () => { if (i >= AIRCRAFT_ORDER.length) return; if (Game.state === 'flying' && Main.fps < 40) { setTimeout(next, 3000); return; } this.harness.push(Harness.run(AIRCRAFT_ORDER[i++])); this.harnessHtml = null; setTimeout(next, 400); }; next(); },
   /** text de l instructor al HUD i barra d arrodoniment de D7 (tasca C3+C4). Nomes dins l escola */
   lessonFrame(f) {
-    if (!currentLesson()) { if (this._lessonEl) this._lessonEl.style.display = 'none'; if (this._flareEl) this._flareEl.style.display = 'none'; return; }
+    if (!currentLesson()) { for (const el of [this._lessonEl, this._flareEl, this._goalsEl]) if (el) el.style.display = 'none'; return; }
     if (!this._lessonEl) { const el = document.createElement('div'); el.id = 'lessonHud'; el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;font:600 13px system-ui;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;pointer-events:none;text-align:center'; document.body.appendChild(el); this._lessonEl = el; }
     const msg = currentLesson().instructorMessage();
     this._lessonEl.style.display = 'block'; this._lessonEl.textContent = messageText(msg);
+    // objectius de la llico (app/lesson-run.js, objectives): generats dels criteris de lessons.js
+    if (!this._goalsEl) { const el = document.createElement('div'); el.id = 'lessonGoals'; el.style.cssText = 'position:fixed;right:12px;top:44px;z-index:60;font:500 12px/1.5 system-ui;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;pointer-events:none;white-space:pre'; document.body.appendChild(el); this._goalsEl = el; }
+    const goals = currentLesson().objectives().map(o => (o.ok ? '\u2713 ' : '\u25cb ') + messageText({ key: o.labelKey, params: o.params })).join('\n');
+    this._goalsEl.style.display = 'block'; if (this._goalsEl.textContent !== goals) this._goalsEl.textContent = goals;
     const lesson = LESSONS.find(l => l.id === currentLessonId());
     if (lesson && lesson.aids && lesson.aids.flareBar && !f.wow && f.out.aglFt <= lesson.flareBar.startAglFt) {
       const T = lesson.flareBar, k = clamp(f.out.aglFt / T.startAglFt, 0, 1), target = T.sinkAtContactFpm + (T.sinkAtStartFpm - T.sinkAtContactFpm) * k;

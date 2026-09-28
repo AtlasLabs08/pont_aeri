@@ -434,6 +434,89 @@ describe('llico ils: ilsFlown amb world/ils.js', () => {
   });
 });
 
+describe('objectives: llista del HUD generada dels criteris', () => {
+  const EXPANDED = { stabilizedOnFinal: ['gear', 'flaps', 'speed', 'sink', 'alignment', 'stabilizedOnFinal'] };
+
+  test('cada llico: una fila per criteri (en ordre), mes timeLeft si te durationS', () => {
+    for (const l of LESSONS) {
+      const ids = new LessonRun(l.id).objectives().map(o => o.id);
+      const expected = [...(l.durationS ? ['timeLeft'] : []), ...l.criteria.flatMap(c => EXPANDED[c.metric] ?? [c.metric])];
+      assert.deepEqual(ids, expected, l.id);
+    }
+  });
+
+  test('cada fila te clau i18n d etiqueta a en i ca', () => {
+    for (const l of LESSONS) {
+      for (const o of new LessonRun(l.id).objectives()) {
+        assert.equal(o.labelKey, 'school.objective.' + o.id);
+        assert.ok(Object.hasOwn(en, o.labelKey), 'en: ' + o.labelKey);
+        assert.ok(Object.hasOwn(ca, o.labelKey), 'ca: ' + o.labelKey);
+      }
+    }
+  });
+
+  test('el llindar de cada fila surt de lessons.js', () => {
+    const run = new LessonRun('exterior');
+    assert.equal(run.objectives()[0].params.target, LESSONS.find(l => l.id === 'exterior').criteria[0].value);
+    const landing = new LessonRun('landing').objectives().find(o => o.id === 'score');
+    assert.equal(landing.params.target, BALANCE.school.passScore);
+  });
+
+  test('llico 1: valor actual i tic quan es compleix', () => {
+    const run = new LessonRun('exterior');
+    run.onView('chase');
+    let [o] = run.objectives();
+    assert.deepEqual([o.params.value, o.ok], [1, false]);
+    for (const v of ['cockpit', 'orbit', 'tower']) run.onView(v);
+    [o] = run.objectives();
+    assert.deepEqual([o.params.value, o.ok], [4, true]);
+  });
+
+  test('llico 5: temps restant, graus virats i desviacio actual', () => {
+    const run = new LessonRun('maneuvers');
+    run.sample(snap({ altFt: 4000, hdgDeg: 0 }));
+    run.sample(snap({ altFt: 4150, hdgDeg: 90 }));
+    run.sample(snap({ altFt: 4050, hdgDeg: 190 }));
+    const by = Object.fromEntries(run.objectives().map(o => [o.id, o]));
+    assert.equal(by.timeLeft.params.value, 117);
+    assert.equal(by.timeLeft.ok, false);
+    assert.equal(by.altDeviationMaxFt.params.value, 50);   // la d ara, no la maxima
+    assert.equal(by.altDeviationMaxFt.ok, true);
+    assert.equal(by.headingChangeDeg.params.value, 190);
+    assert.equal(by.headingChangeDeg.ok, true);
+    setLang('en');
+    assert.equal(messageText({ key: by.headingChangeDeg.labelKey, params: by.headingChangeDeg.params }), 'Turned: 190° of 180°');
+    assert.equal(messageText({ key: by.timeLeft.labelKey, params: by.timeLeft.params }), 'Time left: 117 s');
+  });
+
+  test('llico 6: les condicions de D6 en viu', () => {
+    const run = new LessonRun('circuit');
+    const good = snap({ aglFt: 400, distThrNm: 2, rwyHdgDeg: 250, hdgDeg: 254, gearDown: true,
+      flapsLanding: true, vrefKt: 110, iasKt: 118, vsFpm: -700 });
+    run.sample({ ...good, gearDown: false, vsFpm: -1200 });
+    let by = Object.fromEntries(run.objectives().map(o => [o.id, o]));
+    assert.equal(by.gear.ok, false);
+    assert.equal(by.flaps.ok, true);
+    assert.equal(by.sink.ok, false);
+    assert.equal(by.sink.params.value, 1200);
+    run.sample(good);
+    by = Object.fromEntries(run.objectives().map(o => [o.id, o]));
+    for (const id of ['gear', 'flaps', 'speed', 'sink', 'alignment']) assert.equal(by[id].ok, true, id);
+    assert.deepEqual(by.speed.params, { value: 118, low: 105, high: 130 });
+    assert.equal(by.alignment.params.value, 4);
+    assert.equal(by.stabilizedOnFinal.ok, false);
+    setLang('ca');
+    assert.equal(messageText({ key: by.speed.labelKey, params: by.speed.params }), 'Velocitat: 118 kt (105–130 kt)');
+    setLang('en');
+  });
+
+  test('abans de la primera instantania, sense valor', () => {
+    const by = Object.fromEntries(new LessonRun('circuit').objectives().map(o => [o.id, o]));
+    assert.equal(by.speed.params.value, '—');
+    assert.equal(by.gear.ok, false);
+  });
+});
+
 describe('abandonar i tornar a comencar no arrossega fets', () => {
   test('una nova LessonRun comenca de zero', () => {
     const first = new LessonRun('exterior');

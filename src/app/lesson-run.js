@@ -66,6 +66,15 @@
  *     tecla, tParams.controlName = clau i18n del nom), o a la llico
  *     'circuit' el missatge de la fase del circuit (circuitGuidance). Es
  *     pinta amb messageText().
+ *   run.objectives() -> [{ id, labelKey, params, ok }]   llista d objectius
+ *     per al HUD, generada dels criteris de la llico (lessons.js), mai
+ *     escrita a ma per llico: una fila per criteri, amb el valor actual
+ *     (params.value) i el llindar (params.target), i ok = el criteri es
+ *     compleix. Per metric, no per llico: altDeviationMaxFt mostra la
+ *     desviacio actual; stabilizedOnFinal s expandeix en les condicions de
+ *     finalStabilized (tren, flaps, velocitat, sink, alineacio) mes el temps
+ *     sostingut. Si la llico te durationS, primer una fila timeLeft.
+ *     labelKey = 'school.objective.' + id, amb messageText.
  *   run.circuit -> { phase, side, turnNow } | null   darrera guia de la
  *     llico 'circuit'; null fins a la primera instantania amb asg*.
  *
@@ -159,6 +168,45 @@ function stabilizedChecks(snap, T) {
   };
 }
 
+const NO_VALUE = '—';
+const shown = v => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : NO_VALUE);
+const row = (id, params, ok) => ({ id, labelKey: 'school.objective.' + id, params, ok: ok === true });
+
+/** files d objectiu dels metrics que no son un sol valor contra un llindar.
+ * La resta de metrics fan servir la fila generica d objectiveRows. */
+const OBJECTIVE_ROWS = {
+  altDeviationMaxFt: (run, c) => [row('altDeviationMaxFt',
+    { value: shown(run._devFt), target: c.value }, run.facts.altDeviationMaxFt <= c.value)],
+  stabilizedOnFinal: (run, c) => {
+    const T = run.lesson.finalStabilized, sn = run._snap, ok = sn ? stabilizedChecks(sn, T) : {};
+    const vref = sn && sn.vrefKt != null ? sn.vrefKt : null;
+    return [
+      row('gear', {}, ok.gear),
+      row('flaps', {}, ok.flaps),
+      row('speed', { value: shown(sn?.iasKt), low: shown(vref === null ? null : vref + T.vrefLowKt),
+        high: shown(vref === null ? null : vref + T.vrefHighKt) }, ok.speed),
+      row('sink', { value: shown(sn ? Math.max(0, -sn.vsFpm) : null), target: T.sinkMaxFpm }, ok.sink),
+      row('alignment', { value: shown(sn && sn.rwyHdgDeg != null ? headingDelta(sn.hdgDeg, sn.rwyHdgDeg) : null),
+        target: T.hdgToleranceDeg }, ok.alignment),
+      row(c.metric, { value: shown(run._streak), target: T.sustainedS }, run.facts[c.metric] === c.value)
+    ];
+  }
+};
+
+function objectiveRows(run) {
+  const rows = [];
+  if (run.lesson.durationS) {
+    rows.push(row('timeLeft', { value: shown(Math.max(0, run.lesson.durationS - run._elapsed)) },
+      run._elapsed >= run.lesson.durationS));
+  }
+  for (const c of run.lesson.criteria) {
+    if (Object.hasOwn(OBJECTIVE_ROWS, c.metric)) { rows.push(...OBJECTIVE_ROWS[c.metric](run, c)); continue; }
+    const [r] = evaluate([c], run.facts).results;
+    rows.push(row(c.metric, { value: shown(r.value), target: r.target }, r.ok));
+  }
+  return rows;
+}
+
 export function keyLabel(code) {
   return code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, '');
 }
@@ -190,6 +238,8 @@ export class LessonRun {
     this._elapsed = 0;
     this._streak = 0;
     this.circuit = null;
+    this._snap = null;
+    this._devFt = null;
     if (this.lesson.id === 'exterior') this.facts.viewsVisited = 0;
     if (this.lesson.id === 'cockpit') this.facts.controlsIdentified = 0;
     if (this.lesson.id === 'taxi') this.facts.reachedThreshold = false;
@@ -239,6 +289,7 @@ export class LessonRun {
   sample(snap) {
     if (snap.replay || this.done) return;
     this._elapsed += snap.dt || 0;
+    this._snap = snap;
     switch (this.lesson.id) {
       case 'taxi': {
         const T = this.lesson.taxi;
@@ -256,7 +307,7 @@ export class LessonRun {
       }
       case 'maneuvers': {
         if (this._refAlt === null) this._refAlt = snap.altFt;
-        const dev = Math.abs(snap.altFt - this._refAlt);
+        const dev = this._devFt = Math.abs(snap.altFt - this._refAlt);
         if (dev > this.facts.altDeviationMaxFt) this.facts.altDeviationMaxFt = dev;
         if (this._lastHdg !== null) this.facts.headingChangeDeg += headingDelta(snap.hdgDeg, this._lastHdg);
         this._lastHdg = snap.hdgDeg;
@@ -284,6 +335,8 @@ export class LessonRun {
       default: break;
     }
   }
+
+  objectives() { return objectiveRows(this); }
 
   /** llindar d un criteri de la llico (value), o undefined */
   _target(metric) { return this.lesson.criteria.find(c => c.metric === metric)?.value; }
