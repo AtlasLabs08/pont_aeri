@@ -86,7 +86,10 @@ export const CONTROL_KEYS = {
   steerLeft: ['KeyQ'], steerRight: ['KeyE'],
   // throttleDown: Input llegeix el '-' per e.key (qualsevol teclat); 'Minus' en dona el nom
   throttleUp: ['ShiftLeft', 'ShiftRight', 'NumpadAdd'], throttleDown: ['Minus', 'NumpadSubtract'],
-  brake: ['KeyB']
+  brake: ['KeyB'],
+  // vol (Input.update): W i S mouen el morro (W avall, S amunt), A i D inclinen; les fletxes fan el mateix
+  pitchDown: ['KeyW', 'ArrowUp'], pitchUp: ['KeyS', 'ArrowDown'],
+  rollLeft: ['KeyA', 'ArrowLeft'], rollRight: ['KeyD', 'ArrowRight']
 };
 
 export const LESSONS = [
@@ -108,7 +111,9 @@ export const LESSONS = [
   { id: 'takeoff', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.takeoff.title', goalKey: 'school.lesson.takeoff.goal',
     criteria: [{ metric: 'maxAltFt', op: 'gte', value: 3000 },
-               { metric: 'gearUp', op: 'eq', value: true }] },
+               { metric: 'gearUp', op: 'eq', value: true }],
+    tips: [{ key: 'school.tip.flight', keys: { down: 'pitchDown', up: 'pitchUp', left: 'rollLeft', right: 'rollRight' } },
+           { key: 'school.tip.rudder', keys: { left: 'steerLeft', right: 'steerRight' } }] },
   { id: 'maneuvers', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.maneuvers.title', goalKey: 'school.lesson.maneuvers.goal',
     criteria: [{ metric: 'altDeviationMaxFt', op: 'lte', value: 200 },

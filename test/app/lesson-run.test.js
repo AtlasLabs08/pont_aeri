@@ -628,3 +628,39 @@ describe('llico 3 (taxi): l instructor explica com es roda', () => {
     assert.equal(m.halfWidthM, LESSONS.find(l => l.id === 'taxi').taxi.maxLatOffsetM);
   });
 });
+
+describe('llico 4 (takeoff): comandaments de vol i altura AGL', () => {
+  test('l instructor explica WASD i recorda Q/E, amb les tecles de CONTROL_KEYS', () => {
+    const tips = new LessonRun('takeoff').tips();
+    assert.deepEqual(tips, [
+      { key: 'school.tip.flight', params: { down: 'W', up: 'S', left: 'A', right: 'D' } },
+      { key: 'school.tip.rudder', params: { left: 'Q', right: 'E' } }
+    ]);
+    setLang('en');
+    assert.equal(messageText(tips[0]), 'In flight: W lowers the nose and S raises it, A banks left and D banks right.');
+    assert.equal(messageText(tips[1]), 'Remember: Q and E steer the nosewheel on the ground and move the rudder in the air.');
+    setLang('ca');
+    assert.equal(messageText(tips[0]), "En vol: W baixa el morro i S l'aixeca, A inclina a l'esquerra i D a la dreta.");
+    setLang('en');
+  });
+
+  test('el comptador d altura compta AGL (D4) i l etiqueta ho diu', () => {
+    const run = new LessonRun('takeoff');
+    run.sample(snap({ altFt: 1017, aglFt: 1000 }));
+    const [height] = run.objectives();
+    assert.equal(height.params.value, 1000);
+    setLang('en');
+    assert.equal(messageText({ key: height.labelKey, params: height.params }), 'Height: 1,000 of 3,000 ft AGL');
+    setLang('ca');
+    assert.match(messageText({ key: height.labelKey, params: height.params }), /ft AGL$/);
+    setLang('en');
+  });
+
+  test('el comptador es del mateix pas que la instantania, sense retard', () => {
+    const run = new LessonRun('takeoff');
+    for (const agl of [100, 200, 300]) {
+      run.sample(snap({ aglFt: agl, altFt: agl + 17 }));
+      assert.equal(run.objectives()[0].params.value, agl);
+    }
+  });
+});
