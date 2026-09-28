@@ -9,12 +9,12 @@
  * ./flight.js.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
- *   startLesson(lessonId, flightOpts) -> Promise<{ lessonId, facts, record } | null>
+ *   startLesson(lessonId, flightOpts) -> Promise<{ lessonId, facts, record, reason } | null>
  *     crea la LessonRun (que passa a ser currentLesson()) i llanca el vol
  *     amb launchFlight(flightOpts). Si launchFlight llanca (ja hi ha un vol
  *     en marxa), no canvia res. Quan torna el FlightRecord, tanca aquesta
  *     LessonRun, i nomes aquesta, amb finish(record) i resol amb els fets
- *     combinats. Si el vol es cancel la (record null), resol null sense
+ *     combinats i reason = run.failReason() (per a attemptMessage). Si el vol es cancel la (record null), resol null sense
  *     tocar cap LessonRun: reiniciar (cancelFlight i startLesson) no pot
  *     tancar la llico nova amb la promesa de la vella.
  *   currentLesson() -> LessonRun | null   intent en marxa
@@ -44,7 +44,7 @@ export function startLesson(lessonId, flightOpts) {
   return flight.then(record => {
     release();
     if (record === null) return null;
-    return { lessonId, facts: run.finish(record), record };
+    return { lessonId, facts: run.finish(record), record, reason: run.failReason() };
   }, err => { release(); throw err; });
 }
 

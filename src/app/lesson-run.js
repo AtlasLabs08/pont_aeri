@@ -41,7 +41,13 @@
  *   run.facts   fets en viu acumulats fins ara (sempre inclou crashed)
  *   run.done   true un cop tancat (crash o finish)
  *   run.readyToEnd()   true si toca tancar l intent: crashed, criteris en
- *     viu complerts (llicons 1-4 i 6) o temps de D5 complert (llico 5).
+ *     viu complerts (llicons 1-4 i 6), temps de D5 complert (llico 5) o,
+ *     a la llico 5, desviacio d altitud per sobre del llindar del criteri
+ *     altDeviationMaxFt: suspen a l instant, sense esperar els 120 s
+ *     (decisio d en Marc, docs/DECISIONS.md 28/09/2026).
+ *   run.failReason() -> { key, params } | null   per que l intent ja no pot
+ *     aprovar (ara nomes la desviacio d altitud de la llico 5, amb els peus
+ *     de desviacio); null si no n hi ha cap.
  *     Sempre false per a les llicons 7 i 8 fora d un crash: aquestes
  *     nomes tanquen amb finish(record), quan Game calcula la nota.
  *   run.finish(record) -> facts   tanca l intent (si no ho estava ja) i
@@ -59,15 +65,19 @@
  * keyLabel(code) -> etiqueta curta d una tecla: 'KeyG' -> 'G', 'ShiftLeft'
  *   -> 'Shift'. Noms de tecla, no text traduible.
  * messageText({ key, params, tParams }) -> text amb t(): cada tParams[nom]
- *   es una clau i18n que es tradueix i s interpola com a {nom}.
- * attemptMessage({ passed, mercy, crashed }) -> { key, params }   missatge
- *   final un cop recordLessonAttempt (career/school.js) ja ha decidit el
- *   resultat (inclosa la gracia). No decideix passed/mercy: nomes tria el
- *   text.
+ *   es una clau i18n que es tradueix i s interpola com a {nom}. Els params
+ *   numerics (menys count, que tria el plural) es formaten amb fmtNumber.
+ * attemptMessage({ passed, mercy, crashed, reason }) -> { key, params }
+ *   missatge final un cop recordLessonAttempt (career/school.js) ja ha
+ *   decidit el resultat (inclosa la gracia). No decideix passed/mercy:
+ *   nomes tria el text. reason (opcional) es run.failReason(): si l intent
+ *   ha suspes sense crash, es el missatge.
  */
 
 import { LESSONS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
-import { t } from '../i18n/index.js';
+import { t, fmtNumber } from '../i18n/index.js';
+
+const SECONDS_PER_MINUTE = 60;
 
 function lessonById(lessonId) {
   const lesson = LESSONS.find(l => l.id === lessonId);
@@ -87,7 +97,8 @@ export function lessonGoalParams(lesson) {
     case 'exterior': return { count: value('viewsVisited') };
     case 'cockpit': return { count: value('controlsIdentified') };
     case 'takeoff': return { count: value('maxAltFt') };
-    case 'maneuvers': return { count: value('altDeviationMaxFt') };
+    case 'maneuvers': return { deg: value('headingChangeDeg'), ft: value('altDeviationMaxFt'),
+      min: lesson.durationS / SECONDS_PER_MINUTE };
     case 'landing': return { score: BALANCE.school.passScore };
     default: return {};
   }
@@ -98,13 +109,15 @@ export function keyLabel(code) {
 }
 
 export function messageText({ key, params, tParams }) {
-  const all = { ...params };
+  const all = {};
+  for (const [name, v] of Object.entries(params || {})) all[name] = typeof v === 'number' && name !== 'count' ? fmtNumber(v) : v;
   for (const [name, k] of Object.entries(tParams || {})) all[name] = t(k);
   return t(key, all);
 }
 
-export function attemptMessage({ passed, mercy, crashed }) {
+export function attemptMessage({ passed, mercy, crashed, reason }) {
   if (crashed) return { key: 'school.instructor.crashed' };
+  if (!passed && reason) return reason;
   if (passed && mercy) return { key: 'school.instructor.mercyPassed' };
   if (passed) return { key: 'school.instructor.passed' };
   return { key: 'school.instructor.failed' };
@@ -216,10 +229,20 @@ export class LessonRun {
     }
   }
 
+  /** llindar d un criteri de la llico (value), o undefined */
+  _target(metric) { return this.lesson.criteria.find(c => c.metric === metric)?.value; }
+
+  failReason() {
+    if (this.lesson.id !== 'maneuvers') return null;
+    const dev = this.facts.altDeviationMaxFt;
+    if (!(dev > this._target('altDeviationMaxFt'))) return null;
+    return { key: 'school.instructor.altDeviation', params: { ft: Math.round(dev) } };
+  }
+
   readyToEnd() {
     if (this.facts.crashed) return true;
     if (this.lesson.id === 'landing' || this.lesson.id === 'ils') return false;
-    if (this.lesson.id === 'maneuvers') return this._elapsed >= this.lesson.durationS;
+    if (this.lesson.id === 'maneuvers') return this._elapsed >= this.lesson.durationS || this.failReason() !== null;
     return evaluate(this.lesson.criteria, this.facts).passed === true;
   }
 

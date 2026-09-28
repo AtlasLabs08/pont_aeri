@@ -242,6 +242,49 @@ describe('llico maneuvers: D5', () => {
     assert.equal(passed('maneuvers', facts), false);
   });
 
+  test('201 ft de desviacio suspen a l instant, sense esperar els 120 s', () => {
+    const run = new LessonRun('maneuvers');
+    run.sample(snap({ altFt: 3000, hdgDeg: 0 }));
+    run.sample(snap({ altFt: 3100, hdgDeg: 0 }));
+    assert.equal(run.readyToEnd(), false);
+    run.sample(snap({ altFt: 2799, hdgDeg: 0 }));
+    assert.equal(run.readyToEnd(), true);
+    assert.deepEqual(run.failReason(), { key: 'school.instructor.altDeviation', params: { ft: 201 } });
+    const facts = run.finish(record());
+    assert.equal(passed('maneuvers', facts), false);
+  });
+
+  test('200 ft justos no acaba l intent', () => {
+    const run = new LessonRun('maneuvers');
+    run.sample(snap({ altFt: 3000, hdgDeg: 0 }));
+    run.sample(snap({ altFt: 3200, hdgDeg: 0 }));
+    assert.equal(run.readyToEnd(), false);
+    assert.equal(run.failReason(), null);
+  });
+
+  test('el missatge del suspens diu quants peus t has desviat', () => {
+    const run = new LessonRun('maneuvers');
+    run.sample(snap({ altFt: 4000 }));
+    run.sample(snap({ altFt: 3688.4 }));
+    const msg = attemptMessage({ passed: false, mercy: false, crashed: false, reason: run.failReason() });
+    setLang('en');
+    assert.equal(messageText(msg), 'You drifted 312 ft from your reference altitude. Attempt failed.');
+    setLang('ca');
+    assert.equal(messageText(msg), "T'has desviat 312 ft de l'altitud de referència. Intent suspès.");
+    setLang('en');
+  });
+
+  test("el text de l objectiu diu que cal fer, amb els numeros de lessons.js", () => {
+    const L = LESSONS.find(l => l.id === 'maneuvers');
+    setLang('en');
+    assert.equal(messageText(new LessonRun('maneuvers').instructorMessage()),
+      'Turn at least 180° in total, holding altitude within ±200 ft for 2 min');
+    setLang('ca');
+    assert.equal(messageText({ key: L.goalKey, params: lessonGoalParams(L) }),
+      "Vira almenys 180° en total mantenint l'altitud dins de ±200 ft durant 2 min");
+    setLang('en');
+  });
+
   test('els instants de replay no compten', () => {
     const run = new LessonRun('maneuvers');
     run.sample(snap({ altFt: 3000, hdgDeg: 0 }));
@@ -353,7 +396,7 @@ describe('lessonGoalParams', () => {
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'exterior')), { count: 4 });
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'cockpit')), { count: 6 });
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'takeoff')), { count: 3000 });
-    assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'maneuvers')), { count: 200 });
+    assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'maneuvers')), { deg: 180, ft: 200, min: 2 });
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'circuit')), {});
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'landing')), { score: BALANCE.school.passScore });
   });
@@ -365,5 +408,8 @@ describe('attemptMessage', () => {
     assert.equal(attemptMessage({ passed: true, mercy: true, crashed: false }).key, 'school.instructor.mercyPassed');
     assert.equal(attemptMessage({ passed: true, mercy: false, crashed: false }).key, 'school.instructor.passed');
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: false }).key, 'school.instructor.failed');
+    const reason = { key: 'school.instructor.altDeviation', params: { ft: 250 } };
+    assert.equal(attemptMessage({ passed: false, mercy: false, crashed: false, reason }), reason);
+    assert.equal(attemptMessage({ passed: false, mercy: false, crashed: true, reason }).key, 'school.instructor.crashed');
   });
 });

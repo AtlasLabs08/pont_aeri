@@ -1975,10 +1975,10 @@ function lessonSnapshot() {
   };
 }
 /** desa l intent que startLesson acaba de tancar amb el FlightRecord de Game (crash o report.shown) */
-function concludeLesson({ lessonId, facts, record }) {
+function concludeLesson({ lessonId, facts, record, reason }) {
   const result = recordLessonAttempt(school, lessonId, facts);
   school = result.school;
-  const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed });
+  const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed, reason });
   UI.toast(messageText(msg), 6);
   const lesson = LESSONS.find(l => l.id === lessonId);
   if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record);
