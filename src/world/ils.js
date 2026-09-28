@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS
+ * EXPORTA: ILS thresholdDistNm destinationEnd
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -10,10 +10,31 @@
  * el harness fa servir nav(), core/harness.js acaba important d aqui. No es un
  * cicle, pero es una capa invertida. Apuntat a BACKLOG.md: separar la geometria
  * pura de l auto-sintonitzacio. NO ho facis durant la migracio.
+ *
+ * INTERFICIE (no la canviis, index.html i test/threshold.test.js en depenen):
+ *   thresholdDistNm(A, en, e, n) -> nm   distancia horitzontal en linia
+ *     recta des de (e, n) fins al llindar del cap de pista en. Es l unica
+ *     distancia a l aeroport que index.html mostra (PFD, HUD de cabina, ND,
+ *     caixa d aproximacio de les vistes exteriors, vol cronometrat), perque
+ *     totes les vistes diguin el mateix (docs/DECISIONS.md, 29/09/2026).
+ *     No toca ILS.nav(): distThr (per a les llicons) i dme hi queden igual.
+ *   destinationEnd(A, ...candidats) -> cap de pista de destinacio a A: el
+ *     primer candidat que sigui un cap de pista d A (index.html hi passa el
+ *     sintonitzat i despres l assignat); si cap ho es, el primer d A.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
 import { AIRPORTS, AIRPORT_ORDER } from './airports.js';
+
+export function thresholdDistNm(A, en, e, n) {
+  const l = A.toLocal(e, n);
+  return Math.hypot(l[0] - en.thr[0], l[1] - en.thr[1]) / NM;
+}
+
+export function destinationEnd(A, ...candidates) {
+  return candidates.find(en => en && A.allEnds.includes(en)) || A.allEnds[0];
+}
+
 export const ILS = {
   GS: 3 * DEG, GS_S: 420, LOC_BEYOND: 300, LOC_DOT: 1.25 * DEG, GS_DOT: 0.35 * DEG, RANGE: 25 * NM,
   /** raw geometry of a position (e, n, wheel height above mean sea level) relative to one runway end */

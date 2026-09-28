@@ -137,7 +137,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
@@ -1652,7 +1652,7 @@ const Instruments = {
     if (nav.gsValid) { const gx = cx + 116; c.strokeStyle = K.white; c.lineWidth = 2; for (const k of [-2, -1, 1, 2]) dot(gx, cy + k * D); c.fillStyle = K.white; c.fillRect(gx - 9, cy - 1, 18, 2);
       dia(gx, cy + clamp(nav.gsDots, -2.3, 2.3) * D, 8, 11, Math.abs(nav.gsDots) > 2.3); }
     this.font(c, 15, true); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = K.mag; c.fillText(nav.ident, 6, 452);
-    this.font(c, 14); c.fillStyle = K.white; c.fillText('CRS ' + ('00' + Math.round(nav.en.hdg)).slice(-3), 6, 472); c.fillText(nav.dme.toFixed(1) + ' NM', 6, 492);
+    this.font(c, 14); c.fillStyle = K.white; c.fillText('CRS ' + ('00' + Math.round(nav.en.hdg)).slice(-3), 6, 472); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', 6, 492);
   },
 
   drawND(c, S) {
@@ -1690,8 +1690,9 @@ const Instruments = {
     const wd = S.wind || { dir: 0, kt: 0 }; c.fillStyle = K.green; c.fillText(wd.kt > 0.5 ? ('00' + Math.round(wd.dir)).slice(-3) + '/' + Math.round(wd.kt) : 'CALM', 10, 38);
     if (wd.kt > 0.5) { c.save(); c.translate(100, 38); c.rotate((wd.dir + 180) * DEG - o.psi); c.strokeStyle = K.green; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 10); c.lineTo(0, -10); c.lineTo(-4, -4); c.moveTo(0, -10); c.lineTo(4, -4); c.stroke(); c.restore(); }
     c.fillStyle = K.white; c.textAlign = 'center'; c.fillText('HDG ' + ('00' + Math.round(wrap360(o.hdg)) % 360).slice(-3) + '  MAG', 256, 16);
-    if (S.dest) { const d = Math.hypot(S.dest.e - f.e, S.dest.n - f.n) / NM, eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.dest.icao, 502, 16); c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 502, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 502, 56);
-      const brg = wrap360(Math.atan2(S.dest.e - f.e, S.dest.n - f.n) * RAD); c.fillStyle = K.cyan; c.fillText('BRG ' + ('00' + Math.round(brg)).slice(-3), 502, 76); }
+    // destinacio: fins al capcal de la pista (world/ils.js, thresholdDistNm), com la resta de vistes
+    if (S.dest) { const en = Game.destEnd(S.dest), T = S.dest.toWorld(en.thr[0], en.thr[1]), d = thresholdDistNm(S.dest, en, f.e, f.n), eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.dest.icao, 502, 16); c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 502, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 502, 56);
+      const brg = wrap360(Math.atan2(T[0] - f.e, T[1] - f.n) * RAD); c.fillStyle = K.cyan; c.fillText('BRG ' + ('00' + Math.round(brg)).slice(-3), 502, 76); }
     c.textAlign = 'left'; c.fillStyle = K.cyan; c.fillText('RNG ' + rng, 10, 498); c.fillStyle = '#8a8f98'; c.fillText(rng / 2, cx + 6, cy - R / 2 - 8);
   },
 
@@ -2106,6 +2107,8 @@ const Game = {
     this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
   msg(t, secs) { UI.toast(t, secs); },
+  /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
+  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.activeEnd); },
   onKey(code) {
     const c = this.ctl, f = this.fdm;
     if (this.state === 'replay') { if (code === 'KeyC') { this.rp.manualCam = true; Cameras.mode = Cameras.mode === 'tower' ? 'chase' : 'tower'; } else if (code === 'Escape' || code === 'Space' || code === 'Enter') this.stopReplay(); return; }
@@ -2434,7 +2437,7 @@ const HUD = {
       const dia = (x, y, w, h, out) => { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); if (out) c.stroke(); else c.fill(); };
       for (const k of [-2, -1, 1, 2]) dot(B[0] + k * D, ly); c.fillRect(B[0] - 1, ly - 7, 2, 14); dia(B[0] + clamp(nav.locDots, -2.3, 2.3) * D, ly, 8, 6, Math.abs(nav.locDots) > 2.3);
       if (nav.gsValid) { for (const k of [-2, -1, 1, 2]) dot(gx, B[1] + k * D); c.fillRect(gx - 7, B[1] - 1, 14, 2); dia(gx, B[1] + clamp(nav.gsDots, -2.3, 2.3) * D, 6, 8, Math.abs(nav.gsDots) > 2.3); }
-      font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + nav.dme.toFixed(1) + ' NM', rgt - 4, top + 12); }
+      font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', rgt - 4, top + 12); }
     // flare cue
     if (!f.wow && o.aglFt < 100 && o.vsFpm < 0) { const flareFt = cfg.type === 'jet' ? (f.mass > 150000 ? 50 : 38) : 26;
       font(22, true); c.textAlign = 'center'; c.fillText(String(Math.round(o.aglFt)), B[0], B[1] + hh * 0.72);
@@ -2448,7 +2451,7 @@ const HUD = {
     const font = (px, b) => { c.font = (b ? '700 ' : '500 ') + px + 'px "B612 Mono", "DejaVu Sans Mono", Consolas, monospace'; };
     c.fillStyle = 'rgba(8,22,32,0.74)'; c.fillRect(x0, y0, W, H); c.fillStyle = '#0f9aa0'; c.fillRect(x0, y0, W, 2);
     c.textBaseline = 'middle'; font(13, true); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(nav.ident, x0 + 10, y0 + 16);
-    c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(nav.distThr.toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
+    c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
     // PAPI: four lights, white above their setting angle, red below
     const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5];
     pa.forEach((a, i) => { const x = x0 + 50 + i * 26, y = y0 + 44, wht = el > a; c.beginPath(); c.arc(x, y, 8, 0, 6.3); c.fillStyle = wht ? '#fbfbf2' : '#ff3b30'; c.shadowColor = c.fillStyle; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; });
@@ -2841,7 +2844,7 @@ const UI = {
         cell('FLAPS', cfg.flaps[c.flaps].name) + cell('GEAR', f.gearPos > 0.99 ? 'DOWN' : f.gearPos < 0.01 ? 'UP' : 'TRANSIT', f.gearPos > 0.01 && f.gearPos < 0.99 ? 'amber' : '') + cell('SPLR', f.spoilerPos > 0.05 ? 'OUT' : 'IN', f.spoilerPos > 0.05 ? 'amber' : '') + cell('BRAKE', c.parkBrake ? 'PARK' : f.brakeAct > 0.05 ? 'ON' : 'OFF', c.parkBrake ? 'amber' : '') + cell('AP / ATHR', (S.ap.on ? 'ON' : 'OFF') + ' / ' + (S.ap.athr ? 'ON' : 'OFF'), S.ap.on ? 'green' : '');
       const w = Instruments.warnings(S); this.el.warn.innerHTML = w.map(m => `<span>${m}</span>`).join(''); this.el.warn.className = (Game.time * 3 | 0) % 2 ? 'on' : 'off';
       const hh = Math.floor(Game.hours), mm = Math.floor((Game.hours - hh) * 60), fl = Game.flight; let tr = ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2) + (S.timeAccel > 1 ? '  x' + S.timeAccel : '');
-      if (fl && fl.mode === 'route') tr += '<br>' + this.fmtTime(fl.t) + '<br>' + (Math.hypot(fl.to.e - f.e, fl.to.n - f.n) / NM).toFixed(0) + ' nm to ' + fl.to.icao; this.el.topright.innerHTML = tr;
+      if (fl && fl.mode === 'route') tr += '<br>' + this.fmtTime(fl.t) + '<br>' + thresholdDistNm(fl.to, Game.destEnd(fl.to), f.e, f.n).toFixed(0) + ' nm to ' + fl.to.icao; this.el.topright.innerHTML = tr;
     }
     if (Input.mouseYoke) { this.el.yokedot.style.left = (50 + Input.roll * 50) + '%'; this.el.yokedot.style.top = (50 - Input.pitch * 50) + '%'; }
     if (Game.debug && (Main.frameN % 6) === 0) {
