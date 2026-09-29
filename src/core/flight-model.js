@@ -89,7 +89,7 @@ export class FlightModel {
       return { x, y, z: zFull, nose: isNose, stroke: S, soS, soMax: 0.90 * S, dg, F0: 0.08 * load, kt, ct: 2 * 0.10 * Math.sqrt(kt * mEq), Cc, Cr: 14 * Cc, c1: (kt + kAir) * PHYS_DT * 0.27, tireMax: g.tireDefl * 3.2, so: 0, soDot: 0, comp: 0, load: 0 };
     };
     this.legs.push(mk(g.nose.x, g.nose.y, W * noseShare, true));
-    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }
+    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
     // Rebound damping. The orifice term above is quadratic (vanishes at small stroke speeds) and the only linear term, c1, is a
     // numerical one tied to PHYS_DT (~4 % of critical), so small pitch / heave motions on the gear rang for seconds. Each leg gets
     // a linear damper on its total extension rate, sized as a fraction of critical for the leg's static stiffness (tyre in series
@@ -100,7 +100,7 @@ export class FlightModel {
       const load = leg.F0 / 0.08, kAir = 1.3 * load / (leg.dg - leg.soS), k = leg.kt * kAir / (leg.kt + kAir);
       const mApp = leg.nose ? (Iyy + m * xm * xm) / L2 : (Iyy + m * xn * xn) / L2 / g.mains.length;
       leg.cReb = 2 * GEAR_REBOUND_ZETA * Math.sqrt(k * mApp);
-    }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
+    }
     // structural contact points
     const ct = this.cfg.contact, P = [];
     P.push({ n: 'wing', p: ct.wingtip }, { n: 'wing', p: [ct.wingtip[0], -ct.wingtip[1], ct.wingtip[2]] });
