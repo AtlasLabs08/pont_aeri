@@ -6,7 +6,7 @@
  * d Input que Game.onKey ja gestiona).
  *
  * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
- *          circuitGuidance
+ *          circuitGuidance ilsGuidance
  *
  * IMPORTA: LESSONS, CONTROL_KEYS, factsFromRecord i evaluate de career/; t de i18n/;
  *   taxiRoute i nearestOnPolyline de world/.
@@ -20,6 +20,10 @@
  *       { replay, dt, altFt, aglFt, hdgDeg, iasKt, gsKt, vsFpm, onGround,
  *         gearDown, flapsLanding, vrefKt, distThrNm, distToThrM,
  *         latOffsetM, rwyHdgDeg, locDots, gsDots, locValid, gsValid }
+ *     Opcional: hatFt, altura de les rodes sobre l elevacio de l aeroport
+ *     de la pista sintonitzada (ILS.nav, hW), en ft; la llico 'ils' la fa
+ *     servir com a altura AGL del tram de ilsFlown (lluny de la pista,
+ *     l AGL del radioaltimetre inclou els turons de sota). Sense, aglFt.
  *     Els camps de l ILS (distThrNm, distToThrM, latOffsetM, rwyHdgDeg,
  *     locDots, gsDots, locValid, gsValid) poden ser null si no hi ha cap
  *     pista sintonitzada (Game.nav null): les llicons que els fan servir
@@ -65,8 +69,10 @@
  *     altDeviationMaxFt: suspen a l instant, sense esperar els 120 s
  *     (decisio d en Marc, docs/DECISIONS.md 28/09/2026).
  *   run.failReason() -> { key, params } | null   per que l intent ja no pot
- *     aprovar (ara nomes la desviacio d altitud de la llico 5, amb els peus
- *     de desviacio); null si no n hi ha cap.
+ *     aprovar: la desviacio d altitud de la llico 5 (amb els peus de
+ *     desviacio) o, a la llico 8, haver sortit de l ILS entre topAglFt i
+ *     bottomAglFt (amb els punts de desviacio, o sense senyal); null si no
+ *     n hi ha cap.
  *     Sempre false per a les llicons 7 i 8 fora d un crash: aquestes
  *     nomes tanquen amb finish(record), quan Game calcula la nota.
  *   run.finish(record) -> facts   tanca l intent (si no ho estava ja) i
@@ -79,13 +85,15 @@
  *     l intent es en marxa: l objectiu de la llico, o a la llico 'cockpit'
  *     quin comandament toca provar (params.control = nom, params.key =
  *     tecla, tParams.controlName = clau i18n del nom), o a la llico
- *     'circuit' el missatge de la fase del circuit (circuitGuidance). Es
- *     pinta amb messageText().
+ *     'circuit' el missatge de la fase del circuit (circuitGuidance), o a la
+ *     llico 'ils' el de la fase de la intercepcio (ilsGuidance). Es pinta
+ *     amb messageText().
  *   run.tips() -> [{ key, params }]   explicacions de l instructor que
  *     index.html mostra sota el missatge durant tot l intent, en l ordre de
- *     LESSONS[..].tips. params: cada tecla es keyLabel del primer codi del
- *     comandament a CONTROL_KEYS (lessons.js), mai escrita al text. [] si
- *     la llico no en te. Es pinten amb messageText().
+ *     LESSONS[..].tips. params: els params de la dada (valors de lessons.js)
+ *     mes cada tecla, keyLabel del primer codi del comandament a
+ *     CONTROL_KEYS (lessons.js), mai escrita al text. [] si la llico no en
+ *     te. Es pinten amb messageText().
  *   run.objectives() -> [{ id, labelKey, params, ok }]   llista d objectius
  *     per al HUD, generada dels criteris de la llico (lessons.js), mai
  *     escrita a ma per llico: una fila per criteri, amb el valor actual
@@ -94,10 +102,21 @@
  *     desviacio actual; stabilizedOnFinal s expandeix en totes les
  *     condicions de finalStabilized (distancia al llindar, altura AGL, tren,
  *     flaps, velocitat, sink, alineacio), una fila per condicio de D6, mes el
- *     temps sostingut: si el comptador no avanca, alguna fila no te tic. Si la llico te durationS, primer una fila timeLeft.
+ *     temps sostingut: si el comptador no avanca, alguna fila no te tic.
+ *     ilsFlown s expandeix en la desviacio actual del localitzador i de la
+ *     senda (en punts, contra ilsTolerance) mes una fila per al tram de
+ *     topAglFt a bottomAglFt.
+ *     Si la llico te durationS, primer una fila timeLeft.
  *     labelKey = 'school.objective.' + id, amb messageText.
  *   run.circuit -> { phase, side, turnNow } | null   darrera guia de la
  *     llico 'circuit'; null fins a la primera instantania amb asg*.
+ *   run.ils -> { phase, side } | null   darrera guia de la llico 'ils'
+ *     (ilsGuidance); null fins a la primera instantania.
+ *   ilsFlown (llico 'ils', docs/DECISIONS.md 29/09/2026): true quan l avio
+ *     baixa de bottomAglFt despres d haver passat tot el tram de topAglFt a
+ *     bottomAglFt (en vol) sense sortir mai de locDots ni de gsDots, amb el
+ *     senyal del localitzador i de la senda valid. L altura es hatFt (sobre
+ *     la pista) o, si no n hi ha, aglFt.
  *
  * lessonGoalParams(lesson) -> params per a t(lesson.goalKey, params): el
  *   numero surt sempre de LESSONS, mai escrit al text d i18n.
@@ -120,6 +139,21 @@
  *   pista), pel cami curt; null si no cal girar ('downwind', 'final', o
  *   ja establert en base). turnNow: el rumb encara es a mes d alignedDeg
  *   del d aquest tram (base o final).
+ * ilsGuidance({ hdgDeg, rwyHdgDeg, locDots, gsDots, locValid, gsValid,
+ *   hatFt, aglFt }, guidance, tolerance) -> { phase, side }   fase de la
+ *   intercepcio de l ILS (guidance = LESSONS['ils'].guidance, tolerance =
+ *   ilsTolerance):
+ *     'land'        per sota de bottomAglFt (hatFt, o aglFt): mirar fora i
+ *                   aterrar
+ *     'noSignal'    encara sense localitzador valid
+ *     'intercept'   agulla del localitzador a mes de locAliveDots: mantenir
+ *                   el rumb d intercepcio. side: cap a on es l eix (l agulla)
+ *     'joinLoc'     localitzador viu: girar al rumb de pista (side: cap a on
+ *                   girar) o, ja al rumb, centrar l agulla (side: l agulla)
+ *     'belowGs'     al localitzador, per sota de la senda (o sense senda):
+ *                   mantenir l altitud fins que l agulla de senda baixi
+ *     'aboveGs'     per sobre de la senda: baixar mes
+ *     'established' les dues agulles dins de tolerancia
  * attemptMessage({ passed, mercy, crashed, reason }) -> { key, params }
  *   missatge final un cop recordLessonAttempt (career/school.js) ja ha
  *   decidit el resultat (inclosa la gracia). No decideix passed/mercy:
@@ -156,6 +190,8 @@ export function lessonGoalParams(lesson) {
     case 'maneuvers': return { deg: value('headingChangeDeg'), ft: value('altDeviationMaxFt'),
       min: lesson.durationS / SECONDS_PER_MINUTE };
     case 'landing': return { score: BALANCE.school.passScore };
+    case 'ils': { const T = lesson.ilsTolerance;
+      return { loc: T.locDots, gs: T.gsDots, top: T.topAglFt, bottom: T.bottomAglFt }; }
     default: return {};
   }
 }
@@ -181,6 +217,24 @@ export function circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, G) {
   }
   return { phase: 'finalTurn', side: sideOf(toFinal), turnNow: true };
 }
+
+export function ilsGuidance({ hdgDeg, rwyHdgDeg, locDots, gsDots, locValid, gsValid, hatFt, aglFt }, G, T) {
+  if ((hatFt ?? aglFt) < T.bottomAglFt) return { phase: 'land', side: null };
+  if (!locValid || locDots == null || rwyHdgDeg == null) return { phase: 'noSignal', side: null };
+  // locDots positiu: l avio es a l esquerra de l eix, l agulla (l eix) queda a la dreta
+  const needle = locDots >= 0 ? 'right' : 'left';
+  if (Math.abs(locDots) > G.locAliveDots) return { phase: 'intercept', side: needle };
+  const toRwy = headingDiff(hdgDeg, rwyHdgDeg);
+  if (Math.abs(toRwy) > G.alignedDeg) return { phase: 'joinLoc', side: toRwy >= 0 ? 'right' : 'left' };
+  if (Math.abs(locDots) > T.locDots) return { phase: 'joinLoc', side: needle };
+  // gsDots negatiu: per sota de la senda
+  if (!gsValid || gsDots == null || gsDots < -T.gsDots) return { phase: 'belowGs', side: null };
+  if (gsDots > T.gsDots) return { phase: 'aboveGs', side: null };
+  return { phase: 'established', side: null };
+}
+
+/** desviacio absoluta en punts d una agulla, o null si no hi ha senyal */
+const needleDots = (valid, dots) => (valid && dots != null ? Math.abs(dots) : null);
 
 /** condicions de D6 (finalStabilized de lessons.js) en una instantania. El comptador
  * de sustainedS nomes avanca si es compleixen totes; la llista d objectius en mostra
@@ -222,6 +276,15 @@ const OBJECTIVE_ROWS = {
       row('alignment', { value: shown(sn && sn.rwyHdgDeg != null ? headingDelta(sn.hdgDeg, sn.rwyHdgDeg) : null),
         target: T.hdgToleranceDeg }, ok.alignment),
       row(c.metric, { value: shown(run._streak), target: T.sustainedS }, run.facts[c.metric] === c.value)
+    ];
+  },
+  ilsFlown: (run, c) => {
+    const T = run.lesson.ilsTolerance, sn = run._snap;
+    const loc = sn ? needleDots(sn.locValid, sn.locDots) : null, gs = sn ? needleDots(sn.gsValid, sn.gsDots) : null;
+    return [
+      row('locDots', { value: shown1(loc), target: T.locDots }, loc !== null && loc <= T.locDots),
+      row('gsDots', { value: shown1(gs), target: T.gsDots }, gs !== null && gs <= T.gsDots),
+      row(c.metric, { top: T.topAglFt, bottom: T.bottomAglFt }, run.facts[c.metric] === c.value)
     ];
   }
 };
@@ -279,6 +342,9 @@ export class LessonRun {
     this._snap = null;
     this._devFt = null;
     this._taxi = null;
+    this.ils = null;
+    this._ilsBand = false;
+    this._ilsOut = null;       // { dots } la pitjor sortida de l ILS dins del tram (dots null = sense senyal)
     if (this.lesson.id === 'exterior') this.facts.viewsVisited = 0;
     if (this.lesson.id === 'cockpit') this.facts.controlsIdentified = 0;
     if (this.lesson.id === 'taxi') this.facts.reachedThreshold = false;
@@ -383,10 +449,18 @@ export class LessonRun {
       }
       case 'ils': {
         const T = this.lesson.ilsTolerance;
-        const ok = snap.locValid && snap.gsValid && snap.locDots != null && snap.gsDots != null
-          && Math.abs(snap.locDots) <= T.locDots && Math.abs(snap.gsDots) <= T.gsDots;
-        this._streak = ok ? this._streak + (snap.dt || 0) : 0;
-        if (this._streak >= T.sustainedS) this.facts.ilsFlown = true;
+        this.ils = ilsGuidance(snap, this.lesson.guidance, T);
+        if (snap.onGround) break;
+        const h = snap.hatFt ?? snap.aglFt;
+        if (h <= T.topAglFt && h >= T.bottomAglFt) {
+          this._ilsBand = true;
+          const loc = needleDots(snap.locValid, snap.locDots), gs = needleDots(snap.gsValid, snap.gsDots);
+          if (loc === null || gs === null) this._ilsOut = { dots: null };
+          else if (loc > T.locDots || gs > T.gsDots) {
+            const dots = Math.max(loc > T.locDots ? loc : 0, gs > T.gsDots ? gs : 0);
+            if (!this._ilsOut || (this._ilsOut.dots !== null && dots > this._ilsOut.dots)) this._ilsOut = { dots };
+          }
+        } else if (h < T.bottomAglFt && this._ilsBand && !this._ilsOut) this.facts.ilsFlown = true;
         break;
       }
       default: break;
@@ -396,14 +470,20 @@ export class LessonRun {
   objectives() { return objectiveRows(this); }
 
   tips() {
-    return (this.lesson.tips || []).map(({ key, keys }) => ({ key,
-      params: Object.fromEntries(Object.entries(keys).map(([name, control]) => [name, keyLabel(CONTROL_KEYS[control][0])])) }));
+    return (this.lesson.tips || []).map(({ key, keys, params }) => ({ key,
+      params: { ...params, ...Object.fromEntries(Object.entries(keys || {}).map(([name, control]) => [name, keyLabel(CONTROL_KEYS[control][0])])) } }));
   }
 
   /** llindar d un criteri de la llico (value), o undefined */
   _target(metric) { return this.lesson.criteria.find(c => c.metric === metric)?.value; }
 
   failReason() {
+    if (this.lesson.id === 'ils') {
+      if (!this._ilsOut) return null;
+      const T = this.lesson.ilsTolerance, band = { top: T.topAglFt, bottom: T.bottomAglFt };
+      return this._ilsOut.dots === null ? { key: 'school.instructor.ilsLost', params: band }
+        : { key: 'school.instructor.ilsDeviation', params: { dots: Math.round(this._ilsOut.dots * 10) / 10, ...band } };
+    }
     if (this.lesson.id !== 'maneuvers') return null;
     const dev = this.facts.altDeviationMaxFt;
     if (!(dev > this._target('altDeviationMaxFt'))) return null;
@@ -425,7 +505,21 @@ export class LessonRun {
         tParams: { controlName: 'school.control.' + next } };
     }
     if (this.lesson.id === 'circuit' && this.circuit) return this._circuitMessage();
+    if (this.lesson.id === 'ils' && this.ils) return this._ilsMessage();
     return { key: this.lesson.goalKey, params: lessonGoalParams(this.lesson) };
+  }
+
+  /** missatge de l instructor per a la fase de la intercepcio de l ILS */
+  _ilsMessage() {
+    const { phase, side } = this.ils, T = this.lesson.ilsTolerance;
+    const sideKey = side ? { tParams: { side: 'school.side.' + side } } : {};
+    switch (phase) {
+      case 'joinLoc': return { key: 'school.ils.joinLoc', params: { hdg: Math.round(this._snap.rwyHdgDeg) }, ...sideKey };
+      case 'established': return { key: 'school.ils.established',
+        params: { loc: T.locDots, gs: T.gsDots, top: T.topAglFt, bottom: T.bottomAglFt } };
+      case 'land': return { key: 'school.ils.land', params: { ft: T.bottomAglFt } };
+      default: return { key: 'school.ils.' + phase, ...sideKey };
+    }
   }
 
   /** missatge de l instructor per a la fase del circuit en curs */

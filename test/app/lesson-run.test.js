@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance } from '../../src/app/lesson-run.js';
+import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance, ilsGuidance } from '../../src/app/lesson-run.js';
 import { LESSONS, CONTROL_KEYS, BALANCE, evaluate } from '../../src/career/index.js';
 import { setLang } from '../../src/i18n/index.js';
 import { AIRPORTS } from '../../src/world/index.js';
@@ -532,24 +532,166 @@ describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina cond
   });
 });
 
-describe('llico ils: ilsFlown amb world/ils.js', () => {
-  test('dins de tolerancia 10 s marca ilsFlown', () => {
+describe('llicons 7 i 8: dos punts de partida diferents (lessons.js)', () => {
+  const L7 = LESSONS.find(l => l.id === 'landing').spawn, L8 = LESSONS.find(l => l.id === 'ils').spawn;
+  const FT = 0.3048, NM = 1852, GS_S = 420;
+  const gsFt = dNm => (dNm * NM + GS_S) * Math.tan(3 * Math.PI / 180) / FT;   // senda de 3 graus (world/ils.js)
+
+  test('llico 7: final curt, a uns 3 nm, alineat i sobre la senda (sense offset ni altura propia)', () => {
+    assert.ok(L7.distNm >= 2 && L7.distNm <= 4, String(L7.distNm));
+    assert.equal(L7.lateralNm ?? 0, 0);
+    assert.equal(L7.interceptDeg ?? 0, 0);
+    assert.equal(L7.aglFt, undefined);            // Game.spawn: sobre la senda, configuracio d aterratge
+  });
+
+  test('llico 8: lluny, fora de l eix, angle d intercepcio de 20 a 30 graus i per sota de la senda', () => {
+    assert.ok(L8.distNm >= 10 && L8.distNm <= 14, String(L8.distNm));
+    assert.ok(L8.lateralNm > 0);
+    assert.ok(L8.interceptDeg >= 20 && L8.interceptDeg <= 30, String(L8.interceptDeg));
+    assert.ok(L8.aglFt < gsFt(L8.distNm), `${L8.aglFt} >= ${gsFt(L8.distNm)}`);
+    // on talla l eix (a interceptDeg), continua per sota de la senda: la senda es captura des de sota
+    const cut = L8.distNm - L8.lateralNm / Math.tan(L8.interceptDeg * Math.PI / 180);
+    assert.ok(cut > 0 && L8.aglFt < gsFt(cut), `talla a ${cut} nm`);
+    assert.ok(L8.aglFt > LESSONS.find(l => l.id === 'ils').ilsTolerance.topAglFt);
+  });
+});
+
+describe('llico 8 (ils): ilsFlown, seguit dins d 1 punt de 1.500 a 500 ft AGL', () => {
+  const T = LESSONS.find(l => l.id === 'ils').ilsTolerance;
+  const on = (h, over = {}) => snap({ hatFt: h, aglFt: h, altFt: h, locValid: true, gsValid: true, locDots: 0.3, gsDots: -0.4,
+    rwyHdgDeg: 66, hdgDeg: 66, ...over });
+  const descend = (run, over = () => ({})) => { for (let h = 2000; h >= 300; h -= 50) run.sample(on(h, over(h))); };
+  const touchdown = { fpm: -180, g: 1.1, bounces: 0, onRunway: true, rwy: '07L', tdzDist: 300, center: 1, crab: 0,
+    remaining: 1500, ias: 100, pitch: 3, roll: 0, score: 80, pts: { sink: 30, g: 15, zone: 18, center: 18, attitude: 9 } };
+
+  test('dins de tolerancia de dalt a baix del tram: ilsFlown i aprova en aterrar a pista', () => {
     const run = new LessonRun('ils');
-    for (let i = 0; i < 11; i++) run.sample(snap({ locValid: true, gsValid: true, locDots: 0.5, gsDots: -0.5 }));
-    const facts = run.finish(record({ touchdown: { fpm: -180, g: 1.1, bounces: 0, onRunway: true, rwy: '24L', tdzDist: 300, center: 1, crab: 0, remaining: 1500, ias: 110, pitch: 3, roll: 0, score: 80, pts: { sink: 30, g: 15, zone: 18, center: 18, attitude: 9 } } }));
-    assert.equal(facts.ilsFlown, true);
+    descend(run);
+    assert.equal(run.facts.ilsFlown, true);
+    assert.equal(run.failReason(), null);
+    assert.equal(run.readyToEnd(), false);        // tanca amb finish, quan Game calcula la nota
+    const facts = run.finish(record({ touchdown }));
     assert.equal(passed('ils', facts), true);
   });
 
-  test('fora de tolerancia no la marca', () => {
+  test('aterrar a pista sense haver seguit l ILS no aprova', () => {
     const run = new LessonRun('ils');
-    for (let i = 0; i < 11; i++) run.sample(snap({ locValid: true, gsValid: true, locDots: 2, gsDots: -0.5 }));
+    descend(run, h => (h === 1000 ? { locDots: 1.4 } : {}));
     assert.equal(run.facts.ilsFlown, false);
+    assert.deepEqual(run.failReason(), { key: 'school.instructor.ilsDeviation', params: { dots: 1.4, top: T.topAglFt, bottom: T.bottomAglFt } });
+    const facts = run.finish(record({ touchdown }));
+    assert.equal(passed('ils', facts), false);
+    setLang('en');
+    assert.equal(messageText(run.failReason()), 'You left the ILS: 1.4 dots off between 1,500 and 500 ft AGL.');
+  });
+
+  test('la senda compta igual que el localitzador', () => {
+    const run = new LessonRun('ils');
+    descend(run, h => (h === 700 ? { gsDots: -1.2 } : {}));
+    assert.equal(run.facts.ilsFlown, false);
+  });
+
+  test('fora de tolerancia per sobre de 1.500 o per sota de 500 ft no compta', () => {
+    const run = new LessonRun('ils');
+    descend(run, h => (h > T.topAglFt || h < T.bottomAglFt ? { locDots: 2.5, gsDots: 2.5 } : {}));
+    assert.equal(run.facts.ilsFlown, true);
+  });
+
+  test('perdre el senyal dins del tram no compta com a seguit', () => {
+    const run = new LessonRun('ils');
+    descend(run, h => (h === 900 ? { gsValid: false } : {}));
+    assert.equal(run.facts.ilsFlown, false);
+    assert.equal(run.failReason().key, 'school.instructor.ilsLost');
+  });
+
+  test('l altura es sobre la pista (hatFt): els turons de sota no fan entrar al tram abans d hora', () => {
+    const run = new LessonRun('ils');
+    // lluny, a 2.000 ft sobre la pista pero a 1.400 ft del terra: agulla encara fora
+    run.sample(snap({ hatFt: 2000, aglFt: 1400, locValid: true, gsValid: true, locDots: 6.5, gsDots: -4, rwyHdgDeg: 66, hdgDeg: 91 }));
+    assert.equal(run.failReason(), null);
+    descend(run);
+    assert.equal(run.facts.ilsFlown, true);
+  });
+
+  test('sense haver passat pel tram (nomes a baix) no el marca', () => {
+    const run = new LessonRun('ils');
+    run.sample(on(400));
+    assert.equal(run.facts.ilsFlown, false);
+  });
+
+  test('llista: desviacio de les dues agulles i el tram', () => {
+    const run = new LessonRun('ils');
+    run.sample(on(1200, { locDots: -0.26, gsDots: 1.34 }));
+    const by = Object.fromEntries(run.objectives().map(o => [o.id, o]));
+    assert.deepEqual([by.locDots.params.value, by.locDots.ok], [0.3, true]);
+    assert.deepEqual([by.gsDots.params.value, by.gsDots.ok], [1.3, false]);
+    assert.deepEqual(by.ilsFlown.params, { top: T.topAglFt, bottom: T.bottomAglFt });
+    setLang('en');
+    assert.equal(messageText({ key: by.gsDots.labelKey, params: by.gsDots.params }), 'Glideslope: 1.3 dots off (max 1)');
+    setLang('ca');
+    assert.equal(messageText({ key: by.ilsFlown.labelKey, params: by.ilsFlown.params }), 'ILS seguit de 1.500 a 500 ft AGL');
+    setLang('en');
+  });
+});
+
+describe('llico 8 (ils): l instructor guia la intercepcio', () => {
+  const L = LESSONS.find(l => l.id === 'ils'), G = L.guidance, T = L.ilsTolerance;
+  const g = over => ilsGuidance({ hdgDeg: 91, rwyHdgDeg: 66, locValid: true, gsValid: true, locDots: 0, gsDots: 0,
+    hatFt: 2000, aglFt: 2000, ...over }, G, T);
+
+  test('fases, de lluny fins a terra', () => {
+    assert.deepEqual(g({ locValid: false, locDots: null }), { phase: 'noSignal', side: null });
+    // a l esquerra de l eix (locDots positiu): l agulla, i l eix, queden a la dreta
+    assert.deepEqual(g({ locDots: 6.5 }), { phase: 'intercept', side: 'right' });
+    assert.deepEqual(g({ locDots: -6.5, hdgDeg: 41 }), { phase: 'intercept', side: 'left' });
+    assert.deepEqual(g({ locDots: G.locAliveDots }), { phase: 'joinLoc', side: 'left' });       // de 091 a 066: esquerra
+    assert.deepEqual(g({ locDots: 1.5, hdgDeg: 66 }), { phase: 'joinLoc', side: 'right' });     // ja al rumb: centrar l agulla
+    assert.deepEqual(g({ locDots: 0.2, hdgDeg: 70, gsDots: -3 }), { phase: 'belowGs', side: null });
+    assert.deepEqual(g({ locDots: 0.2, hdgDeg: 70, gsValid: false, gsDots: null }), { phase: 'belowGs', side: null });
+    assert.deepEqual(g({ locDots: 0.2, hdgDeg: 70, gsDots: 2 }), { phase: 'aboveGs', side: null });
+    assert.deepEqual(g({ locDots: 0.2, hdgDeg: 70, gsDots: 0.5 }), { phase: 'established', side: null });
+    assert.deepEqual(g({ hatFt: T.bottomAglFt - 1 }), { phase: 'land', side: null });
+  });
+
+  test('missatges amb els numeros de lessons.js i el costat traduit', () => {
+    const run = new LessonRun('ils');
+    setLang('en');
+    run.sample(snap({ hatFt: 2000, aglFt: 2000, locValid: true, gsValid: true, locDots: 6, gsDots: -4, rwyHdgDeg: 66, hdgDeg: 91 }));
+    assert.equal(messageText(run.instructorMessage()),
+      'Intercept: hold this heading. The vertical needle (localiser) is off to the right; when it starts to move towards the centre, turn onto the runway heading.');
+    run.sample(snap({ hatFt: 2000, aglFt: 2000, locValid: true, gsValid: true, locDots: 1.8, gsDots: -3, rwyHdgDeg: 66, hdgDeg: 91 }));
+    assert.equal(messageText(run.instructorMessage()), 'Localiser alive: turn left towards runway heading 66° and keep the vertical needle centred.');
+    run.sample(snap({ hatFt: 1200, aglFt: 1200, locValid: true, gsValid: true, locDots: 0.1, gsDots: 0.1, rwyHdgDeg: 66, hdgDeg: 66 }));
+    assert.equal(run.instructorMessage().key, 'school.ils.established');
+    assert.deepEqual(run.instructorMessage().params, { loc: T.locDots, gs: T.gsDots, top: T.topAglFt, bottom: T.bottomAglFt });
+    setLang('ca');
+    run.sample(snap({ hatFt: 2000, aglFt: 2000, locValid: true, gsValid: true, locDots: 1.8, gsDots: -3, rwyHdgDeg: 66, hdgDeg: 91 }));
+    assert.equal(messageText(run.instructorMessage()), "Localitzador viu: gira a l'esquerra cap al rumb de pista 66° i mantén l'agulla vertical al centre.");
+    setLang('en');
+  });
+
+  test('explica les dues agulles', () => {
+    const tips = new LessonRun('ils').tips();
+    assert.deepEqual(tips.map(x => x.key), ['school.tip.ilsNeedles']);
+    setLang('en');
+    assert.match(messageText(tips[0]), /vertical one is the localiser.*horizontal one is the glideslope/);
+  });
+});
+
+describe('llico 7 (landing): l instructor parla de l arrodoniment', () => {
+  test('tip amb l altura de la barra d arrodoniment de lessons.js', () => {
+    const L = LESSONS.find(l => l.id === 'landing');
+    const tips = new LessonRun('landing').tips();
+    assert.deepEqual(tips, [{ key: 'school.tip.flare', params: { ft: L.flareBar.startAglFt } }]);
+    setLang('ca');
+    assert.match(messageText(tips[0]), /Des de 50 ft segueix la barra d'arrodoniment/);
+    setLang('en');
   });
 });
 
 describe('objectives: llista del HUD generada dels criteris', () => {
-  const EXPANDED = { stabilizedOnFinal: ['distance', 'height', 'gear', 'flaps', 'speed', 'sink', 'alignment', 'stabilizedOnFinal'] };
+  const EXPANDED = { stabilizedOnFinal: ['distance', 'height', 'gear', 'flaps', 'speed', 'sink', 'alignment', 'stabilizedOnFinal'],
+    ilsFlown: ['locDots', 'gsDots', 'ilsFlown'] };
 
   test('cada llico: una fila per criteri (en ordre), mes timeLeft si te durationS', () => {
     for (const l of LESSONS) {
@@ -660,6 +802,7 @@ describe('lessonGoalParams', () => {
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'maneuvers')), { deg: 180, ft: 200, min: 2 });
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'circuit')), {});
     assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'landing')), { score: BALANCE.school.passScore });
+    assert.deepEqual(lessonGoalParams(LESSONS.find(l => l.id === 'ils')), { loc: 1, gs: 1, top: 1500, bottom: 500 });
   });
 });
 
@@ -679,7 +822,7 @@ describe('tips: explicacions de l instructor', () => {
   test('cada tip te text a en i ca i nomes fa servir comandaments de CONTROL_KEYS', () => {
     for (const l of LESSONS) for (const tip of l.tips || []) {
       assert.ok(Object.hasOwn(en, tip.key) && Object.hasOwn(ca, tip.key), tip.key);
-      for (const control of Object.values(tip.keys)) assert.ok(Object.hasOwn(CONTROL_KEYS, control), control);
+      for (const control of Object.values(tip.keys || {})) assert.ok(Object.hasOwn(CONTROL_KEYS, control), control);
     }
   });
 

@@ -1976,6 +1976,7 @@ function lessonSnapshot() {
     latOffsetM: nav ? nav.t : null,
     rwyHdgDeg: nav ? nav.en.hdg : null,
     locDots: nav ? nav.locDots : null,
+    hatFt: nav ? nav.hW / FT : null,
     gsDots: nav ? nav.gsDots : null,
     locValid: nav ? nav.locValid : false,
     gsValid: nav ? nav.gsValid : false,
@@ -1993,6 +1994,9 @@ function concludeLesson({ lessonId, facts, record, reason }) {
   if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record);
   if (IS_DEV && DevSchoolPanel.el) DevSchoolPanel.render();
 }
+/** treu d opts els camps spawn* de l escola (LESSONS[..].spawn): Game.opts els conserva despres d una llico
+ *  (Object.assign del launcher), i un Free Flight 'final' o la llico seguent no els ha d heretar */
+function dropSpawnOpts(o) { for (const k of Object.keys(o)) if (k.startsWith('spawn')) delete o[k]; }
 /** llanca una llico de l escola (nomes IS_DEV, D1). unlockAll: nomes el boto DEV.
  * Espill de Best.startFlight(), pero passant per launchFlight() (C2) en comptes
  * de Game.spawn() directe: aixi el launcher injectat es l unic que hi toca. */
@@ -2005,10 +2009,11 @@ async function launchLesson(lessonId, unlockAll) {
     : lesson.id === 'maneuvers' ? 'airborne'
     : lesson.id === 'circuit' ? 'downwind'
     : 'final';
-  // spawnAglFt/spawnOffsetNm/spawnFlaps: nomes els fan servir 'airborne' i 'downwind' (Game.spawn).
-  // Els valors venen de LESSONS[..].spawn a lessons.js, mai escrits aqui.
-  const spawnOpts = lesson.spawn
-    ? { spawnAglFt: lesson.spawn.aglFt, spawnOffsetNm: lesson.spawn.offshoreNm ?? lesson.spawn.lateralNm, spawnFlaps: lesson.spawn.flaps }
+  // spawnAglFt/spawnOffsetNm/spawnFlaps: 'airborne', 'downwind' i 'final'; spawnDistNm/spawnInterceptDeg: nomes 'final'
+  // (Game.spawn). Els valors venen de LESSONS[..].spawn a lessons.js, mai escrits aqui.
+  const S = lesson.spawn;
+  const spawnOpts = S
+    ? { spawnAglFt: S.aglFt, spawnOffsetNm: S.offshoreNm ?? S.lateralNm, spawnFlaps: S.flaps, spawnDistNm: S.distNm, spawnInterceptDeg: S.interceptDeg }
     : {};
   Sound.unlock(); UI.showMenu(false); Game.state = 'loading'; UI.loading(0.5, 'Preparing the lesson');
   const lessonDone = startLesson(lessonId, { aircraft: lesson.aircraftTypeId, airport: 'LEBL', runway: 0, start,
@@ -2071,9 +2076,18 @@ const Game = {
       f.reset({}); const v = f.vspeeds();
       let pos, alt, hdg, cas, gamma, flaps, gearDown;
       if (O.start === 'final') {
-        const d = 10 * NM; pos = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d);
-        alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic;
-        hdg = en.hdg; cas = v.vapp * KT; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+        // per defecte (Free Flight): 10 nm, sobre l eix i la senda, configuracio d aterratge. L escola (llicons 7 i 8,
+        // LESSONS[..].spawn) hi pot passar spawnDistNm, i la 8 tambe spawnOffsetNm (a l esquerra de l eix, mateixa
+        // convencio que 'downwind'), spawnInterceptDeg (rumb de pista mes aquests graus, cap a l eix) i spawnAglFt
+        // (anivellat a aquesta altura, per sota de la senda, tren amunt i flaps segons spawnFlaps). Mateix trimAircraft.
+        const d = (O.spawnDistNm ?? 10) * NM, lat = (O.spawnOffsetNm ?? 0) * NM;
+        pos = A.toWorld(en.thr[0] - en.dir[0] * d - en.dir[1] * lat, en.thr[1] - en.dir[1] * d + en.dir[0] * lat);
+        hdg = wrap360(en.hdg + (O.spawnInterceptDeg ?? 0)); cas = v.vapp * KT;
+        if (O.spawnAglFt != null) {
+          alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+        } else {
+          alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+        }
       } else if (O.start === 'airborne') {
         // en vol, anivellat, uns spawnOffsetNm mar endins de l aeroport (mateix eix que 'final'),
         // rumb de la pista, tren amunt, flaps segons opts.spawnFlaps. Sense velocitat de creuer
@@ -2677,7 +2691,7 @@ const Main = {
     Scenery.init(); prog(0.55, 'Painting runways and switching on the lights'); await tick();
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
-    setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); Object.assign(Game.opts, opts); Game.spawn(); });
+    setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, opts); Game.spawn(); });
     if (IS_DEV) DevSchoolPanel.init();
     Env.update(Game.opts.hours, 100, [0, 0, -1]);
     prog(0.7, 'Generating terrain'); await tick();
@@ -2778,7 +2792,7 @@ const UI = {
   modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.$('modeNote').textContent = O.mode === 'route' ? `Timed flight ${a.city} to ${b.city}: about 110 nm on a heading near ${O.airport === 'LEBL' ? '165' : '345'}\u00b0. The summary appears once you have landed and slowed down at ${b.city}.` : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
-  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
+  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
   restart() { this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
   toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },

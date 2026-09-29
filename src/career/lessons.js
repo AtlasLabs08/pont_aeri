@@ -26,10 +26,12 @@
  *                        cap comprovacio de Game (correccio del PR #22).
  *                        Nomes compten els comandaments de controls.
  *       tips            (qualsevol llico) explicacions de l instructor, en
- *                        ordre: [{ key, keys }]. key es la clau i18n; keys es
- *                        { parametre: comandament de CONTROL_KEYS }: el
- *                        parametre val la primera tecla del comandament
- *                        (app/lesson-run.js, LessonRun.tips).
+ *                        ordre: [{ key, keys?, params? }]. key es la clau
+ *                        i18n; keys es { parametre: comandament de
+ *                        CONTROL_KEYS }: el parametre val la primera tecla
+ *                        del comandament (app/lesson-run.js, LessonRun.tips);
+ *                        params, valors numerics presos d altres dades
+ *                        d aquest fitxer (mai escrits al text i18n).
  *       taxi            (llico 'taxi') { maxDistToThrM, maxLatOffsetM,
  *                        maxGroundKt, rerouteM }: els tres primers son els
  *                        llindars de reachedThreshold; rerouteM, metres que
@@ -39,6 +41,11 @@
  *       finalStabilized (llico 'circuit') llindars de D6 per a
  *                        stabilizedOnFinal: { maxDistNm, aglFt, sustainedS,
  *                        hdgToleranceDeg, sinkMaxFpm, vrefLowKt, vrefHighKt }.
+ *       guidance        (llico 'ils') { locAliveDots, alignedDeg } per a la
+ *                        guia de la intercepcio (app/lesson-run.js,
+ *                        ilsGuidance): el localitzador es viu a locAliveDots
+ *                        punts o menys; alignedDeg, diferencia amb el rumb de
+ *                        pista per considerar-se al rumb d aproximacio.
  *       guidance        (llico 'circuit') llindars de la guia per fases de
  *                        l instructor (app/lesson-run.js, circuitGuidance),
  *                        tots respecte de la pista assignada: { baseTurnDeg,
@@ -48,14 +55,16 @@
  *                        l eix per girar a final. alignedDeg: diferencia de
  *                        rumb per considerar-se establert en un tram (base o
  *                        final).
- *       ilsTolerance    (llico 'ils') { locDots, gsDots, sustainedS } per a
- *                        ilsFlown.
+ *       ilsTolerance    (llico 'ils') { locDots, gsDots, topAglFt,
+ *                        bottomAglFt } per a ilsFlown: seguit si, entre
+ *                        topAglFt i bottomAglFt, la desviacio no passa mai de
+ *                        locDots (localitzador) ni de gsDots (senda).
  *       flareBar        (llico 'landing') llindars de D7 de la barra
  *                        d arrodoniment: { startAglFt, sinkAtStartFpm,
  *                        sinkAtContactFpm }.
  *       aids            (llico 'landing') { flareBar, autoDebrief }: marques
  *                        de D8, mai condicions al codi.
- *       spawn           (llicons 'maneuvers' i 'circuit') posicio inicial
+ *       spawn           (llicons 'maneuvers', 'circuit', 'landing', 'ils') posicio inicial
  *                        que index.html passa a Game.spawn() via opts
  *                        (correccio del PR #22): { aglFt, offshoreNm,
  *                        flaps } per a 'maneuvers' (mode 'airborne': en
@@ -66,6 +75,14 @@
  *                        pista). flaps es 'clean' o 'approach': Game.spawn()
  *                        el tradueix a l index de flaps de l avio (0 o
  *                        cfg.flapTO), mai un index escrit a ma.
+ *                        Llicons 'landing' i 'ils' (mode 'final', correccio
+ *                        del 29/09): { distNm } per a 'landing' (distNm abans
+ *                        del llindar, sobre l eix i la senda, configuracio
+ *                        d aterratge); { distNm, lateralNm, interceptDeg,
+ *                        aglFt, flaps } per a 'ils' (distNm abans del
+ *                        llindar, lateralNm a l esquerra de l eix, rumb de
+ *                        pista mes interceptDeg cap a l eix, anivellat a
+ *                        aglFt, per sota de la senda, tren amunt).
  *   CHECK_RIDES: clau = id d habilitacio de BALANCE.ratings (sense commuter,
  *     que es la graduacio), cadascun { aircraftTypeId, titleKey, setup,
  *     criteria }. setup es informacio per a qui prepara el vol (C3, D3):
@@ -96,6 +113,12 @@ export const CONTROL_KEYS = {
   pitchDown: ['KeyW', 'ArrowUp'], pitchUp: ['KeyS', 'ArrowDown'],
   rollLeft: ['KeyA', 'ArrowLeft'], rollRight: ['KeyD', 'ArrowRight']
 };
+
+/** llindars de D7 de la barra d arrodoniment (llico 'landing') */
+const FLARE_BAR = { startAglFt: 50, sinkAtStartFpm: 500, sinkAtContactFpm: 150 };
+/** ilsFlown (llico 'ils'): haver seguit l ILS vol dir no passar de locDots ni de
+ * gsDots punts de desviacio en tot el tram de topAglFt a bottomAglFt (AGL) */
+const ILS_TOLERANCE = { locDots: 1, gsDots: 1, topAglFt: 1500, bottomAglFt: 500 };
 
 export const LESSONS = [
   { id: 'exterior', aircraftTypeId: 'commuter',
@@ -136,13 +159,21 @@ export const LESSONS = [
     titleKey: 'school.lesson.landing.title', goalKey: 'school.lesson.landing.goal',
     criteria: [{ metric: 'landed', op: 'eq', value: true },
                { metric: 'score', op: 'gte', value: SCHOOL_PASS }],
-    flareBar: { startAglFt: 50, sinkAtStartFpm: 500, sinkAtContactFpm: 150 },
-    aids: { flareBar: true, autoDebrief: true } },
+    flareBar: FLARE_BAR,
+    aids: { flareBar: true, autoDebrief: true },
+    // final curt: alineat, a la senda i en configuracio d aterratge; tot va de l arrodoniment
+    spawn: { distNm: 3 },
+    tips: [{ key: 'school.tip.flare', params: { ft: FLARE_BAR.startAglFt } }] },
   { id: 'ils', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.ils.title', goalKey: 'school.lesson.ils.goal',
-    criteria: [{ metric: 'landed', op: 'eq', value: true },
+    criteria: [{ metric: 'ilsFlown', op: 'eq', value: true },
+               { metric: 'landed', op: 'eq', value: true },
                { metric: 'onRunway', op: 'eq', value: true }],
-    ilsTolerance: { locDots: 1, gsDots: 1, sustainedS: 10 } }
+    ilsTolerance: ILS_TOLERANCE,
+    // lluny, fora de l eix i per sota de la senda: cal interceptar el localitzador i despres la senda
+    spawn: { distNm: 12, lateralNm: 2, interceptDeg: 25, aglFt: 2000, flaps: 'approach' },
+    guidance: { locAliveDots: 2, alignedDeg: 10 },
+    tips: [{ key: 'school.tip.ilsNeedles' }] }
 ];
 
 export const CHECK_RIDES = {

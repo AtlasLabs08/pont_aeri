@@ -64,8 +64,9 @@ describe('llicons: cada criteri just al limit', () => {
     ['circuit', { stabilizedOnFinal: true }, { stabilizedOnFinal: false }],
     ['landing', { landed: true, score: 45 }, { landed: true, score: 44 }],
     ['landing', { landed: true, score: 45 }, { landed: false, score: 45 }],
-    ['ils', { landed: true, onRunway: true }, { landed: true, onRunway: false }],
-    ['ils', { landed: true, onRunway: true }, { landed: false, onRunway: true }]
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: true, landed: true, onRunway: false }],
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: true, landed: false, onRunway: true }],
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: false, landed: true, onRunway: true }]
   ];
   for (const [id, ok, ko] of cases) {
     test(id + ': ' + JSON.stringify(ok) + ' passa, ' + JSON.stringify(ko) + ' falla', () => {
@@ -196,7 +197,8 @@ describe('recordLessonAttempt', () => {
   test('no toca graduated', () => {
     const all = LESSONS.map(l => l.id);
     const r = recordLessonAttempt(school({ lessonsPassed: all.slice(0, -1) }), 'ils',
-      { landed: true, onRunway: true });
+      { ilsFlown: true, landed: true, onRunway: true });
+    assert.equal(r.passed, true);
     assert.equal(r.school.graduated, false);
     const g = recordLessonAttempt(school({ graduated: true }), 'exterior', { viewsVisited: 0 });
     assert.equal(g.school.graduated, true);
