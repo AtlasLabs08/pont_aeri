@@ -228,18 +228,29 @@ describe('llico 3: taxiPath, cami per les calles de rodatge fins a la rodona', (
   });
 });
 
-describe('llico takeoff: maxAltFt es AGL i gearUp', () => {
-  test('agafa l AGL de la instantania, no el MSL', () => {
+describe('llico takeoff: maxAltFt es MSL, com l altimetre, i gearUp', () => {
+  test('agafa l altitud MSL de la instantania, no l AGL', () => {
     const run = new LessonRun('takeoff');
-    run.sample(snap({ onGround: false, aglFt: 3000, gearDown: false }));
+    run.sample(snap({ onGround: false, altFt: 3000, aglFt: 2983, gearDown: false }));
     const facts = run.finish(record({ maxAltFt: 9999 }));
     assert.equal(facts.maxAltFt, 3000);
     assert.equal(passed('takeoff', facts), true);
   });
 
+  test('arrodonit a 10 ft com l altimetre: quan l altimetre diu 3000 aprova', () => {
+    const run = new LessonRun('takeoff');
+    run.sample(snap({ onGround: false, altFt: 2995, aglFt: 2978, gearDown: false }));
+    assert.equal(run.facts.maxAltFt, 3000);
+    assert.equal(run.readyToEnd(), true);
+    const low = new LessonRun('takeoff');
+    low.sample(snap({ onGround: false, altFt: 2994, aglFt: 2977, gearDown: false }));
+    assert.equal(low.facts.maxAltFt, 2990);
+    assert.equal(low.readyToEnd(), false);
+  });
+
   test('gear avall no compleix gearUp', () => {
     const run = new LessonRun('takeoff');
-    run.sample(snap({ onGround: false, aglFt: 3000, gearDown: true }));
+    run.sample(snap({ onGround: false, altFt: 3000, aglFt: 2983, gearDown: true }));
     assert.equal(run.readyToEnd(), false);
   });
 });
@@ -732,7 +743,7 @@ describe('llico 3 (taxi): l instructor explica com es roda', () => {
   });
 });
 
-describe('llico 4 (takeoff): comandaments de vol i altura AGL', () => {
+describe('llico 4 (takeoff): comandaments de vol i altitud MSL', () => {
   test('l instructor explica WASD i recorda Q/E, amb les tecles de CONTROL_KEYS', () => {
     const tips = new LessonRun('takeoff').tips();
     assert.deepEqual(tips, [
@@ -747,23 +758,23 @@ describe('llico 4 (takeoff): comandaments de vol i altura AGL', () => {
     setLang('en');
   });
 
-  test('el comptador d altura compta AGL (D4) i l etiqueta ho diu', () => {
+  test('el comptador compta MSL, el mateix numero que l altimetre (D4 canviada), i l etiqueta diu ft', () => {
     const run = new LessonRun('takeoff');
     run.sample(snap({ altFt: 1017, aglFt: 1000 }));
-    const [height] = run.objectives();
-    assert.equal(height.params.value, 1000);
+    const [alt] = run.objectives();
+    assert.equal(alt.params.value, 1020);                  // altimetre: Math.round(1017 / 10) * 10
     setLang('en');
-    assert.equal(messageText({ key: height.labelKey, params: height.params }), 'Height: 1,000 of 3,000 ft AGL');
+    assert.equal(messageText({ key: alt.labelKey, params: alt.params }), 'Altitude: 1,020 of 3,000 ft');
     setLang('ca');
-    assert.match(messageText({ key: height.labelKey, params: height.params }), /ft AGL$/);
+    assert.equal(messageText({ key: alt.labelKey, params: alt.params }), 'Altitud: 1.020 de 3.000 ft');
     setLang('en');
   });
 
   test('el comptador es del mateix pas que la instantania, sense retard', () => {
     const run = new LessonRun('takeoff');
-    for (const agl of [100, 200, 300]) {
-      run.sample(snap({ aglFt: agl, altFt: agl + 17 }));
-      assert.equal(run.objectives()[0].params.value, agl);
+    for (const alt of [120, 220, 320]) {
+      run.sample(snap({ altFt: alt, aglFt: alt - 17 }));
+      assert.equal(run.objectives()[0].params.value, alt);
     }
   });
 });

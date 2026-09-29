@@ -67,7 +67,7 @@ export default {
   'school.objective.viewsVisited': 'Vistes visitades: {value}/{target}',
   'school.objective.controlsIdentified': 'Comandaments identificats: {value}/{target}',
   'school.objective.reachedThreshold': 'Al llindar de la pista',
-  'school.objective.maxAltFt': 'Alçada: {value} de {target} ft AGL',
+  'school.objective.maxAltFt': 'Altitud: {value} de {target} ft',
   'school.objective.gearUp': 'Tren amunt després d\'enlairar-te',
   'school.objective.altDeviationMaxFt': 'Desviació d\'altitud: {value} ft (màx. {target} ft)',
   'school.objective.headingChangeDeg': 'Virat: {value}° de {target}°',

@@ -72,7 +72,9 @@
  *   run.finish(record) -> facts   tanca l intent (si no ho estava ja) i
  *     retorna els fets combinats: factsFromRecord(record) mes els fets en
  *     viu, que guanyen en cas de xoc de clau (per exemple maxAltFt de la
- *     llico 4, en AGL, substitueix el del FlightRecord, que es en MSL)
+ *     llico 4: MSL, com el del FlightRecord, pero arrodonit a 10 ft com
+ *     l altimetre del HUD, perque el jugador vegi el mateix numero a la
+ *     llista i a l altimetre; docs/DECISIONS.md, 29/09/2026, D4 canviada)
  *   run.instructorMessage() -> { key, params, tParams? }   text mentre
  *     l intent es en marxa: l objectiu de la llico, o a la llico 'cockpit'
  *     quin comandament toca provar (params.control = nom, params.key =
@@ -130,6 +132,8 @@ import { t, fmtNumber } from '../i18n/index.js';
 import { taxiRoute, nearestOnPolyline } from '../world/index.js';
 
 const SECONDS_PER_MINUTE = 60;
+/** l altimetre del HUD (index.html) arrodoneix l altitud MSL a 10 ft */
+const ALTIMETER_STEP_FT = 10;
 
 function lessonById(lessonId) {
   const lesson = LESSONS.find(l => l.id === lessonId);
@@ -351,7 +355,9 @@ export class LessonRun {
       }
       case 'takeoff': {
         if (!snap.onGround) {
-          if (snap.aglFt > this.facts.maxAltFt) this.facts.maxAltFt = snap.aglFt;
+          // MSL arrodonit com l altimetre del HUD: el jugador veu el mateix numero a tot arreu (D4, 29/09/2026)
+          const alt = Math.round(snap.altFt / ALTIMETER_STEP_FT) * ALTIMETER_STEP_FT;
+          if (alt > this.facts.maxAltFt) this.facts.maxAltFt = alt;
           if (!snap.gearDown) this.facts.gearUp = true;
         }
         break;

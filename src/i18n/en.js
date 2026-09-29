@@ -70,7 +70,7 @@ export default {
   'school.objective.viewsVisited': 'Views visited: {value}/{target}',
   'school.objective.controlsIdentified': 'Controls identified: {value}/{target}',
   'school.objective.reachedThreshold': 'At the runway threshold',
-  'school.objective.maxAltFt': 'Height: {value} of {target} ft AGL',
+  'school.objective.maxAltFt': 'Altitude: {value} of {target} ft',
   'school.objective.gearUp': 'Gear up after takeoff',
   'school.objective.altDeviationMaxFt': 'Altitude deviation: {value} ft (max {target} ft)',
   'school.objective.headingChangeDeg': 'Turned: {value}° of {target}°',
