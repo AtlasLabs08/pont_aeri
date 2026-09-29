@@ -640,10 +640,10 @@ describe('tips: explicacions de l instructor', () => {
     assert.deepEqual(tips, [{ key: 'school.tip.cameraDrag', params: { reset: keyLabel(CONTROL_KEYS.cameraReset[0]) } }]);
     setLang('en');
     assert.equal(messageText(tips[0]),
-      'Outside views: hold the right mouse button and drag to turn the camera. Home puts it back to the default angle.');
+      'Outside views: hold the right mouse button and drag to turn the camera. Double-click the right button to put it back to the default angle (Home does it too).');
     setLang('ca');
     assert.equal(messageText(tips[0]),
-      "Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. Home la torna a l'angle per defecte.");
+      "Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. Fes doble clic amb el botó dret per tornar-la a l'angle per defecte (també amb Home).");
     setLang('en');
   });
 

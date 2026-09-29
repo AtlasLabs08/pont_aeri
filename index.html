@@ -1860,13 +1860,17 @@ const Cockpit = {
    ============================================================================ */
 const Input = {
   keys: {}, pitch: 0, roll: 0, yaw: 0, mouseYoke: false, mx: 0, my: 0, rmb: false, lookDX: 0, lookDY: 0, wheel: 0,
+  // doble clic amb el boto dret: el navegador no dona dblclick del boto dret, es mesura aqui (docs/DECISIONS.md, 29/09/2026)
+  RMB_DOUBLE_MS: 400, rmbAt: -Infinity,
   init(canvas) {
     window.addEventListener('keydown', e => { if (Game.state === 'menu' && e.code !== 'Escape') return; if ( ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault(); if (e.key === '-') this.keys.MinusChar = true; if (e.key === '+') this.keys.PlusChar = true;      // layout independent (Spanish, US, ...)
       if (!e.repeat) { this.keys[e.code] = true; Game.onKey(e.code); } else this.keys[e.code] = true; });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; if (e.key === '-' || e.key === '_' || e.code === 'Slash' || e.code === 'Minus') this.keys.MinusChar = false; if (e.key === '+' || e.key === '*' || e.code === 'BracketRight' || e.code === 'Equal') this.keys.PlusChar = false; });
     window.addEventListener('blur', () => { this.keys = {}; this.rmb = false; });
     canvas.addEventListener('mousemove', e => { this.mx = e.clientX / window.innerWidth * 2 - 1; this.my = -(e.clientY / window.innerHeight * 2 - 1); if (this.rmb) { this.lookDX += e.movementX; this.lookDY += e.movementY; } });
-    canvas.addEventListener('mousedown', e => { if (e.button === 2) this.rmb = true; if (e.button === 0) Game.onClick(this.mx, this.my, e.shiftKey); });
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 2) { this.rmb = true; if (e.timeStamp - this.rmbAt < this.RMB_DOUBLE_MS) { this.rmbAt = -Infinity; Game.resetCamera(); } else this.rmbAt = e.timeStamp; }
+      if (e.button === 0) Game.onClick(this.mx, this.my, e.shiftKey); });
     window.addEventListener('mouseup', e => { if (e.button === 2) this.rmb = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     canvas.addEventListener('wheel', e => { e.preventDefault(); Game.onWheel(Math.sign(e.deltaY), this.mx, this.my); }, { passive: false });
@@ -2109,6 +2113,8 @@ const Game = {
   msg(t, secs) { UI.toast(t, secs); },
   /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
   destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.activeEnd); },
+  /** camera a l angle per defecte: tecla Home o doble clic amb el boto dret (Input) */
+  resetCamera() { if (this.state !== 'flying') return; Cameras.resetView(this.fdm); this.msg(t('camera.reset')); },
   onKey(code) {
     const c = this.ctl, f = this.fdm;
     if (this.state === 'replay') { if (code === 'KeyC') { this.rp.manualCam = true; Cameras.mode = Cameras.mode === 'tower' ? 'chase' : 'tower'; } else if (code === 'Escape' || code === 'Space' || code === 'Enter') this.stopReplay(); return; }
@@ -2117,7 +2123,7 @@ const Game = {
     // escola, llico 'cockpit': identificar el comandament compta en premer la tecla, abans de
     // qualsevol comprovacio que impedeixi l accio (tren a terra, inversors en vol)
     if (currentLesson()) currentLesson().onKey(code);
-    if (CONTROL_KEYS.cameraReset.includes(code)) { Cameras.resetView(f); this.msg(t('camera.reset')); return; }
+    if (CONTROL_KEYS.cameraReset.includes(code)) { this.resetCamera(); return; }
     switch (code) {
       case 'KeyF': c.flaps = Math.min(f.cfg.flaps.length - 1, c.flaps + 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;
       case 'KeyV': c.flaps = Math.max(0, c.flaps - 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;

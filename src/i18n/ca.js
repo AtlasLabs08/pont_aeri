@@ -82,7 +82,7 @@ export default {
   'school.objective.landed': 'Aterrar',
   'school.objective.score': 'Nota: {value} (mín. {target})',
   'school.objective.onRunway': 'Dins de la pista',
-  'school.tip.cameraDrag': 'Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. {reset} la torna a l\'angle per defecte.',
+  'school.tip.cameraDrag': 'Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. Fes doble clic amb el botó dret per tornar-la a l\'angle per defecte (també amb {reset}).',
   'school.tip.taxi': 'Rodatge: {left} i {right} giren la roda de morro, {more} dona potència i {less} en treu, mantén {brake} per frenar. {park} posa o treu el fre d\'aparcament.',
   'school.tip.flight': 'En vol: {down} baixa el morro i {up} l\'aixeca, {left} inclina a l\'esquerra i {right} a la dreta.',
   'school.tip.rudder': 'Recorda: {left} i {right} giren la roda de morro a terra i mouen el timó de direcció en vol.',

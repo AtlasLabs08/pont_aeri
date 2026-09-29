@@ -85,7 +85,7 @@ export default {
   'school.objective.landed': 'Land',
   'school.objective.score': 'Score: {value} (min {target})',
   'school.objective.onRunway': 'On the runway',
-  'school.tip.cameraDrag': 'Outside views: hold the right mouse button and drag to turn the camera. {reset} puts it back to the default angle.',
+  'school.tip.cameraDrag': 'Outside views: hold the right mouse button and drag to turn the camera. Double-click the right button to put it back to the default angle ({reset} does it too).',
   'school.tip.taxi': 'Taxiing: {left} and {right} steer the nosewheel, {more} adds power and {less} takes it off, hold {brake} to brake. {park} sets or releases the parking brake.',
   'school.tip.flight': 'In flight: {down} lowers the nose and {up} raises it, {left} banks left and {right} banks right.',
   'school.tip.rudder': 'Remember: {left} and {right} steer the nosewheel on the ground and move the rudder in the air.',

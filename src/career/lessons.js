@@ -76,7 +76,9 @@ export const SCHOOL_PASS = 'schoolPass';
  * Input i Game.onKey (index.html). El primer codi es el que anomena
  * l instructor. cameraReset torna la camera a l angle per defecte
  * (docs/DECISIONS.md, 29/09/2026): Home, l unica tecla que no fa servir cap
- * altre comandament. */
+ * altre comandament. El mateix fa un doble clic amb el boto dret (Input a
+ * index.html), que es el que ensenya l instructor a la llico 1; Home queda
+ * com a alternativa. */
 export const CONTROL_KEYS = {
   flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
   throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
