@@ -393,3 +393,72 @@ tools/estabilitat.mjs (taules a la descripcio del PR).
 - Observacio, sense canvi: el X-90 fa un 40 % mes de velocitat de balanceig per
   unitat d aleto que el M-200 (envergadura curta). Es potencia de control, no
   estabilitat; si en Marc el troba massa viu, es Clda.
+
+## 2026-09-29 - Fisica: Mi-9 docil en capcineig, tren amb massa real i informe d aterratge
+
+Seguiment del PR #24. Mesures abans i despres amb tools/estabilitat.mjs
+(taules a la descripcio del PR).
+
+- Mi-9, criteri de joc: es l avio de l escola i ha de ser el turbohelix mes
+  docil en donar o treure molta potencia de cop, no un de la mitjana. Criteri
+  mesurat: en el pas de ralenti a maxima i de maxima a ralenti (planeig o
+  pujada trimats a 1,6 Vs neta, 5.000 ft, massa tipica, comandament i trim
+  quiets, 60 s), el Mi-9 te l excés de capcineig i la desviacio d altitud mes
+  baixos dels tres turbohelix (G-72, G-42 i Mi-9), en els dos sentits.
+  test/fisica.test.js ho comprova directament; les files phugPitch i phugAlt
+  del harness en guarden el rang per avio.
+- Metrica respecte de l equilibri final, no de l estat inicial: amb la
+  palanca nova i el mateix trim l avio acaba en un altre vol estabilitzat
+  (una altra actitud i una altra velocitat vertical), i arribar-hi es la
+  resposta que toca, no un defecte. Harness.equilibrium resol aquest vol
+  estabilitzat (alfa, TAS i trajectoria) i Harness.powerResponse mesura:
+  excés de capcineig (el que el morro es mou en sentit contrari abans
+  d arribar a l actitud d equilibri i, a partir d aleshores, la desviacio
+  maxima respecte d ella) i desviacio d altitud respecte de la trajectoria
+  d equilibri des que la velocitat vertical hi arriba per primer cop.
+  Comparades amb l estat inicial, el Mi-9 sortia pitjor nomes perque te mes
+  relacio potencia/pes (232 W/kg, G-72 177): puja amb mes angle a tota
+  potencia.
+- Les sobreoscil.lacions i el temps d assentament queden a la taula nomes com
+  a informacio, no com a criteri. Cap avio no s apaga en 60 s: la fugoide te
+  un esmorteiment de 0,04 a 0,07 als turbohelix (el M-200 a tota potencia es
+  lleugerament divergent, uns -0,02) i un periode de 35 a 45 s. El nombre de
+  sobreoscil.lacions en 60 s depen sobretot del periode, no de l esmorteiment:
+  el Mi-9 vola la prova mes lent (154 kt, G-72 171) i, amb un periode mes
+  curt, li cap una sortida mes de +-1 grau dins la finestra, encara que siguin
+  mes petites. No s ha tocat la fugoide de cap avio.
+- Causa i canvi: la linia d empenta del Mi-9 era 0,75 m per sobre del CG.
+  Amb el trim fix, el moment de l empenta canviava l alfa d equilibri uns
+  3 graus i, amb ella, la velocitat i la trajectoria, i excitava la fugoide.
+  Cmq no hi fa gairebe res (amb -60, irrealista, menys d 1 grau). Camp nou
+  engines.thrustPos, nomes de fisica: el punt on actua l empenta. Per defecte
+  es engines.pos, i index.html continua dibuixant les gondoles amb pos (la
+  geometria 3D no canvia). Al Mi-9, 0,1 m per sobre del CG: la linia
+  d empenta quasi pel CG, com l ajustaria el fabricant d un avio d escola.
+  Excés de capcineig 15,5/15,7 -> 12,2/10,5 graus (G-72 13,1/13,2, G-42
+  14,7/15,5) i desviacio d altitud 1.163/683 -> 790/626 ft (G-72 1.180/736,
+  G-42 1.101/689). El valor es el minim de l escombrat entre -0,75 i +0,2 m.
+  Ara, en els primers 10 s amb tota la potencia, el Mi-9 aixeca el morro
+  7,4 graus en lloc d abaixar-lo 8,9 (fila powerPitch, dins de [6,5, 9,5]).
+- Tren: l amortidor d extensio (GEAR_REBOUND_ZETA) es dimensionava un sol
+  cop amb la massa tipica. La massa aparent de cada pota es proporcional a la
+  massa, aixi que el coeficient s escala amb sqrt(massa / massa tipica)
+  (FlightModel.reboundCoef) i la zeta es 2,5 buit o carregat (abans, un avio
+  buit quedava a uns 3,1). Files noves al harness: contacte a 400 fpm a la
+  massa maxima d aterratge i a la minima, i contacte a 800 fpm (rebots [0, 0]
+  i assentament [0, 2] s: amb GEAR_REBOUND_ZETA = 0 fallen).
+- Informe d aterratge (preventiu, no reproduit): despres de dos bots, en
+  Marc no va veure ni l informe ni la pantalla d accident. Dues vies possibles:
+  (1) el model nomes emet 'touchdown' si les principals toquen amb
+  airTime > 2, i airTime torna a 0 despres de 0,5 s amb qualsevol roda a
+  terra: si el morro toca primer i s hi queda, no hi ha informe; (2) una
+  excepcio a Game.onTouchdown (candidat Sound.touchdown, WebAudio) deixava
+  f.events sense buidar i es tornava a llancar a cada pas. core/landing-watch.js
+  registra l aterratge amb qualsevol ordre de contacte i, com a xarxa de
+  seguretat, el tanca a terra per sota de 35 kt; nomes actua sense informe
+  obert ni accident, aixi que els aterratges normals no canvien. Cada
+  esdeveniment es processa dins un try amb console.error, perque si torna a
+  passar es vegi a la consola.
+- Sense canvi: els rebots que el model compta pero Game no (un contacte de
+  mes de 0,5 s i un bot de menys de 2 s en l aire) es queden, perque
+  canviarien les notes. Vegeu la descripcio del PR.
