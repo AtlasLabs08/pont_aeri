@@ -95,12 +95,15 @@ export class FlightModel {
     // a linear damper on its total extension rate, sized as a fraction of critical for the leg's static stiffness (tyre in series
     // with the air spring) and the mass the aircraft presents at that leg: pitching about the mains for the nose leg, about the
     // nose leg for the mains. The nose leg carries ~10 % of the weight but must stop the whole pitch inertia, hence mApp.
+    // cReb is sized here at the typical mass; mApp is proportional to the mass (Iyy scales with it), so step() multiplies it
+    // by sqrt(mass / typical) and the fraction of critical stays GEAR_REBOUND_ZETA with any fuel and payload.
     const Iyy = this.cfg.inertia.Iyy * m / this.cfg.inertia.refMass, xn = g.nose.x, L2 = (xn - xm) * (xn - xm);
     for (const leg of this.legs) {
       const load = leg.F0 / 0.08, kAir = 1.3 * load / (leg.dg - leg.soS), k = leg.kt * kAir / (leg.kt + kAir);
       const mApp = leg.nose ? (Iyy + m * xm * xm) / L2 : (Iyy + m * xn * xn) / L2 / g.mains.length;
       leg.cReb = 2 * GEAR_REBOUND_ZETA * Math.sqrt(k * mApp);
     }
+    this.gearMass = m;
     // structural contact points
     const ct = this.cfg.contact, P = [];
     P.push({ n: 'wing', p: ct.wingtip }, { n: 'wing', p: [ct.wingtip[0], -ct.wingtip[1], ct.wingtip[2]] });
@@ -334,6 +337,7 @@ export class FlightModel {
       const steerMax = lerp(c.gear.steerMax, 6 * DEG, smoothstep(4, 22, gsMs));
       this.steer = approach(this.steer, clamp(ctl.steer !== undefined ? ctl.steer : ctl.yaw, -1, 1) * steerMax, 1.2 * dt);
       let fl = Math.hypot(r11, r21); const fwdN = r11 / fl, fwdE = r21 / fl;          // wheel heading on the ground plane
+      const rebK = Math.sqrt(m / this.gearMass);                                       // rebound damping at the actual mass
       for (const leg of this.legs) {
         leg.load = 0;
         if (!gearOk) { leg.comp = 0; continue; }
@@ -356,7 +360,7 @@ export class FlightModel {
         const vo = (so - leg.so) / dt; leg.so = so; leg.soDot = vo;
         const dTire = comp - leg.so;
         let N = leg.kt * dTire + leg.ct * (compRate - vo);
-        if (compRate < 0) N += leg.cReb * compRate;                                          // rebound damping (extension only)
+        if (compRate < 0) N += leg.cReb * rebK * compRate;                                   // rebound damping (extension only)
         if (dTire > leg.tireMax) N += 6 * leg.kt * (dTire - leg.tireMax);                   // rim / bottoming
         if (N <= 0) { leg.comp = comp; continue; }
         leg.comp = comp; leg.load = N;
