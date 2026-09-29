@@ -27,7 +27,8 @@ test('core exporta el que ha d exportar', () => {
 });
 
 test('world exporta el que ha d exportar', () => {
-  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm']) {
+  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm', 'thresholdDistNm', 'destinationEnd',
+    'buildTaxiGraph', 'taxiRoute', 'nearestOnPolyline']) {
     assert.ok(name in world, `falta l export: ${name}`);
   }
 });
@@ -36,7 +37,9 @@ test('app exporta el que ha d exportar', () => {
   for (const name of [
     'TOPICS', 'on', 'off', 'emit',
     'setFlightLauncher', 'launchFlight', 'onFlightFinished', 'cancelFlight', 'isFlightInProgress',
-    'CAREER_KEY', 'loadCareer', 'saveCareer', 'backupCareer', 'discardCareer'
+    'CAREER_KEY', 'loadCareer', 'saveCareer', 'backupCareer', 'discardCareer',
+    'LessonRun', 'lessonGoalParams', 'attemptMessage',
+    'debriefRows', 'BOUNCE_PENALTY_PTS', 'TAIL_STRIKE_PENALTY_PTS'
   ]) {
     assert.ok(name in app, `falta l export: ${name}`);
   }

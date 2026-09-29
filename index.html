@@ -129,7 +129,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
    ============================================================================ */
 
 import {
-  AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FlightModel,
+  AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FT, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
   sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder
@@ -137,11 +137,17 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
 import { t } from './src/i18n/index.js';
+import { LESSONS, CONTROL_KEYS, isLessonAvailable, recordLessonAttempt } from './src/career/index.js';
+import {
+  lessonGoalParams, attemptMessage, messageText, debriefRows,
+  setFlightLauncher, onFlightFinished, cancelFlight,
+  startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson
+} from './src/app/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -1646,7 +1652,7 @@ const Instruments = {
     if (nav.gsValid) { const gx = cx + 116; c.strokeStyle = K.white; c.lineWidth = 2; for (const k of [-2, -1, 1, 2]) dot(gx, cy + k * D); c.fillStyle = K.white; c.fillRect(gx - 9, cy - 1, 18, 2);
       dia(gx, cy + clamp(nav.gsDots, -2.3, 2.3) * D, 8, 11, Math.abs(nav.gsDots) > 2.3); }
     this.font(c, 15, true); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = K.mag; c.fillText(nav.ident, 6, 452);
-    this.font(c, 14); c.fillStyle = K.white; c.fillText('CRS ' + ('00' + Math.round(nav.en.hdg)).slice(-3), 6, 472); c.fillText(nav.dme.toFixed(1) + ' NM', 6, 492);
+    this.font(c, 14); c.fillStyle = K.white; c.fillText('CRS ' + ('00' + Math.round(nav.en.hdg)).slice(-3), 6, 472); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', 6, 492);
   },
 
   drawND(c, S) {
@@ -1684,8 +1690,9 @@ const Instruments = {
     const wd = S.wind || { dir: 0, kt: 0 }; c.fillStyle = K.green; c.fillText(wd.kt > 0.5 ? ('00' + Math.round(wd.dir)).slice(-3) + '/' + Math.round(wd.kt) : 'CALM', 10, 38);
     if (wd.kt > 0.5) { c.save(); c.translate(100, 38); c.rotate((wd.dir + 180) * DEG - o.psi); c.strokeStyle = K.green; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 10); c.lineTo(0, -10); c.lineTo(-4, -4); c.moveTo(0, -10); c.lineTo(4, -4); c.stroke(); c.restore(); }
     c.fillStyle = K.white; c.textAlign = 'center'; c.fillText('HDG ' + ('00' + Math.round(wrap360(o.hdg)) % 360).slice(-3) + '  MAG', 256, 16);
-    if (S.dest) { const d = Math.hypot(S.dest.e - f.e, S.dest.n - f.n) / NM, eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.dest.icao, 502, 16); c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 502, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 502, 56);
-      const brg = wrap360(Math.atan2(S.dest.e - f.e, S.dest.n - f.n) * RAD); c.fillStyle = K.cyan; c.fillText('BRG ' + ('00' + Math.round(brg)).slice(-3), 502, 76); }
+    // destinacio: fins al capcal de la pista (world/ils.js, thresholdDistNm), com la resta de vistes
+    if (S.dest) { const en = Game.destEnd(S.dest), T = S.dest.toWorld(en.thr[0], en.thr[1]), d = thresholdDistNm(S.dest, en, f.e, f.n), eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.dest.icao, 502, 16); c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 502, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 502, 56);
+      const brg = wrap360(Math.atan2(T[0] - f.e, T[1] - f.n) * RAD); c.fillStyle = K.cyan; c.fillText('BRG ' + ('00' + Math.round(brg)).slice(-3), 502, 76); }
     c.textAlign = 'left'; c.fillStyle = K.cyan; c.fillText('RNG ' + rng, 10, 498); c.fillStyle = '#8a8f98'; c.fillText(rng / 2, cx + 6, cy - R / 2 - 8);
   },
 
@@ -1853,13 +1860,17 @@ const Cockpit = {
    ============================================================================ */
 const Input = {
   keys: {}, pitch: 0, roll: 0, yaw: 0, mouseYoke: false, mx: 0, my: 0, rmb: false, lookDX: 0, lookDY: 0, wheel: 0,
+  // doble clic amb el boto dret: el navegador no dona dblclick del boto dret, es mesura aqui (docs/DECISIONS.md, 29/09/2026)
+  RMB_DOUBLE_MS: 400, rmbAt: -Infinity,
   init(canvas) {
     window.addEventListener('keydown', e => { if (Game.state === 'menu' && e.code !== 'Escape') return; if ( ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault(); if (e.key === '-') this.keys.MinusChar = true; if (e.key === '+') this.keys.PlusChar = true;      // layout independent (Spanish, US, ...)
       if (!e.repeat) { this.keys[e.code] = true; Game.onKey(e.code); } else this.keys[e.code] = true; });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; if (e.key === '-' || e.key === '_' || e.code === 'Slash' || e.code === 'Minus') this.keys.MinusChar = false; if (e.key === '+' || e.key === '*' || e.code === 'BracketRight' || e.code === 'Equal') this.keys.PlusChar = false; });
     window.addEventListener('blur', () => { this.keys = {}; this.rmb = false; });
     canvas.addEventListener('mousemove', e => { this.mx = e.clientX / window.innerWidth * 2 - 1; this.my = -(e.clientY / window.innerHeight * 2 - 1); if (this.rmb) { this.lookDX += e.movementX; this.lookDY += e.movementY; } });
-    canvas.addEventListener('mousedown', e => { if (e.button === 2) this.rmb = true; if (e.button === 0) Game.onClick(this.mx, this.my, e.shiftKey); });
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 2) { this.rmb = true; if (e.timeStamp - this.rmbAt < this.RMB_DOUBLE_MS) { this.rmbAt = -Infinity; Game.resetCamera(); } else this.rmbAt = e.timeStamp; }
+      if (e.button === 0) Game.onClick(this.mx, this.my, e.shiftKey); });
     window.addEventListener('mouseup', e => { if (e.button === 2) this.rmb = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     canvas.addEventListener('wheel', e => { e.preventDefault(); Game.onWheel(Math.sign(e.deltaY), this.mx, this.my); }, { passive: false });
@@ -1879,6 +1890,7 @@ const Input = {
     // The levers stop in the CLB detent; release the key and press again to go through it (to TOGA or toward idle).
     const dir = (K.down('ShiftLeft', 'ShiftRight', 'NumpadAdd') || K.keys.PlusChar ? 1 : 0) - (K.down('NumpadSubtract') || K.keys.MinusChar ? 1 : 0);
     if (dir !== this.lastDir) this.detHold = false; this.lastDir = dir;
+    if (dir !== 0 && currentLesson()) currentLesson().onCommand('throttle');
     if (dir !== 0 && !this.detHold) {
       const prev = ctl.throttle; let next = clamp(prev + dir * 0.38 * dt, 0, 1);
       if (!ctl.reverse && ((prev < THR_CLB && next >= THR_CLB) || (prev > THR_CLB && next <= THR_CLB))) { next = THR_CLB; this.detHold = true; Game.msg('Thrust levers in the CLB detent'); }
@@ -1897,6 +1909,8 @@ const Cameras = {
   modes: ['cockpit', 'chase', 'orbit', 'tower'], mode: 'chase', headYaw: 0, headPitch: -0.06, fov: 60, orbYaw: 2.4, orbPitch: 0.18, dist: 1, chaseYaw: 0, towerFov: 20, fwd: [0, 0, -1],
   _q: null, _v: null,
   cycle() { this.mode = this.modes[(this.modes.indexOf(this.mode) + 1) % this.modes.length]; this.headYaw = 0; this.headPitch = -0.06; this.fov = 60; },
+  /** CONTROL_KEYS.cameraReset (lessons.js): la camera torna a l angle i la distancia per defecte, en qualsevol vista i a Free Flight */
+  resetView(fdm) { this.headYaw = 0; this.headPitch = -0.06; this.fov = 60; this.orbYaw = 2.4; this.orbPitch = 0.18; this.dist = 1; this.towerFov = 20; this.chaseYaw = fdm.out.psi; },
   update(dt, fdm, mdl) {
     const T = THREE, cam = R3.camera, o = fdm.out, cfg = fdm.cfg, L = cfg.model.length;
     const q = this._q || (this._q = new T.Quaternion()), v = this._v || (this._v = new T.Vector3()), qh = this._qh || (this._qh = new T.Quaternion()), eu = this._e || (this._e = new T.Euler(0, 0, 0, 'YXZ'));
@@ -1944,6 +1958,96 @@ const Cameras = {
      'Runway excursion'  -> excursion      'Fuselage impact'   -> fuselage
      'Gear-up landing'   -> gearUp         'Hard impact'       -> hardImpact */
 const Recorder = new FlightRecorder();
+/* Escola de vol (tasca C3 d ENGINEERING.md). school nomes viu en memoria
+ * (D2, docs/DECISIONS.md 27/09/2026): no es desa ni es carrega enlloc.
+ * currentLesson() (app/lesson-session.js) es la LessonRun de l intent en marxa,
+ * o null fora de l escola. */
+let school = { lessonsPassed: [], attempts: {}, graduated: false };
+/** instantania plana per a app/lesson-run.js: vegeu la capcalera del fitxer */
+function lessonSnapshot() {
+  const f = Game.fdm, o = f.out, c = Game.ctl, nav = Game.nav, cfg = f.cfg;
+  return {
+    replay: false, dt: PHYS_DT, altFt: o.altFt, aglFt: o.aglFt, hdgDeg: o.hdg,
+    iasKt: o.ias, gsKt: o.gs, vsFpm: o.vsFpm, onGround: f.wow,
+    gearDown: c.gearDown, flapsLanding: c.flaps === cfg.flapLDG,
+    vrefKt: f.vspeeds().vref,
+    distThrNm: nav ? nav.distThr : null,
+    distToThrM: nav ? Math.max(0, -nav.s) : null,
+    latOffsetM: nav ? nav.t : null,
+    rwyHdgDeg: nav ? nav.en.hdg : null,
+    locDots: nav ? nav.locDots : null,
+    hatFt: nav ? nav.hW / FT : null,
+    gsDots: nav ? nav.gsDots : null,
+    locValid: nav ? nav.locValid : false,
+    gsValid: nav ? nav.gsValid : false,
+    // pista assignada, no la sintonitzada: en vent en cua l ILS agafa el capcal contrari (guia de la llico 'circuit')
+    ...(Game.activeEnd ? (g => ({ asgAlongM: g.s, asgLatM: g.t, asgHdgDeg: Game.activeEnd.hdg }))(ILS.geom(Game.airport, Game.activeEnd, f.e, f.n, f.h)) : {})
+  };
+}
+/** desa l intent que startLesson acaba de tancar amb el FlightRecord de Game (crash o report.shown) */
+function concludeLesson({ lessonId, facts, record, reason }) {
+  const result = recordLessonAttempt(school, lessonId, facts);
+  school = result.school;
+  const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed, reason });
+  UI.toast(messageText(msg), 6);
+  const lesson = LESSONS.find(l => l.id === lessonId);
+  if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record);
+  if (IS_DEV && DevSchoolPanel.el) DevSchoolPanel.render();
+}
+/** treu d opts els camps spawn* de l escola (LESSONS[..].spawn): Game.opts els conserva despres d una llico
+ *  (Object.assign del launcher), i un Free Flight 'final' o la llico seguent no els ha d heretar */
+function dropSpawnOpts(o) { for (const k of Object.keys(o)) if (k.startsWith('spawn')) delete o[k]; }
+/** llanca una llico de l escola (nomes IS_DEV, D1). unlockAll: nomes el boto DEV.
+ * Espill de Best.startFlight(), pero passant per launchFlight() (C2) en comptes
+ * de Game.spawn() directe: aixi el launcher injectat es l unic que hi toca. */
+async function launchLesson(lessonId, unlockAll) {
+  if (!unlockAll && !isLessonAvailable(school, lessonId)) { UI.toast('Lesson not available yet', 3); return; }
+  const lesson = LESSONS.find(l => l.id === lessonId);
+  // exterior a la pista (correccio del PR #22): a la porta, els edificis de la terminal tapaven una camera
+  const start = lesson.id === 'cockpit' || lesson.id === 'taxi' ? 'gate'
+    : lesson.id === 'exterior' || lesson.id === 'takeoff' ? 'runway'
+    : lesson.id === 'maneuvers' ? 'airborne'
+    : lesson.id === 'circuit' ? 'downwind'
+    : 'final';
+  // spawnAglFt/spawnOffsetNm/spawnFlaps: 'airborne', 'downwind' i 'final'; spawnDistNm/spawnInterceptDeg: nomes 'final'
+  // (Game.spawn). Els valors venen de LESSONS[..].spawn a lessons.js, mai escrits aqui.
+  const S = lesson.spawn;
+  const spawnOpts = S
+    ? { spawnAglFt: S.aglFt, spawnOffsetNm: S.offshoreNm ?? S.lateralNm, spawnFlaps: S.flaps, spawnDistNm: S.distNm, spawnInterceptDeg: S.interceptDeg }
+    : {};
+  Sound.unlock(); UI.showMenu(false); Game.state = 'loading'; UI.loading(0.5, 'Preparing the lesson');
+  const lessonDone = startLesson(lessonId, { aircraft: lesson.aircraftTypeId, airport: 'LEBL', runway: 0, start,
+    hours: 11.5, windDir: 250, windKt: 0, turb: false, mode: 'free',
+    quality: Game.opts.quality, difficulty: 'normal', autoTrim: true, ...spawnOpts });
+  await Main.preloadTerrain();
+  UI.loading(1); UI.el.report.hidden = true; UI.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
+  lessonDone.then(outcome => { if (outcome) concludeLesson(outcome); }).catch(err => { if (IS_DEV) console.error(err); });
+}
+/* Panell DEV de l escola (D1, docs/DECISIONS.md 27/09/2026): fora d i18n,
+ * nomes visible amb IS_DEV. El boto "unlock all" nomes marca les llicons
+ * com a aprovades a la memoria (school), sense passar per recordLessonAttempt. */
+const DevSchoolPanel = {
+  init() {
+    const el = document.createElement('div');
+    el.id = 'devSchoolPanel';
+    el.style.cssText = 'position:fixed;left:8px;top:32px;z-index:9999;font:12px system-ui;background:rgba(20,20,20,.85);color:#fff;padding:6px 8px;border-radius:6px;max-width:220px';
+    document.body.appendChild(el);
+    this.el = el;
+    this.render();
+  },
+  render() {
+    const rows = LESSONS.map(l => {
+      const available = isLessonAvailable(school, l.id), passed = school.lessonsPassed.includes(l.id);
+      return `<div style="margin:2px 0"><button data-lesson="${l.id}" ${available ? '' : 'disabled'}>${l.id}</button> ${passed ? '✓' : ''}</div>`;
+    }).join('');
+    this.el.innerHTML = '<b>DEV school</b>' + rows + '<div style="margin-top:4px"><button data-unlock="1">unlock all (DEV)</button></div>';
+    this.el.querySelectorAll('button[data-lesson]').forEach(b => b.addEventListener('click', () => launchLesson(b.dataset.lesson, false)));
+    this.el.querySelector('button[data-unlock]').addEventListener('click', () => {
+      school = { ...school, lessonsPassed: LESSONS.map(l => l.id) };
+      this.render();
+    });
+  }
+};
 const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terrain', 'Runway excursion': 'excursion', 'Gear-up landing': 'gearUp',
   'Hard impact': 'hardImpact', 'Wing strike': 'wingStrike', 'Engine pod strike': 'engineStrike', 'Fuselage impact': 'fuselage' };
 
@@ -1964,10 +2068,42 @@ const Game = {
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; Input.pitch = Input.roll = Input.yaw = 0;
     const other = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.dest = O.mode === 'route' ? other : A;
-    if (O.start === 'final') {
-      const d = 10 * NM, thr = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d), alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic;
-      f.reset({}); const v = f.vspeeds(); const tr = trimAircraft(f, { cas: v.vapp * KT, alt, gamma: -3 * DEG, flaps: cfg.flapLDG, gearDown: true, hdg: en.hdg, n: thr[1], e: thr[0] });
-      ctl.flaps = cfg.flapLDG; ctl.trim = tr.trim; ctl.throttle = tr.throttle; ctl.gearDown = true; f.groundSpoilerArmed = true;
+    if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
+      // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
+      // en vol que 'final' (posicionar i trimar amb trimAircraft), amb una altra posicio, altitud,
+      // velocitat i configuracio. Els valors (ft, nm, flaps) venen d opts, que launchLesson() omple
+      // des de LESSONS[..].spawn a lessons.js: cap valor de llico escrit aqui.
+      f.reset({}); const v = f.vspeeds();
+      let pos, alt, hdg, cas, gamma, flaps, gearDown;
+      if (O.start === 'final') {
+        // per defecte (Free Flight): 10 nm, sobre l eix i la senda, configuracio d aterratge. L escola (llicons 7 i 8,
+        // LESSONS[..].spawn) hi pot passar spawnDistNm, i la 8 tambe spawnOffsetNm (a l esquerra de l eix, mateixa
+        // convencio que 'downwind'), spawnInterceptDeg (rumb de pista mes aquests graus, cap a l eix) i spawnAglFt
+        // (anivellat a aquesta altura, per sota de la senda, tren amunt i flaps segons spawnFlaps). Mateix trimAircraft.
+        const d = (O.spawnDistNm ?? 10) * NM, lat = (O.spawnOffsetNm ?? 0) * NM;
+        pos = A.toWorld(en.thr[0] - en.dir[0] * d - en.dir[1] * lat, en.thr[1] - en.dir[1] * d + en.dir[0] * lat);
+        hdg = wrap360(en.hdg + (O.spawnInterceptDeg ?? 0)); cas = v.vapp * KT;
+        if (O.spawnAglFt != null) {
+          alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+        } else {
+          alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+        }
+      } else if (O.start === 'airborne') {
+        // en vol, anivellat, uns spawnOffsetNm mar endins de l aeroport (mateix eix que 'final'),
+        // rumb de la pista, tren amunt, flaps segons opts.spawnFlaps. Sense velocitat de creuer
+        // explicita a aircraft-data.js: es pren el 75% de limits.vmo (vegeu la descripcio del PR).
+        const d = O.spawnOffsetNm * NM; pos = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d);
+        alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; hdg = en.hdg;
+        cas = 0.75 * cfg.limits.vmo * KT; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+      } else {
+        // al travers del llindar (downwind), rumb contrari al de la pista, separacio lateral
+        // spawnOffsetNm cap a l esquerra de la trajectoria (mateixa convencio de signe que ILS.geom)
+        const d = O.spawnOffsetNm * NM; pos = A.toWorld(en.thr[0] - en.dir[1] * d, en.thr[1] + en.dir[0] * d);
+        alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; hdg = wrap360(en.hdg + 180);
+        cas = v.vapp * KT; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
+      }
+      const tr = trimAircraft(f, { cas, alt, gamma, flaps, gearDown, hdg, n: pos[1], e: pos[0] });
+      ctl.flaps = flaps; ctl.trim = tr.trim; ctl.throttle = tr.throttle; ctl.gearDown = gearDown; f.groundSpoilerArmed = O.start === 'final';
     } else {
       let p, hdg; f.reset({});
       if (O.start === 'gate') { const big = cfg.geom.b > 50, g = A.gates.find(q => (q.size === 'H') === big) || A.gates[0]; p = A.toWorld(g.a, g.c); hdg = wrap360(g.hdg); }
@@ -1989,11 +2125,19 @@ const Game = {
     this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
   msg(t, secs) { UI.toast(t, secs); },
+  /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
+  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.activeEnd); },
+  /** camera a l angle per defecte: tecla Home o doble clic amb el boto dret (Input) */
+  resetCamera() { if (this.state !== 'flying') return; Cameras.resetView(this.fdm); this.msg(t('camera.reset')); },
   onKey(code) {
     const c = this.ctl, f = this.fdm;
     if (this.state === 'replay') { if (code === 'KeyC') { this.rp.manualCam = true; Cameras.mode = Cameras.mode === 'tower' ? 'chase' : 'tower'; } else if (code === 'Escape' || code === 'Space' || code === 'Enter') this.stopReplay(); return; }
     if (code === 'Escape') { if (this.state === 'flying') UI.pause(true); else if (this.state === 'paused') UI.pause(false); return; }
     if (this.state !== 'flying') return;
+    // escola, llico 'cockpit': identificar el comandament compta en premer la tecla, abans de
+    // qualsevol comprovacio que impedeixi l accio (tren a terra, inversors en vol)
+    if (currentLesson()) currentLesson().onKey(code);
+    if (CONTROL_KEYS.cameraReset.includes(code)) { this.resetCamera(); return; }
     switch (code) {
       case 'KeyF': c.flaps = Math.min(f.cfg.flaps.length - 1, c.flaps + 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;
       case 'KeyV': c.flaps = Math.max(0, c.flaps - 1); this.msg('Flaps ' + f.cfg.flaps[c.flaps].name); break;
@@ -2008,7 +2152,7 @@ const Game = {
         this.msg(!armed ? 'Approach modes cancelled' : nv ? 'Approach armed on ' + nv + (this.ap.on ? ': the autopilot will capture it' : '. Follow the guidance circle, or J for the autopilot') : 'Approach armed: it captures once you are lined up with an ILS runway', 4); break; }
       case 'KeyO': HUD.on = !HUD.on; this.msg('Head-up display ' + (HUD.on ? 'on' : 'off')); break;
       case 'Digit0': case 'Numpad0': this.msg(Sound.toggleMute() ? 'Sound off' : 'Sound on'); break;
-      case 'KeyC': Cameras.cycle(); this.msg('Camera: ' + Cameras.mode); break;
+      case 'KeyC': Cameras.cycle(); this.msg('Camera: ' + Cameras.mode); if (currentLesson()) currentLesson().onView(Cameras.mode); break;
       case 'KeyM': Input.mouseYoke = !Input.mouseYoke; UI.yoke(Input.mouseYoke); this.msg(Input.mouseYoke ? 'Mouse yoke on' : 'Mouse yoke off'); break;
       case 'KeyH': UI.toggleHelp(); break;
       case 'KeyI': this.debug = !this.debug; UI.showDebug(this.debug); break;
@@ -2056,6 +2200,7 @@ const Game = {
     this.updateGusts(PHYS_DT);
     f.step(PHYS_DT, c, this.env); this.time += PHYS_DT; this.record();
     if (this.state !== 'replay') Recorder.sample(f, c, PHYS_DT);
+    if (currentLesson()) { currentLesson().sample(lessonSnapshot()); if (!this.recordDone && currentLesson().readyToEnd()) this.finishRecord(); }
     const o = f.out, fl = this.flight;
     // avisos que el joc ja mostra (PFD, HUD, memo del motor): un esdeveniment quan s'encenen
     this.warnEvent('stallWarning', o.stallWarn && !f.wow); this.warnEvent('overspeed', Instruments.warnings(this).some(w => /OVERSPEED/.test(w))); this.warnEvent('engineFailure', f.fuelOut);
@@ -2134,11 +2279,15 @@ const Game = {
     const g = R.gNow, pts = { sink: 35 * (1 - smoothstep(180, 650, R.fpm)), g: 15 * (1 - smoothstep(1.5, 2.2, g)), zone: R.onRunway ? 20 * (1 - smoothstep(150, 700, Math.abs(R.tdzDist))) : 0, center: R.onRunway ? 20 * (1 - smoothstep(2, 18, Math.abs(R.center))) : 0, attitude: 10 * (1 - smoothstep(3, 9, Math.abs(R.roll))) * (R.pitch > -0.5 ? 1 : 0.2) };
     let s = pts.sink + pts.g + pts.zone + pts.center + pts.attitude - R.bounces * 8 - (this.tailStrike ? 15 : 0); if (R.onRunway && R.fromThr < 0) s -= 25; s = clamp(Math.round(s), 0, 100);
     const comment = !R.onRunway ? 'That was not a runway. Any landing you can walk away from...' : s >= 92 ? 'Butter. The passengers are still asleep.' : s >= 80 ? 'A very good landing, right in the zone.' : s >= 65 ? 'Solid and safe. A little polish on the flare and centreline.' : s >= 45 ? 'Firm. The cabin crew will have words with you.' : s >= 25 ? 'Rough arrival: check the sink rate and aim for the markers.' : 'Maintenance has been called to inspect the gear.';
-    return { score: s, comment, pts };
+    // ptsMax: els punts maxims de cada component (coeficients d aquesta mateixa formula),
+    // afegit per a app/debrief.js (tasca C4 d ENGINEERING.md): no hi havia cap altre lloc
+    // que els exposes, vegeu la descripcio del PR.
+    return { score: s, comment, pts, ptsMax: { sink: 35, g: 15, zone: 20, center: 20, attitude: 10 } };
   },
-  crashNow(title, detail) { if (this.state !== 'flying' || this.crash) return; Sound.crash(); this.crash = { title, detail }; this.state = 'crashed'; Recorder.crash(CRASH_CAUSE_BY_TITLE[title] || title); this.finishRecord(); UI.showCrash(title, detail); },
-  /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola */
-  finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish({ arrivalMin: null }); if (IS_DEV) console.log('[FlightRecord]', record); },
+  crashNow(title, detail) { if (this.state !== 'flying' || this.crash) return; Sound.crash(); this.crash = { title, detail }; this.state = 'crashed'; Recorder.crash(CRASH_CAUSE_BY_TITLE[title] || title); if (currentLesson()) currentLesson().crash(); this.finishRecord(); UI.showCrash(title, detail); },
+  /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola.
+   * onFlightFinished no fa res si no hi ha cap vol llancat per app/flight.js (Free Flight): C2+C3. */
+  finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish({ arrivalMin: null }); if (IS_DEV) console.log('[FlightRecord]', record); onFlightFinished(record); },
   /** Recorder.event(type) quan un avis existent passa d'apagat a ences */
   warnEvent(type, on) { if (on && !this.warnWas[type]) Recorder.event(type); this.warnWas[type] = on; },
 
@@ -2160,7 +2309,7 @@ const Game = {
    synthetic runway outline sit exactly on the outside world (conformal).
    ============================================================================ */
 const HUD = {
-  on: true, cv: null, c: null, w: 0, h: 0, dpr: 1, drawn: false, _v: null,
+  green: '#63ff9c', on: true, cv: null, c: null, w: 0, h: 0, dpr: 1, drawn: false, _v: null,
   init() { this.cv = document.getElementById('hudcv'); this.c = this.cv.getContext('2d'); this._v = new THREE.Vector3(); },
   size() {
     const d = Math.min(window.devicePixelRatio || 1, 2), w = window.innerWidth, h = window.innerHeight;
@@ -2170,10 +2319,48 @@ const HUD = {
     if (!this.c) return; this.size(); const c = this.c, f = S.fdm, st = Game.state, nav = S.nav;
     const cockpit = Cameras.mode === 'cockpit';
     const box = !cockpit && nav && nav.locValid && !f.wow && nav.distThr < 15 && f.out.aglFt < 6000;
-    const want = st === 'flying' && ((cockpit && this.on) || box);
+    const lesson = st === 'flying' ? currentLesson() : null, mark = lesson && lesson.thresholdMark();   // escola, llico 'taxi'
+    const want = st === 'flying' && ((cockpit && this.on) || box || mark);
     if (!want) { if (this.drawn) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.cv.width, this.cv.height); this.drawn = false; } return; }
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); this.drawn = true;
-    if (cockpit) this.drawHUD(c, S); else this.drawBox(c, S);
+    if (cockpit) { if (this.on) this.drawHUD(c, S); } else if (box) this.drawBox(c, S);
+    if (mark) this.drawTarget(c, mark, f, lesson);
+  },
+  /** escola, llico 'taxi': rodona verda fluorescent a terra al punt objectiu (centre del tram de thresholdMark sobre l eix de la
+   *  pista assignada, Game.activeEnd; radi halfWidthM) i linia discontinua del mateix color des de l avio fins a la rodona pel cami
+   *  de les calles de rodatge (LessonRun.taxiPath, world/taxi.js). Es redibuixa a cada frame, en qualsevol camera */
+  targetGreen: '#39ff14',
+  drawTarget(c, m, f, lesson) {
+    const A = Game.airport, en = Game.activeEnd; if (!A || !en) return;
+    const y = A.elev + 0.3, s = (m.fromM + m.toM) / 2, r = m.halfWidthM, P = A.toWorld(en.thr[0] + en.dir[0] * s, en.thr[1] + en.dir[1] * s);
+    c.save(); c.strokeStyle = this.targetGreen; c.shadowColor = 'rgba(57,255,20,0.7)'; c.shadowBlur = 6; c.lineJoin = 'round'; c.lineCap = 'round';
+    // rodona: un poligon a terra; si una part queda darrere la camera, nomes el contorn visible
+    const ring = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * 2 * Math.PI; ring.push(this.world(P[0] + Math.cos(a) * r, P[1] + Math.sin(a) * r, y)); }
+    c.beginPath(); let pen = false; for (const p of ring) { if (!p) { pen = false; continue; } if (pen) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); pen = true; }
+    if (ring.every(Boolean)) { c.closePath(); c.fillStyle = 'rgba(57,255,20,0.28)'; c.fill(); }
+    c.lineWidth = 3; c.stroke();
+    // linia: de l avio (a terra) fins a la vora de la rodona, pel cami de les calles de rodatge
+    const path = lesson.taxiPath(A, en, A.toLocal(f.e, f.n));
+    if (path) {
+      const W = path.map(p => A.toWorld(p[0], p[1])), inside = q => Math.hypot(q[0] - P[0], q[1] - P[1]) <= r;
+      while (W.length > 1 && inside(W[W.length - 2])) W.pop();
+      if (W.length > 1 && inside(W[W.length - 1])) {      // talla el darrer tram a la vora de la rodona
+        const a = W[W.length - 2], b = W[W.length - 1], ux = b[0] - a[0], uy = b[1] - a[1], px = a[0] - P[0], py = a[1] - P[1];
+        const A2 = ux * ux + uy * uy, B = px * ux + py * uy, C = px * px + py * py - r * r, k = (-B - Math.sqrt(Math.max(0, B * B - A2 * C))) / A2;
+        W[W.length - 1] = [a[0] + ux * k, a[1] + uy * k];
+      }
+      c.setLineDash([12, 9]); c.lineWidth = 2.5;
+      for (let i = 0; i + 1 < W.length; i++) { const seg = this.groundSegment(W[i][0], W[i][1], W[i + 1][0], W[i + 1][1], y); if (seg) this.line(c, seg[0], seg[1]); }
+    }
+    c.restore();
+  },
+  /** extrems en pantalla d un segment a l altura y, retallat davant de la camera (a la cabina l avio queda darrere); null si no se n veu res */
+  groundSegment(e0, n0, e1, n1, y) {
+    const cam = R3.camera, F = Cameras.fwd, depth = (e, n) => (rx(e) - cam.position.x) * F[0] + (y - cam.position.y) * F[1] + (rz(n) - cam.position.z) * F[2];
+    const NEAR = 6, d0 = depth(e0, n0), d1 = depth(e1, n1); if (d0 < NEAR && d1 < NEAR) return null;
+    const cut = (ea, na, da, eb, nb, db) => { const k = (NEAR - da) / (db - da); return [ea + (eb - ea) * k, na + (nb - na) * k]; };
+    if (d0 < NEAR) [e0, n0] = cut(e0, n0, d0, e1, n1, d1); else if (d1 < NEAR) [e1, n1] = cut(e1, n1, d1, e0, n0, d0);
+    const a = this.world(e0, n0, y), b = this.world(e1, n1, y); return a && b ? [a, b] : null;
   },
   /* ---- projection helpers (render axes: x east, y up, z south) ---- */
   dir(dx, dy, dz) {
@@ -2187,11 +2374,17 @@ const HUD = {
     if ((px - cam.position.x) * F[0] + (y - cam.position.y) * F[1] + (pz - cam.position.z) * F[2] < 5) return null;
     const v = this._v.set(px, y, pz).project(cam); return [(v.x + 1) * 0.5 * this.w, (1 - v.y) * 0.5 * this.h];
   },
+  /** screen corners of a stretch of runway on the ground, from s0 to s1 metres past the threshold and w2 metres each side of the centreline */
+  runwayQuad(A, en, s0, s1, w2) {
+    const d = en.dir, pp = [-d[1], d[0]], y = A.elev + 0.3, T = en.thr;
+    const W = (s, t) => { const p = A.toWorld(T[0] + d[0] * s + pp[0] * t, T[1] + d[1] * s + pp[1] * t); return this.world(p[0], p[1], y); };
+    return [W(s0, w2), W(s1, w2), W(s1, -w2), W(s0, -w2)];
+  },
   bodyFwd(f) { const w = f.q0, x = f.q1, y = f.q2, z = f.q3; return [2 * (x * y + w * z), -2 * (x * z - w * y), -(1 - 2 * (y * y + z * z))]; },
   line(c, a, b) { if (!a || !b) return; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); },
 
   drawHUD(c, S) {
-    const f = S.fdm, o = f.out, ap = S.ap, nav = S.nav, G = '#63ff9c', cfg = f.cfg;
+    const f = S.fdm, o = f.out, ap = S.ap, nav = S.nav, G = this.green, cfg = f.cfg;
     const bf = this.bodyFwd(f), B = this.dir(bf[0], bf[1], bf[2]); if (!B) return;
     const F = Cameras.fwd, ang = Math.acos(clamp(bf[0] * F[0] + bf[1] * F[1] + bf[2] * F[2], -1, 1)), alpha = 1 - smoothstep(0.30, 0.55, ang); if (alpha < 0.02) return;
     const ppr = (this.h / 2) / Math.tan(R3.camera.fov * DEG / 2), hw = Math.tan(15 * DEG) * ppr, hh = Math.tan(11 * DEG) * ppr;
@@ -2225,7 +2418,7 @@ const HUD = {
     if (nav && nav.locValid && nav.distThr < 15) { const A = AIRPORTS[nav.apt], en = A && A.allEnds[nav.idx];
       if (en) { const d = en.dir, pp = [-d[1], d[0]], w2 = en.rw.wid / 2, L = en.rw.len, y = A.elev + 0.3, T = en.thr;
         const W = (a, cc) => { const p = A.toWorld(a, cc); return this.world(p[0], p[1], y); };
-        const q = [W(T[0] + pp[0] * w2, T[1] + pp[1] * w2), W(T[0] + d[0] * L + pp[0] * w2, T[1] + d[1] * L + pp[1] * w2), W(T[0] + d[0] * L - pp[0] * w2, T[1] + d[1] * L - pp[1] * w2), W(T[0] - pp[0] * w2, T[1] - pp[1] * w2)];
+        const q = this.runwayQuad(A, en, 0, L, w2);
         if (q.every(Boolean)) { c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke();
           const a1 = W(T[0] + d[0] * 420 + pp[0] * w2 * 0.6, T[1] + d[1] * 420 + pp[1] * w2 * 0.6), a2 = W(T[0] + d[0] * 420 - pp[0] * w2 * 0.6, T[1] + d[1] * 420 - pp[1] * w2 * 0.6); c.lineWidth = 2.4; this.line(c, a1, a2); c.lineWidth = 1.6; }
         for (let k = 1; k <= 18; k++) { const s0 = -k * 300, a = W(T[0] + d[0] * s0, T[1] + d[1] * s0), b = W(T[0] + d[0] * (s0 + 120), T[1] + d[1] * (s0 + 120)); this.line(c, a, b); } } }
@@ -2273,7 +2466,7 @@ const HUD = {
       const dia = (x, y, w, h, out) => { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); if (out) c.stroke(); else c.fill(); };
       for (const k of [-2, -1, 1, 2]) dot(B[0] + k * D, ly); c.fillRect(B[0] - 1, ly - 7, 2, 14); dia(B[0] + clamp(nav.locDots, -2.3, 2.3) * D, ly, 8, 6, Math.abs(nav.locDots) > 2.3);
       if (nav.gsValid) { for (const k of [-2, -1, 1, 2]) dot(gx, B[1] + k * D); c.fillRect(gx - 7, B[1] - 1, 14, 2); dia(gx, B[1] + clamp(nav.gsDots, -2.3, 2.3) * D, 6, 8, Math.abs(nav.gsDots) > 2.3); }
-      font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + nav.dme.toFixed(1) + ' NM', rgt - 4, top + 12); }
+      font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', rgt - 4, top + 12); }
     // flare cue
     if (!f.wow && o.aglFt < 100 && o.vsFpm < 0) { const flareFt = cfg.type === 'jet' ? (f.mass > 150000 ? 50 : 38) : 26;
       font(22, true); c.textAlign = 'center'; c.fillText(String(Math.round(o.aglFt)), B[0], B[1] + hh * 0.72);
@@ -2287,7 +2480,7 @@ const HUD = {
     const font = (px, b) => { c.font = (b ? '700 ' : '500 ') + px + 'px "B612 Mono", "DejaVu Sans Mono", Consolas, monospace'; };
     c.fillStyle = 'rgba(8,22,32,0.74)'; c.fillRect(x0, y0, W, H); c.fillStyle = '#0f9aa0'; c.fillRect(x0, y0, W, 2);
     c.textBaseline = 'middle'; font(13, true); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(nav.ident, x0 + 10, y0 + 16);
-    c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(nav.distThr.toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
+    c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
     // PAPI: four lights, white above their setting angle, red below
     const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5];
     pa.forEach((a, i) => { const x = x0 + 50 + i * 26, y = y0 + 44, wht = el > a; c.beginPath(); c.arc(x, y, 8, 0, 6.3); c.fillStyle = wht ? '#fbfbf2' : '#ff3b30'; c.shadowColor = c.fillStyle; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; });
@@ -2498,6 +2691,8 @@ const Main = {
     Scenery.init(); prog(0.55, 'Painting runways and switching on the lights'); await tick();
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
+    setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, opts); Game.spawn(); });
+    if (IS_DEV) DevSchoolPanel.init();
     Env.update(Game.opts.hours, 100, [0, 0, -1]);
     prog(0.7, 'Generating terrain'); await tick();
     await this.preloadTerrain(prog);
@@ -2597,10 +2792,10 @@ const UI = {
   modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.$('modeNote').textContent = O.mode === 'route' ? `Timed flight ${a.city} to ${b.city}: about 110 nm on a heading near ${O.airport === 'LEBL' ? '165' : '345'}\u00b0. The summary appears once you have landed and slowed down at ${b.city}.` : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
-  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
+  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
-  restart() { this.el.crash.hidden = true; this.el.report.hidden = true; this.startFlight(); },
-  toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },
+  restart() { this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
+  toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },
   pause(on) { if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
   /** photo scenery: a line in the menu and the data credits in a corner */
@@ -2632,8 +2827,42 @@ const UI = {
   },
   /** background run of the headless harness, one aircraft at a time */
   runHarness() { let i = 0; const next = () => { if (i >= AIRCRAFT_ORDER.length) return; if (Game.state === 'flying' && Main.fps < 40) { setTimeout(next, 3000); return; } this.harness.push(Harness.run(AIRCRAFT_ORDER[i++])); this.harnessHtml = null; setTimeout(next, 400); }; next(); },
+  /** text de l instructor al HUD i barra d arrodoniment de D7 (tasca C3+C4). Nomes dins l escola */
+  lessonFrame(f) {
+    if (!currentLesson()) { for (const el of [this._lessonEl, this._flareEl, this._goalsEl]) if (el) el.style.display = 'none'; return; }
+    if (!this._lessonEl) { const el = document.createElement('div'); el.id = 'lessonHud'; el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;font:600 13px system-ui;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;pointer-events:none;text-align:center'; document.body.appendChild(el); this._lessonEl = el; }
+    const msg = currentLesson().instructorMessage();
+    // sota el missatge, les explicacions de l instructor (LESSONS[..].tips), durant tot l intent
+    this._lessonEl.style.display = 'block'; this._lessonEl.style.whiteSpace = 'pre-line'; this._lessonEl.style.maxWidth = '60vw';
+    this._lessonEl.textContent = [msg, ...currentLesson().tips()].map(messageText).join('\n');
+    // objectius de la llico (app/lesson-run.js, objectives): generats dels criteris de lessons.js
+    if (!this._goalsEl) { const el = document.createElement('div'); el.id = 'lessonGoals'; el.style.cssText = 'position:fixed;right:12px;top:44px;z-index:60;font:500 12px/1.5 system-ui;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;pointer-events:none;white-space:pre'; document.body.appendChild(el); this._goalsEl = el; }
+    const goals = currentLesson().objectives().map(o => (o.ok ? '\u2713 ' : '\u25cb ') + messageText({ key: o.labelKey, params: o.params })).join('\n');
+    this._goalsEl.style.display = 'block'; if (this._goalsEl.textContent !== goals) this._goalsEl.textContent = goals;
+    const lesson = LESSONS.find(l => l.id === currentLessonId());
+    if (lesson && lesson.aids && lesson.aids.flareBar && !f.wow && f.out.aglFt <= lesson.flareBar.startAglFt) {
+      const T = lesson.flareBar, k = clamp(f.out.aglFt / T.startAglFt, 0, 1), target = T.sinkAtContactFpm + (T.sinkAtStartFpm - T.sinkAtContactFpm) * k;
+      if (!this._flareEl) { const el = document.createElement('div'); el.id = 'flareBar'; el.style.cssText = 'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:60;font:600 12px system-ui;color:#fff;background:rgba(0,0,0,.55);padding:3px 8px;border-radius:6px;pointer-events:none'; document.body.appendChild(el); this._flareEl = el; }
+      this._flareEl.style.display = 'block';
+      this._flareEl.textContent = t('school.flareBar', { sink: Math.round(-f.out.vsFpm), target: Math.round(target) });
+    } else if (this._flareEl) this._flareEl.style.display = 'none';
+  },
+  /** debrief detallat (D8): nomes la llico 7, s obre sol despres de cada intent */
+  showDebrief(record) {
+    const td = record.touchdown, ptsMax = Game.scoreReport(Game.report).ptsMax;
+    const rows = debriefRows(td, { tailStrike: record.tailStrike, ptsMax });
+    const line = r => {
+      if (r.component === 'bounces') return `<tr><th>${t('debrief.component.bounces')}</th><td>${r.count}</td><td>${-r.penaltyPts} pts</td></tr>`;
+      if (r.component === 'tailStrike') return `<tr><th>${t('debrief.component.tailStrike')}</th><td>${r.present ? 'yes' : 'no'}</td><td>${-r.penaltyPts} pts</td></tr>`;
+      return `<tr><th>${t('debrief.component.' + r.component)}</th><td>${r.ok ? t('debrief.ok') : t('debrief.needsImprovement')}</td><td>${r.measured == null ? '' : Math.round(r.measured * 10) / 10}</td></tr>`;
+    };
+    let el = document.getElementById('debriefPanel');
+    if (!el) { el = document.createElement('div'); el.id = 'debriefPanel'; el.style.cssText = 'position:fixed;right:12px;top:12px;z-index:70;background:rgba(15,20,25,.92);color:#fff;font:13px system-ui;padding:10px 12px;border-radius:8px;max-width:280px'; document.body.appendChild(el); }
+    el.innerHTML = `<b>${t('debrief.title')}</b><table>${rows.map(line).join('')}</table>`;
+    el.style.display = 'block';
+  },
   frame(S, dt, fps) {
-    HUD.frame(S); Sound.frame(S, dt);
+    HUD.frame(S); Sound.frame(S, dt); this.lessonFrame(S.fdm);
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.el.toast.style.opacity = 0; }
     if (Game.state === 'menu') return; if (Game.state === 'replay') { this.el.warn.innerHTML = ''; } const f = S.fdm, o = f.out, c = S.ctl, cfg = f.cfg;
     if ((Main.frameN & 3) === 0) {
@@ -2644,7 +2873,7 @@ const UI = {
         cell('FLAPS', cfg.flaps[c.flaps].name) + cell('GEAR', f.gearPos > 0.99 ? 'DOWN' : f.gearPos < 0.01 ? 'UP' : 'TRANSIT', f.gearPos > 0.01 && f.gearPos < 0.99 ? 'amber' : '') + cell('SPLR', f.spoilerPos > 0.05 ? 'OUT' : 'IN', f.spoilerPos > 0.05 ? 'amber' : '') + cell('BRAKE', c.parkBrake ? 'PARK' : f.brakeAct > 0.05 ? 'ON' : 'OFF', c.parkBrake ? 'amber' : '') + cell('AP / ATHR', (S.ap.on ? 'ON' : 'OFF') + ' / ' + (S.ap.athr ? 'ON' : 'OFF'), S.ap.on ? 'green' : '');
       const w = Instruments.warnings(S); this.el.warn.innerHTML = w.map(m => `<span>${m}</span>`).join(''); this.el.warn.className = (Game.time * 3 | 0) % 2 ? 'on' : 'off';
       const hh = Math.floor(Game.hours), mm = Math.floor((Game.hours - hh) * 60), fl = Game.flight; let tr = ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2) + (S.timeAccel > 1 ? '  x' + S.timeAccel : '');
-      if (fl && fl.mode === 'route') tr += '<br>' + this.fmtTime(fl.t) + '<br>' + (Math.hypot(fl.to.e - f.e, fl.to.n - f.n) / NM).toFixed(0) + ' nm to ' + fl.to.icao; this.el.topright.innerHTML = tr;
+      if (fl && fl.mode === 'route') tr += '<br>' + this.fmtTime(fl.t) + '<br>' + thresholdDistNm(fl.to, Game.destEnd(fl.to), f.e, f.n).toFixed(0) + ' nm to ' + fl.to.icao; this.el.topright.innerHTML = tr;
     }
     if (Input.mouseYoke) { this.el.yokedot.style.left = (50 + Input.roll * 50) + '%'; this.el.yokedot.style.top = (50 - Input.pitch * 50) + '%'; }
     if (Game.debug && (Main.frameN % 6) === 0) {

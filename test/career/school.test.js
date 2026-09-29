@@ -59,12 +59,14 @@ describe('llicons: cada criteri just al limit', () => {
     ['taxi', { reachedThreshold: true }, { reachedThreshold: false }],
     ['takeoff', { maxAltFt: 3000, gearUp: true }, { maxAltFt: 2999, gearUp: true }],
     ['takeoff', { maxAltFt: 3000, gearUp: true }, { maxAltFt: 3000, gearUp: false }],
-    ['maneuvers', { altDeviationMaxFt: 200 }, { altDeviationMaxFt: 201 }],
+    ['maneuvers', { altDeviationMaxFt: 200, headingChangeDeg: 180 }, { altDeviationMaxFt: 201, headingChangeDeg: 180 }],
+    ['maneuvers', { altDeviationMaxFt: 200, headingChangeDeg: 180 }, { altDeviationMaxFt: 200, headingChangeDeg: 179 }],
     ['circuit', { stabilizedOnFinal: true }, { stabilizedOnFinal: false }],
     ['landing', { landed: true, score: 45 }, { landed: true, score: 44 }],
     ['landing', { landed: true, score: 45 }, { landed: false, score: 45 }],
-    ['ils', { landed: true, onRunway: true }, { landed: true, onRunway: false }],
-    ['ils', { landed: true, onRunway: true }, { landed: false, onRunway: true }]
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: true, landed: true, onRunway: false }],
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: true, landed: false, onRunway: true }],
+    ['ils', { ilsFlown: true, landed: true, onRunway: true }, { ilsFlown: false, landed: true, onRunway: true }]
   ];
   for (const [id, ok, ko] of cases) {
     test(id + ': ' + JSON.stringify(ok) + ' passa, ' + JSON.stringify(ko) + ' falla', () => {
@@ -72,6 +74,15 @@ describe('llicons: cada criteri just al limit', () => {
       assert.equal(attemptOf(id, { crashed: false, ...ko }).passed, false);
     });
   }
+});
+
+describe('headingChangeDeg: metrica nova de D5', () => {
+  test('es a METRICS i evaluate la fa servir amb gte', () => {
+    assert.ok(METRICS.includes('headingChangeDeg'));
+    const r = evaluate([{ metric: 'headingChangeDeg', op: 'gte', value: 180 }], { crashed: false, headingChangeDeg: 180 });
+    assert.equal(r.passed, true);
+    assert.equal(evaluate([{ metric: 'headingChangeDeg', op: 'gte', value: 180 }], { crashed: false, headingChangeDeg: 179 }).passed, false);
+  });
 });
 
 describe('llico 7: gracia a partir del tercer intent', () => {
@@ -186,7 +197,8 @@ describe('recordLessonAttempt', () => {
   test('no toca graduated', () => {
     const all = LESSONS.map(l => l.id);
     const r = recordLessonAttempt(school({ lessonsPassed: all.slice(0, -1) }), 'ils',
-      { landed: true, onRunway: true });
+      { ilsFlown: true, landed: true, onRunway: true });
+    assert.equal(r.passed, true);
     assert.equal(r.school.graduated, false);
     const g = recordLessonAttempt(school({ graduated: true }), 'exterior', { viewsVisited: 0 });
     assert.equal(g.school.graduated, true);
@@ -252,7 +264,8 @@ describe('crash', () => {
   const perfect = {
     crashed: true, landed: true, score: 100, onRunway: true, viewsVisited: 4,
     controlsIdentified: 6, reachedThreshold: true, maxAltFt: 5000, gearUp: true,
-    altDeviationMaxFt: 0, stabilizedOnFinal: true, ilsFlown: true, fuelWithinPlan: true
+    altDeviationMaxFt: 0, headingChangeDeg: 180, stabilizedOnFinal: true,
+    ilsFlown: true, fuelWithinPlan: true
   };
 
   for (const l of LESSONS) {

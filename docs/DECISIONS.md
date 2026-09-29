@@ -165,3 +165,180 @@ evaluateCheckRide(ratingId, facts) diu si s'ha passat i prou. Donar l'habilitaci
 - discardCareer() sempre intenta backupCareer() primer. Si la copia falla (Storage ple o refusant) i hi havia partida, no esborra res: es prefereix deixar una partida bruta pero recuperable a perdre-la sense cap rastre.
 - emit() amb un tema fora de TOPICS llanca (error de programacio d'un mòdul, no una entrada de l'usuari); un subscriptor que llanca no bloqueja els altres ni fa llancar emit: es un error de la UI, no del bus.
 - loadCareer() distingeix 'migrated' de 'ok' comparant schemaVersion de l'estat cru amb SCHEMA_VERSION abans de migrar. Avui career/state.js nomes accepta schemaVersion === 1 (MIGRATIONS hi es buit), aixi que aquest estat no te encara cap prova amb una migracio real: queda preparat per quan n'hi hagi una.
+
+## 2026-09-27 - C3+C4: D1-D8, encarrec de l escola de vol
+
+Decisions d'en Marc per a C3 (executor de llicons) i C4 (ajudes de l escola).
+
+- D1. Mentre no existeixi el C5, les llicons es llancen des del panell DEV
+  (nomes IS_DEV). El panell DEV queda fora d'i18n (decisio ja existent, vegeu
+  "Noms propis i panell DEV fora d'i18n"). Hi ha un boto DEV "desbloqueja-les
+  totes" que nomes marca les llicons com a aprovades a la memoria (school),
+  sense passar per recordLessonAttempt.
+- D2. El progres de l escola (l objecte school de CareerState) viu nomes en
+  memoria. No es desa. La persistencia la decideix el C5.
+- D3. Un vol abandonat (cancelFlight) no compta com a intent. Un crash si que
+  compta, i sempre es un suspens: els fets en viu inclouen sempre crashed, i
+  un crash sense crashed aprovaria la llico.
+- D4. Totes les llicons es fan a LEBL, amb meteo calma (sense turbulencia,
+  vent 0). maxAltFt de la llico 4 (takeoff) es AGL: app/lesson-run.js el
+  calcula en viu i substitueix el maxAltFt (MSL) del FlightRecord en combinar
+  els fets.
+- D5. Llico 5 (maneuvers): comenca en vol, anivellat. Altitud de referencia =
+  altitud inicial de l intent. S'avalua en complir 120 s (durationS a
+  lessons.js), no continuament. Criteri nou: canvi de rumb total acumulat
+  >= 180 graus (metrica nova headingChangeDeg, afegida a METRICS de
+  school.js, amb prova).
+- D6. Llico 6 (circuit), "final estabilitzat": en creuar 500 ft AGL a menys
+  de 3 nm del llindar, i mantingut 10 s: rumb a +-10 graus de la pista, tren
+  avall, flaps d'aterratge, IAS entre Vref-5 i Vref+20 kt, sink <= 1000 fpm.
+  Llindars a LESSONS['circuit'].finalStabilized.
+- D7. Barra d'arrodoniment (C4): sink desitjada lineal de 500 fpm a 50 ft AGL
+  fins a 150 fpm al contacte. Visible des de 50 ft AGL fins al contacte.
+  Llindars a LESSONS['landing'].flareBar.
+- D8. Barra d'arrodoniment i debrief automatic: nomes a la llico 7, marcats
+  com a dades a lessons.js (aids: { flareBar: true, autoDebrief: true }), mai
+  com a condicio al codi.
+
+Consequencia tecnica no discutida per en Marc, nomes registrada: Game.scoreReport
+(index.html) no exposava els punts maxims de cada component (sink, g, zone,
+center, attitude), nomes els aconseguits. app/debrief.js els necessita per
+decidir "OK" / "Needs improvement" (regla 8 de la seccio 0: no copiar-los a
+ma). S'ha afegit un camp ptsMax al retorn de scoreReport amb els mateixos
+coeficients que ja hi havia a la formula (35, 15, 20, 20, 10): cap fisica
+nova, nomes exposar el que ja hi era. Vegeu la descripcio del PR.
+
+## 2026-09-28 - C3: correccions de l escola de vol despres de la prova d en Marc
+
+En Marc ha provat les llicons al navegador (PR #22). Decisions:
+
+- Llico 5 (maneuvers): en superar la desviacio d altitud del criteri
+  altDeviationMaxFt (200 ft a lessons.js), l intent suspen a l instant, sense
+  esperar els 120 s, i l instructor diu quants peus t has desviat. Els 120 s
+  de D5 continuen sent la condicio per aprovar. Substitueix el "s avalua en
+  complir 120 s, no continuament" de D5 nomes per al suspens per desviacio.
+  El text de l objectiu diu el que s ha de fer de debo: virar almenys 180
+  graus en total mantenint l altitud dins de +-200 ft durant 2 min, amb els
+  tres numeros com a parametres de lessons.js.
+- Llico 1 (exterior): comenca a la pista (mode 'runway': alineat, fre
+  d aparcament posat, motors al ralenti), no a la porta: a la porta els
+  edificis de la terminal tapaven una de les cameres.
+- Llico 2 (cockpit): l objectiu es IDENTIFICAR el comandament, no fer-lo
+  servir. onCommand s emet quan el jugador prem la tecla, abans de qualsevol
+  comprovacio que impedeixi l accio (tren bloquejat a terra, inversors nomes
+  a terra). Tota la llico s ha de poder fer amb l avio aturat. Les tecles de
+  cada comandament son dades a lessons.js (controlKeys) i el missatge de
+  l instructor diu el nom i la tecla, com a parametres i18n.
+- Llico 6 (circuit): l instructor guia per fases, un missatge per fase: vent
+  en cua (mantenir l altitud del spawn, tren i flaps), gir a base quan el
+  llindar queda baseTurnDeg (45 graus) enrere del travers (i comencar a
+  baixar), gir a final quan l eix queda a finalTurnLatM, i a final
+  (estabilitzar-se abans de finalStabilized.aglFt). El costat del gir surt de
+  la geometria real (posicio i rumb respecte de la pista assignada), mai
+  escrit a ma. Llindars a LESSONS['circuit'].guidance.
+
+Consequencia tecnica, nomes registrada: la guia de la llico 6 fa servir la
+geometria respecte de la pista assignada (Game.activeEnd), no de l ILS
+autosintonitzat, perque en vent en cua el receptor sintonitza el capcal
+contrari. La instantania de lesson-run.js te tres camps opcionals nous
+(asgAlongM, asgLatM, asgHdgDeg).
+
+## 2026-09-29 - C3: llicons 1 a 5 per donar-les per acabades
+
+En Marc ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
+
+- Tecla de reinici de camera: Home. Torna la camera a l angle (i la
+  distancia i el zoom) per defecte, a totes les cameres exteriors, a la
+  cabina i a Free Flight (Cameras.resetView a index.html). Es l unica tecla
+  lliure: totes les lletres ja son d Input o de Game.onKey. Viu a
+  CONTROL_KEYS.cameraReset (lessons.js), el mapa de tecles de comandament
+  que la llico 2 fa servir com a controlKeys. L instructor ho ensenya a la
+  llico 1 (arrossegar amb el clic dret gira la camera, Home la torna), sense
+  cap criteri nou. Les explicacions de l instructor son dades (tips a
+  lessons.js) i les tecles surten sempre de CONTROL_KEYS.
+- Llico 3 (taxi): una rodona verda fluorescent a terra, al punt objectiu
+  (el llindar de la pista assignada, sobre l eix; radi = maxLatOffsetM), i
+  una linia recta discontinua del mateix color des de l avio fins a la
+  rodona, redibuixada a cada frame. Linia recta, no el cami per les
+  taxiways. Substitueix el ressaltat del capcal. Nomes en aquesta llico.
+- Distancia a l aeroport: totes les vistes la mesuren fins al capcal de la
+  pista de destinacio (thresholdDistNm a world/ils.js), en linia recta. El
+  capcal es el de l ILS sintonitzat si es de l aeroport de destinacio, si
+  no el de la pista assignada (destinationEnd). Abans la cabina (PFD i HUD)
+  mostrava el DME, que es a l antena del localitzador, a l altre extrem de
+  la pista (uns 2 nm mes), i l ND i el vol cronometrat mesuraven fins al
+  centre de l aeroport. Error antic: tambe passava a Free Flight a dev.
+  Les llicons continuen fent servir distThr de l ILS: no canvien.
+- Llico 4 (takeoff): el comptador d altura de la llista d objectius no va
+  amb retard. Compta AGL (D4, alcada del tren sobre el terreny), i
+  l altimetre del HUD es MSL: la diferencia es l elevacio de l aeroport mes
+  l alcada del tren. L etiqueta de la llista ara diu "ft AGL".
+
+## 2026-09-29 - C3: llicons 6 a 8 i darrers canvis per tancar C3+C4
+
+En Marc ha provat les 8 llicons (PR #22). Decisions:
+
+- Reinici de camera: un doble clic amb el boto dret torna la camera a l angle
+  per defecte, igual que Home, que es mante com a alternativa. El navegador no
+  dona dblclick del boto dret: Input (index.html) mesura dos mousedown del boto
+  dret en menys de 400 ms. L instructor de la llico 1 ensenya el doble clic i
+  menciona Home (la tecla surt de CONTROL_KEYS).
+- Llico 3 (taxi): la linia verda discontinua segueix el cami per les calles de
+  rodatge, no una recta (substitueix la "linia recta" de l entrada anterior del
+  29/09). world/taxi.js fa un graf de la geometria de taxiways que ja existia,
+  sense redibuixar-la (cruilles en T i creuaments), i en busca el cami mes curt
+  (A*) des de l avio fins al capcal, amb la rodona al final. A LEBL tota la
+  xarxa queda connectada. El cami es recalcula si l avio se n allunya mes de
+  taxi.rerouteM (40 m, lessons.js).
+- D4 canviada: la llico 4 fa servir la mateixa altitud que l altimetre del HUD
+  (MSL), no AGL, perque el jugador vegi el mateix numero a tot arreu. Totes les
+  llicons son a LEBL, gairebe a nivell del mar. maxAltFt en viu es l altitud
+  MSL arrodonida a 10 ft, com l altimetre, i l etiqueta de la llista torna a
+  dir "ft". La resta de D4 (LEBL, meteo calma) no canvia.
+- Llicons 7 i 8 separades, abans indistingibles (totes dues a 10 nm sobre la
+  senda):
+  - Llico 7 (aterratge): comenca a 3 nm en final curt, alineada i
+    estabilitzada. Tot va de l arrodoniment.
+  - Llico 8 (ILS): comenca a 12 nm, 2 nm fora de l eix amb 25 graus d angle
+    d intercepcio, anivellada a 2.000 ft (per sota de la senda), tren amunt i
+    flaps d aproximacio. L instructor explica les dues agulles (localitzador i
+    senda) i guia la intercepcio per fases. Criteri nou ilsFlown: haver seguit
+    l ILS vol dir que, entre 1.500 i 500 ft AGL, cap de les dues agulles no
+    passa d 1 punt de desviacio i el senyal es valid en tot el tram.
+  Distancies, angles i llindars a lessons.js (spawn, ilsTolerance, guidance).
+  El mode 'final' de Game.spawn accepta per opts la distancia, l offset, l angle
+  d intercepcio i l altura, amb el mateix trimAircraft (cap fisica nova); per
+  defecte, Free Flight, no canvia.
+
+- D6, circuit a 1.000 ft (decisio d en Marc, correccio posterior del mateix
+  dia): el tram de vent en cua de la llico 6 passa de 1.500 a 1.000 ft AGL
+  (LESSONS['circuit'].spawn.aglFt), l altura habitual del circuit d avions
+  petits, per poder arribar als 10 s estabilitzat baixant a un ritme normal.
+  La resta de D6 (500 ft AGL, 3 nm, 10 s, rumb, tren, flaps, velocitat, sink)
+  no canvia. Volat sencer sense navegador (FlightModel, Autopilot i World
+  reals, des del spawn 'downwind', velocitat vertical fixa des del gir a base):
+  amb 400 a 700 fpm a base els 10 s es compleixen a 1,32 nm del llindar, tan
+  aviat com l avio queda alineat a final (a 448, 394, 332, 208 i 83 ft AGL amb
+  400, 450, 500, 600 i 700 fpm). El ritme bo es 400-500 fpm: a 600 fpm o mes
+  ja s es per sota dels 500 ft abans del gir a final i, sense aplanar el
+  descens, molt per sota de la senda (uns 460 ft a 1,3 nm). Amb 300 fpm
+  tambe s hi arriba, pero a 0,32 nm.
+
+Consequencies tecniques, nomes registrades:
+
+- L altura del tram d ilsFlown es l altura sobre la pista (hatFt, de l hW
+  d ILS.nav), no el radioaltimetre: a 12 nm de la 07L hi ha turons d uns
+  600 ft, i amb l AGL del terreny l avio ja entrava al tram al punt de sortida,
+  amb l agulla fora.
+- Llico 6: el comptador dels 10 s nomes avanca a menys de 3 nm del llindar i
+  per sota de 500 ft AGL, dues condicions de D6 que no eren a la llista, i
+  l instructor deia "estabilitza't abans dels 500 ft". Ara la llista mostra
+  totes les condicions de D6 i el missatge de final diu les del comptador.
+  Els criteris de D6 no canvien. Amb el circuit a 1.500 ft (a 1,5 nm del
+  llindar) i un descens d uns 500 fpm, s arribava als 500 ft gairebe al
+  llindar: per tenir els 10 s abans calia baixar uns 900 fpm a base.
+- Panell DEV: llancar una llico amb una altra en marxa cancel la la que hi ha
+  (cancelFlight, no compta com a intent, D3) i comenca la nova.
+- Game.opts conservava els camps spawn* d una llico (Object.assign del
+  launcher): ara es treuen abans de cada vol, perque un Free Flight 'final' no
+  hereti la distancia ni l offset de la llico 8.
