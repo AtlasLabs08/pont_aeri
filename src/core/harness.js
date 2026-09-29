@@ -230,9 +230,10 @@ export const Harness = {
   /** contacte ferm: com drop() (actitud d aproximacio trimada a Vref, 5 cm per sobre de la pista, sense arrodonir), pero
       en tocar les rodes principals el motor va a ralenti (surten els spoilers de terra, com en un aterratge normal) i el
       pilot baixa el morro a 2 graus/s; quan el morro toca, deixa anar el comandament. Sense frens. Compta els rebots del
-      tren principal i del de morro, i mesura l assentament des que toca el morro (6 s de finestra) */
-  firmContact(cfg, fpm = 400) {
-    const f = new FlightModel(cfg), ap = new Autopilot(f), ctl = newCtl(), mass = cfg.test.ldgMass, fuel = cfg.mass.typFuel;
+      tren principal i del de morro, i mesura l assentament des que toca el morro (6 s de finestra). Per defecte, a la
+      massa d aterratge de prova (test.ldgMass) i amb el combustible tipic */
+  firmContact(cfg, fpm = 400, mass = cfg.test.ldgMass, fuel = cfg.mass.typFuel) {
+    const f = new FlightModel(cfg), ap = new Autopilot(f), ctl = newCtl();
     f.reset({ mass, fuel }); const v = f.vspeeds(), cas = v.vref * KT, gam = -Math.asin(fpm * FPM / tasFromCas(cas, 0));
     const tr = trimAircraft(f, { cas, alt: 50, gamma: gam, flaps: cfg.flapLDG, gearDown: true, mass, fuel });
     ctl.flaps = cfg.flapLDG; ctl.trim = tr.trim; ctl.throttle = tr.throttle;
@@ -359,6 +360,16 @@ export const Harness = {
     add('Brake release at full power: settling time', br.tSettle, ex.brakeSettle, 's');
     add('Firm touchdown at 400 fpm: bounces', fc.bounces, ex.tdBounces, '');
     add('Firm touchdown at 400 fpm: settling time', fc.tSettle, ex.tdSettle, 's');
+    // el mateix contacte a la massa maxima d aterratge i a la minima (buit, sense passatgers, 10 % del combustible maxim):
+    // l amortiment del tren ha de ser el mateix carregat o buit
+    const M = cfg.mass, fcHi = Harness.firmContact(cfg, 400, M.mlw, M.typFuel), fcLo = Harness.firmContact(cfg, 400, M.empty + 0.1 * M.maxFuel, 0.1 * M.maxFuel);
+    add('Firm touchdown at 400 fpm, max landing mass: bounces', fcHi.bounces, ex.tdBounces, '');
+    add('Firm touchdown at 400 fpm, max landing mass: settling time', fcHi.tSettle, ex.tdSettle, 's');
+    add('Firm touchdown at 400 fpm, minimum mass: bounces', fcLo.bounces, ex.tdBounces, '');
+    add('Firm touchdown at 400 fpm, minimum mass: settling time', fcLo.tSettle, ex.tdSettle, 's');
+    const fc8 = Harness.firmContact(cfg, 800);
+    add('Hard touchdown at 800 fpm: bounces', fc8.bounces, ex.tdBounces800, '');
+    add('Hard touchdown at 800 fpm: settling time', fc8.tSettle, ex.tdSettle800, 's');
     add('Idle to full power: pitch deviation in 10 s', ps.dev, ex.powerPitch, 'deg');
     return { id, name: cfg.name, rows, pass: rows.every(r => r.pass), detail: { to, sc, sf, ld, apr, gr } };
   },
