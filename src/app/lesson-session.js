@@ -11,8 +11,11 @@
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   startLesson(lessonId, flightOpts) -> Promise<{ lessonId, facts, record, reason } | null>
  *     crea la LessonRun (que passa a ser currentLesson()) i llanca el vol
- *     amb launchFlight(flightOpts). Si launchFlight llanca (ja hi ha un vol
- *     en marxa), no canvia res. Quan torna el FlightRecord, tanca aquesta
+ *     amb launchFlight(flightOpts). Si ja hi ha una llico en marxa (la
+ *     mateixa o una altra, panell DEV), primer la cancel la amb
+ *     cancelFlight(): la seva promesa resol null i no compta com a intent
+ *     (D3). Si launchFlight llanca (hi ha un vol en marxa que no es de cap
+ *     llico), no canvia res. Quan torna el FlightRecord, tanca aquesta
  *     LessonRun, i nomes aquesta, amb finish(record) i resol amb els fets
  *     combinats i reason = run.failReason() (per a attemptMessage). Si el vol es cancel la (record null), resol null sense
  *     tocar cap LessonRun: reiniciar (cancelFlight i startLesson) no pot
@@ -39,6 +42,8 @@ export function startLesson(lessonId, flightOpts) {
   // la promesa es d aquest vol: nomes pot tancar aquesta run, mai la que
   // hagi pres el relleu despres d un Restart
   const release = () => { if (active === run) { active = null; activeId = null; } };
+  // una llico en marxa es cancel la: el seu then veu record null i no toca la nova
+  if (active !== null) cancelFlight();
   const flight = launchFlight(flightOpts);
   active = run; activeId = lessonId; lastId = lessonId;
   return flight.then(record => {

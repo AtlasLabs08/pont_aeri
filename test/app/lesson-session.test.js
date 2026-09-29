@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson
 } from '../../src/app/lesson-session.js';
-import { setFlightLauncher, onFlightFinished, cancelFlight, _resetFlight } from '../../src/app/flight.js';
+import { setFlightLauncher, launchFlight, onFlightFinished, cancelFlight, _resetFlight } from '../../src/app/flight.js';
 import { LESSONS, recordLessonAttempt } from '../../src/career/index.js';
 import { RECORD_KEYS } from '../../src/core/index.js';
 
@@ -96,12 +96,42 @@ describe('startLesson', () => {
     assert.equal(fresh.done, false);
   });
 
-  test('si ja hi ha un vol en marxa llanca i no canvia la llico en marxa', () => {
-    startLesson('exterior', {});
-    const run = currentLesson();
+  test('si hi ha un vol en marxa que no es de cap llico llanca i no canvia res', () => {
+    launchFlight({});
     assert.throws(() => startLesson('cockpit', {}));
-    assert.equal(currentLesson(), run);
-    assert.equal(currentLessonId(), 'exterior');
+    assert.equal(currentLesson(), null);
+    assert.equal(currentLessonId(), null);
+    assert.equal(launched.length, 1);
+  });
+});
+
+describe('panell DEV: llancar una llico amb una altra en marxa', () => {
+  test('cancel la la que hi ha (sense intent) i comenca la nova', async () => {
+    const first = startLesson('exterior', { start: 'runway' });
+    const old = currentLesson();
+    const second = startLesson('cockpit', { start: 'gate' });
+    assert.equal(launched.length, 2);
+    assert.equal(launched[1].start, 'gate');
+    assert.equal(currentLessonId(), 'cockpit');
+    assert.notEqual(currentLesson(), old);
+    // la vella es un vol cancel lat: resol null, no hi ha intent per desar
+    assert.equal(await first, null);
+    assert.equal(old.done, false);
+    assert.equal(currentLessonId(), 'cockpit');
+    onFlightFinished(record());
+    const outcome = await second;
+    assert.equal(outcome.lessonId, 'cockpit');
+  });
+
+  test('tambe la mateixa llico', async () => {
+    const first = startLesson('taxi', { start: 'gate' });
+    const old = currentLesson();
+    startLesson('taxi', { start: 'gate' });
+    assert.equal(launched.length, 2);
+    assert.equal(await first, null);
+    assert.notEqual(currentLesson(), old);
+    assert.equal(currentLessonId(), 'taxi');
+    assert.equal(currentLesson().done, false);
   });
 });
 
