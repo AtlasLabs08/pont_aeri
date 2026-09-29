@@ -310,6 +310,20 @@ En Marc ha provat les 8 llicons (PR #22). Decisions:
   d intercepcio i l altura, amb el mateix trimAircraft (cap fisica nova); per
   defecte, Free Flight, no canvia.
 
+- D6, circuit a 1.000 ft (decisio d en Marc, correccio posterior del mateix
+  dia): el tram de vent en cua de la llico 6 passa de 1.500 a 1.000 ft AGL
+  (LESSONS['circuit'].spawn.aglFt), l altura habitual del circuit d avions
+  petits, per poder arribar als 10 s estabilitzat baixant a un ritme normal.
+  La resta de D6 (500 ft AGL, 3 nm, 10 s, rumb, tren, flaps, velocitat, sink)
+  no canvia. Volat sencer sense navegador (FlightModel, Autopilot i World
+  reals, des del spawn 'downwind', velocitat vertical fixa des del gir a base):
+  amb 400 a 700 fpm a base els 10 s es compleixen a 1,32 nm del llindar, en
+  quan l avio queda alineat a final (a 448, 394, 332, 208 i 83 ft AGL amb
+  400, 450, 500, 600 i 700 fpm). El ritme bo es 400-500 fpm: a 600 fpm o mes
+  ja s es per sota dels 500 ft abans del gir a final i, sense aplanar el
+  descens, molt per sota de la senda (uns 460 ft a 1,3 nm). Amb 300 fpm
+  tambe s hi arriba, pero a 0,32 nm.
+
 Consequencies tecniques, nomes registrades:
 
 - L altura del tram d ilsFlown es l altura sobre la pista (hatFt, de l hW
@@ -320,9 +334,9 @@ Consequencies tecniques, nomes registrades:
   per sota de 500 ft AGL, dues condicions de D6 que no eren a la llista, i
   l instructor deia "estabilitza't abans dels 500 ft". Ara la llista mostra
   totes les condicions de D6 i el missatge de final diu les del comptador.
-  D6 no canvia. Amb el circuit de la llico (1.500 ft a 1,5 nm del llindar) i
-  un descens d uns 500 fpm, s arriba als 500 ft gairebe al llindar: per tenir
-  els 10 s abans cal baixar mes (uns 900 fpm a base). No s ha tocat el spawn.
+  Els criteris de D6 no canvien. Amb el circuit a 1.500 ft (a 1,5 nm del
+  llindar) i un descens d uns 500 fpm, s arribava als 500 ft gairebe al
+  llindar: per tenir els 10 s abans calia baixar uns 900 fpm a base.
 - Panell DEV: llancar una llico amb una altra en marxa cancel la la que hi ha
   (cancelFlight, no compta com a intent, D3) i comenca la nova.
 - Game.opts conservava els camps spawn* d una llico (Object.assign del
