@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance, ilsGuidance } from '../../src/app/lesson-run.js';
 import { LESSONS, CONTROL_KEYS, BALANCE, evaluate } from '../../src/career/index.js';
-import { setLang } from '../../src/i18n/index.js';
+import { setLang, fmtNumber } from '../../src/i18n/index.js';
 import { AIRPORTS } from '../../src/world/index.js';
 import en from '../../src/i18n/en.js';
 import ca from '../../src/i18n/ca.js';
@@ -453,7 +453,7 @@ describe('llico circuit: guia per fases, a banda i banda de la pista', () => {
     const run = new LessonRun('circuit');
     setLang('en');
     run.sample(snapAt({ alongM: 0, latM: lateral, hdgDeg: 70 }));
-    assert.equal(messageText(run.instructorMessage()), 'Downwind: hold 1,500 ft, lower the gear and set flaps.');
+    assert.equal(messageText(run.instructorMessage()), `Downwind: hold ${fmtNumber(L.spawn.aglFt)} ft, lower the gear and set flaps.`);
     run.sample(snapAt({ alongM: -lateral * 1.1, latM: lateral, hdgDeg: 70 }));
     assert.equal(messageText(run.instructorMessage()), 'Turn left onto base now and start descending.');
     run.sample(snapAt({ alongM: -3300, latM: 2000, hdgDeg: 340 }));

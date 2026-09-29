@@ -153,7 +153,7 @@ export const LESSONS = [
     criteria: [{ metric: 'stabilizedOnFinal', op: 'eq', value: true }],
     finalStabilized: { maxDistNm: 3, aglFt: 500, sustainedS: 10,
       hdgToleranceDeg: 10, sinkMaxFpm: 1000, vrefLowKt: -5, vrefHighKt: 20 },
-    spawn: { aglFt: 1500, lateralNm: 1.5, flaps: 'approach' },
+    spawn: { aglFt: 1000, lateralNm: 1.5, flaps: 'approach' },
     guidance: { baseTurnDeg: 45, finalTurnLatM: 1000, alignedDeg: 30 } },
   { id: 'landing', aircraftTypeId: 'commuter', mercy: true,
     titleKey: 'school.lesson.landing.title', goalKey: 'school.lesson.landing.goal',
