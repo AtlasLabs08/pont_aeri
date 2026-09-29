@@ -555,10 +555,19 @@ Tot amb `node:test`, com les existents. `npm test` les corre totes.
 | Fitxer | Què comprova |
 | --- | --- |
 | `test/smoke.test.js` | exports de `core` i `world`. **Actualitza'l** quan s'afegeixi un export que la resta del joc necessiti, o quan canviï el nombre d'avions (F4). |
-| `test/harness.test.js` | rangs realistes per avió |
+| `test/harness.test.js` | rangs realistes per avió (bloc `expect`), també el tren (fre a tota potència, contacte a 400 fpm) i el pas de ralentí a potència màxima |
 | `test/snapshot.test.js` | física idèntica. Vegeu la regla 2 de §0 |
 | `test/career/*.test.js` | NOU. Una prova per funció pública de `career/` |
 | `test/recorder.test.js` | NOU. `FlightRecorder` alimentat amb un `FlightModel` real |
+
+### Estabilitat del tren i qualitats de vol: `tools/estabilitat.mjs`
+
+`node tools/estabilitat.mjs [id ...]`. No forma part de `npm test`. Imprimeix
+per avió els tres escenaris que el harness comprova (treure el fre amb tota la
+potència, contacte a 400 fpm, pas de ralentí a potència màxima) i una taula de
+qualitats de vol (període curt, balanceig holandès, balanceig i espiral) per
+comparar els avions entre ells. Criteris d'amortiment a `docs/DECISIONS.md`,
+29/09/2026.
 
 ### Harness econòmic: `tools/balance.mjs`, script `npm run balance`
 
