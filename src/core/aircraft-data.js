@@ -295,8 +295,11 @@ export const AIRCRAFT = {
       CL0: 0.31, CLa: 5.36, CLde: 0.376, CD0: 0.0228, e: 0.80, Mcrit: 0.76,
       Cm0: 0.053, Cma: -1.34, Cmq: -20.8, Cmadot: -4.4, Cmde: -1.45,
       CYb: -0.93, CYdr: 0.188,
-      Clb: -0.122, Clp: -0.452, Clr: 0.124, Clda: 0.112, Cldr: 0.0074,
-      Cnb: 0.142, Cnp: -0.072, Cnr: -0.23, Cnda: -0.0132, Cndr: 0.103,
+      // Cnb, Cnr i Clb no son interpolats: amb fuselatge llarg i envergadura curta, Izz/(m b2) es 0,093 (la resta, 0,046-0,056)
+      // i el brac de la deriva sobre b es 1,3 vegades el del M-200. Cnb x 1,3 i Cnr x 1,3^2 pel brac, i Clb reduit perque
+      // phi/beta i l esmorteiment del balanceig holandes quedin com els del M-200 (docs/DECISIONS.md, 29/09/2026)
+      Clb: -0.105, Clp: -0.452, Clr: 0.124, Clda: 0.112, Cldr: 0.0074,
+      Cnb: 0.185, Cnp: -0.072, Cnr: -0.39, Cnda: -0.0132, Cndr: 0.103,
       dCDgear: 0.0208, deMax: 25 * DEG, daMax: 20 * DEG, drMax: 25 * DEG,
       trimRange: [-13.7 * DEG, 4.4 * DEG], slatDAlpha: 6.5 * DEG, flapDAlpha: -1.5 * DEG, clmaxCal: 1.0
     },
