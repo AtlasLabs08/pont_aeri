@@ -404,6 +404,12 @@ export const Harness = {
     add('Hard touchdown at 800 fpm: bounces', fc8.bounces, ex.tdBounces800, '');
     add('Hard touchdown at 800 fpm: settling time', fc8.tSettle, ex.tdSettle800, 's');
     add('Idle to full power: pitch deviation in 10 s', ps.dev, ex.powerPitch, 'deg');
+    // el mateix canvi de potencia seguit 60 s, respecte de l equilibri final (fugoide inclosa)
+    for (const [dir, label] of [['up', 'Idle to full power'], ['down', 'Full power to idle']]) {
+      const pr = Harness.powerResponse(cfg, dir);
+      add(label + ', 60 s: pitch excess over the new equilibrium', pr.pitchDev, ex.phugPitch, 'deg');
+      add(label + ', 60 s: altitude deviation from the new equilibrium path', pr.altDev, ex.phugAlt, 'ft');
+    }
     return { id, name: cfg.name, rows, pass: rows.every(r => r.pass), detail: { to, sc, sf, ld, apr, gr } };
   },
   runAll() { return AIRCRAFT_ORDER.map(Harness.run); }
