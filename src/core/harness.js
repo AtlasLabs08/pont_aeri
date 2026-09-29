@@ -313,6 +313,12 @@ export const Harness = {
     const gr = Harness.ground(cfg);
     add('Parking brake creep (10 s)', gr.held, [0, 0.05], 'm');
     add('180 deg taxi turn diameter', gr.turnDiam, [cfg.gear.nose.x * 1.0, cfg.gear.nose.x * 4.5], 'm');
+    const br = Harness.brakeRelease(cfg), fc = Harness.firmContact(cfg, 400), ps = Harness.powerStep(cfg);
+    add('Brake release at full power: pitch transient', br.amp, ex.brakePitch, 'deg');
+    add('Brake release at full power: settling time', br.tSettle, ex.brakeSettle, 's');
+    add('Firm touchdown at 400 fpm: bounces', fc.bounces, ex.tdBounces, '');
+    add('Firm touchdown at 400 fpm: settling time', fc.tSettle, ex.tdSettle, 's');
+    add('Idle to full power: pitch deviation in 10 s', ps.dev, ex.powerPitch, 'deg');
     return { id, name: cfg.name, rows, pass: rows.every(r => r.pass), detail: { to, sc, sf, ld, apr, gr } };
   },
   runAll() { return AIRCRAFT_ORDER.map(Harness.run); }
