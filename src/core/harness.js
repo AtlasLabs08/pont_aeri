@@ -190,6 +190,95 @@ export const Harness = {
     return { held, restPitch, restH, tTo15: t, turnDiam: diam, turned: turned * RAD, maxRoll, gsEnd: f.out.gs };
   },
 
+  /* ---- estabilitat del tren i del capcineig (tools/estabilitat.mjs i les files de run()) ----
+     Amplitud: desviacio maxima respecte de la recta que millor s ajusta (minims quadrats) als darrers 2 s de la
+     finestra, perque el canvi quasi estatic d actitud (acceleracio, velocitat) no compti com a oscil.lacio.
+     Temps fins que s apaga: l ultim instant en que la velocitat de capcineig passa de 0,3 graus/s o la vertical del
+     CG passa d 1,5 cm/s (una oscil.lacio d 1 Hz de 0,05 graus o de 2,5 mm ja queda per sota). */
+
+  /** amplitud i temps d assentament d una serie [{t, th, h, q, vh}] (s, graus, m, graus/s, m/s) */
+  settle(s, fitFrom, qTol = 0.3, vTol = 0.015) {
+    const fit = (k) => { const w = s.filter(p => p.t >= fitFrom); const n = w.length, mt = w.reduce((a, p) => a + p.t, 0) / n, mv = w.reduce((a, p) => a + p[k], 0) / n;
+      const b = w.reduce((a, p) => a + (p.t - mt) * (p[k] - mv), 0) / (w.reduce((a, p) => a + (p.t - mt) * (p.t - mt), 0) || 1); return t => mv + b * (t - mt); };
+    const fth = fit('th'), fh = fit('h');
+    let amp = 0, hAmp = 0, tSettle = 0;
+    for (const p of s) {
+      amp = Math.max(amp, Math.abs(p.th - fth(p.t))); hAmp = Math.max(hAmp, Math.abs(p.h - fh(p.t)));
+      if (Math.abs(p.q) > qTol || Math.abs(p.vh) > vTol) tSettle = p.t;
+    }
+    return { amp, hAmp, tSettle };
+  },
+
+  /** treure el fre d aparcament amb tota la potencia: massa tipica, 5 s a ralenti amb el fre posat, potencia maxima
+      amb el fre fins que els motors arriben al 97 %, i 6 s de carrera sense tocar el comandament de capcineig */
+  brakeRelease(cfg) {
+    const f = new FlightModel(cfg), ctl = newCtl();
+    f.reset({ onGround: true, hdg: 0 }); ctl.parkBrake = true;
+    for (let i = 0; i < 120 * 5; i++) f.step(PHYS_DT, ctl, FLAT_ENV);
+    ctl.throttle = 1;
+    for (let i = 0; i < 120 * 15 && f.eng.some(e => e.x < 0.97); i++) f.step(PHYS_DT, ctl, FLAT_ENV);
+    ctl.parkBrake = false;
+    const s = [];
+    for (let i = 0; i < 120 * 6; i++) {
+      ctl.yaw = clamp(-2 * wrapPi(f.out.psi) - 1.5 * f.r, -1, 1);
+      f.step(PHYS_DT, ctl, FLAT_ENV);
+      s.push({ t: (i + 1) * PHYS_DT, th: f.out.pitch, h: f.h, q: f.q * RAD, vh: -f.vd });
+    }
+    return { ...Harness.settle(s, 4), gs: f.out.gs };
+  },
+
+  /** contacte ferm: com drop() (actitud d aproximacio trimada a Vref, 5 cm per sobre de la pista, sense arrodonir), pero
+      en tocar les rodes principals el motor va a ralenti (surten els spoilers de terra, com en un aterratge normal) i el
+      pilot baixa el morro a 2 graus/s; quan el morro toca, deixa anar el comandament. Sense frens. Compta els rebots del
+      tren principal i del de morro, i mesura l assentament des que toca el morro (6 s de finestra) */
+  firmContact(cfg, fpm = 400) {
+    const f = new FlightModel(cfg), ap = new Autopilot(f), ctl = newCtl(), mass = cfg.test.ldgMass, fuel = cfg.mass.typFuel;
+    f.reset({ mass, fuel }); const v = f.vspeeds(), cas = v.vref * KT, gam = -Math.asin(fpm * FPM / tasFromCas(cas, 0));
+    const tr = trimAircraft(f, { cas, alt: 50, gamma: gam, flaps: cfg.flapLDG, gearDown: true, mass, fuel });
+    ctl.flaps = cfg.flapLDG; ctl.trim = tr.trim; ctl.throttle = tr.throttle;
+    f.h = cfg.gear.zStatic + cfg.gear.staticDefl + 0.05 + Math.sin(f.out.theta) * Math.abs(f.legs[1].x); f.airTime = 10;
+    let tMain = -1, tNose = -1, tHit = -1, fpmTd = NaN, noseBounces = 0, wasNose = false, hMin = Infinity, rebound = 0, peakG = 0;
+    const s = [];
+    for (let i = 0; i < 120 * 20; i++) {
+      f.step(PHYS_DT, ctl, FLAT_ENV);
+      if (tMain < 0 && f.mainWow) { tMain = f.time; fpmTd = f.vdTouch / FPM; ctl.throttle = 0; ap.resetLoops(); }
+      if (tMain < 0) continue;
+      if (tNose < 0) { ap.thetaCmd = approach(ap.thetaCmd, -0.5 * DEG, 2 * DEG * PHYS_DT); ctl.pitch = ap.pitchLoop(ap.thetaCmd, PHYS_DT); } else ctl.pitch = 0;
+      peakG = Math.max(peakG, f.nz);
+      if (tNose < 0) { hMin = Math.min(hMin, f.h); rebound = Math.max(rebound, f.h - hMin); }
+      if (f.noseWow && !wasNose) { if (tNose < 0) tNose = f.time; else noseBounces++; }
+      wasNose = f.noseWow;
+      if (tNose >= 0 && tHit < 0 && f.q >= 0) tHit = f.time;                // fi del cop: el morro ha deixat de baixar
+      if (tHit >= 0) { s.push({ t: f.time - tHit, th: f.out.pitch, h: f.h, q: f.q * RAD, vh: -f.vd }); if (f.time - tHit >= 6) break; }
+    }
+    const st = s.length ? Harness.settle(s, 4) : { amp: NaN, hAmp: NaN, tSettle: NaN };
+    return { fpm: fpmTd, mainBounces: f.touchdown ? f.touchdown.bounces : NaN, noseBounces,
+      bounces: (f.touchdown ? f.touchdown.bounces : 0) + noseBounces, rebound, derot: tNose - tMain, peakG, ...st };
+  },
+
+  /** canvi gran de potencia en vol: massa tipica, net, tren amunt, 5.000 ft, 1,6 x la velocitat de perdua neta. El vol
+      anivellat a ralenti no es un equilibri, aixi que es trima el planeig estabilitzat a ralenti a aquesta velocitat
+      (vol sense acceleracions) i es passa a potencia maxima amb el comandament de capcineig i el trim quiets, ales
+      anivellades amb el pilot automatic de balanceig. Desviacio maxima de capcineig en 10 s, cap amunt i cap avall */
+  powerStep(cfg) {
+    const f = new FlightModel(cfg), ap = new Autopilot(f), ctl = newCtl();
+    const mass = cfg.mass.typical, fuel = cfg.mass.typFuel;
+    f.reset({ mass, fuel }); const cas = 1.6 * f.stallSpeed(0), alt = 5000 * FT;
+    const trimAt = gamma => trimAircraft(f, { cas, alt, gamma, flaps: 0, gearDown: false, mass, fuel });
+    let lo = -15 * DEG, hi = 0;                                   // planeig a ralenti: la trajectoria on la palanca trimada es 0
+    for (let k = 0; k < 30; k++) { const mid = (lo + hi) / 2; if (trimAt(mid).throttle > 1e-4) hi = mid; else lo = mid; }
+    const tr = trimAt(hi);
+    ctl.gearDown = false; ctl.trim = tr.trim; ctl.throttle = 1;
+    ap.resetLoops();
+    const th0 = f.out.pitch; let up = 0, down = 0;
+    for (let i = 0; i < 120 * 10; i++) {
+      ctl.roll = ap.rollLoop(0, PHYS_DT);
+      f.step(PHYS_DT, ctl, FLAT_ENV_AIR);
+      up = Math.max(up, f.out.pitch - th0); down = Math.max(down, th0 - f.out.pitch);
+    }
+    return { gamma: hi * RAD, trimOk: tr.ok, up, down, dev: Math.max(up, down), dIas: f.out.ias - cas / KT };
+  },
+
   /** run everything for one aircraft and grade it */
   run(id) {
     const cfg = AIRCRAFT[id], ex = cfg.expect, rows = [];
@@ -224,6 +313,12 @@ export const Harness = {
     const gr = Harness.ground(cfg);
     add('Parking brake creep (10 s)', gr.held, [0, 0.05], 'm');
     add('180 deg taxi turn diameter', gr.turnDiam, [cfg.gear.nose.x * 1.0, cfg.gear.nose.x * 4.5], 'm');
+    const br = Harness.brakeRelease(cfg), fc = Harness.firmContact(cfg, 400), ps = Harness.powerStep(cfg);
+    add('Brake release at full power: pitch transient', br.amp, ex.brakePitch, 'deg');
+    add('Brake release at full power: settling time', br.tSettle, ex.brakeSettle, 's');
+    add('Firm touchdown at 400 fpm: bounces', fc.bounces, ex.tdBounces, '');
+    add('Firm touchdown at 400 fpm: settling time', fc.tSettle, ex.tdSettle, 's');
+    add('Idle to full power: pitch deviation in 10 s', ps.dev, ex.powerPitch, 'deg');
     return { id, name: cfg.name, rows, pass: rows.every(r => r.pass), detail: { to, sc, sf, ld, apr, gr } };
   },
   runAll() { return AIRCRAFT_ORDER.map(Harness.run); }

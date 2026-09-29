@@ -342,3 +342,54 @@ Consequencies tecniques, nomes registrades:
 - Game.opts conservava els camps spawn* d una llico (Object.assign del
   launcher): ara es treuen abans de cada vol, perque un Free Flight 'final' no
   hereti la distancia ni l offset de la llico 8.
+
+## 2026-09-29 - Fisica: amortiment del tren, potencia del Mi-9 i estabilitat del X-90
+
+Tres problemes que en Marc ha trobat jugant. Mesures abans i despres amb
+tools/estabilitat.mjs (taules a la descripcio del PR).
+
+- Criteri d amortiment del tren: gairebe critic. Un cop i com a molt un petit
+  rebot, i l oscil.lacio de capcineig i d alcada del tren s apaga en menys
+  d 1 s, a tots els avions. "S apaga" vol dir que la velocitat de capcineig
+  queda per sota de 0,3 graus/s i la vertical del CG per sota d 1,5 cm/s. Es
+  mesura en dos escenaris: treure el fre d aparcament amb tota la potencia
+  (6 s de carrera) i un contacte a 400 fpm amb els spoilers de terra, des que
+  el morro acaba de baixar. Rangs a l expect de cada avio: brakeSettle i
+  tdSettle [0, 1] s, tdBounces [0, 1], brakePitch [0, 0,8] graus.
+- Com: amortidor lineal nomes en extensio a cada pota, 2,5 vegades el critic
+  de la pota (GEAR_REBOUND_ZETA a flight-model.js), amb la rigidesa estatica
+  de la pota (pneumatic en serie amb l aire) i la massa aparent de l avio en
+  aquell punt, perque escali igual a tots els avions. Nomes extensio perque
+  la compressio decideix el pic de g del contacte: les files "Touchdown load"
+  del harness (i la nota d aterratge i els danys que en depenen) queden
+  identiques. Descartat un amortidor en els dos sentits: amb el mateix
+  esmorteiment, el contacte a 300 fpm passava de 1,4 a 2-3 g. Descartat
+  tambe afegir-lo en compressio nomes a velocitats de carrera petites: amb
+  0,5 del critic ja treia de rang el contacte de 600 fpm del X-90, i amb 1,0
+  els de 150 i 300 fpm del T-4 i del M-300, entre d altres. El
+  terme c1 (lligat a PHYS_DT, fa estable la integracio de l oleo) es queda:
+  el resultat nou es el mateix amb PHYS_DT/2 i PHYS_DT/4.
+- Mi-9: 950 kW per motor (abans 1.200, classe PT6A-67D del Beech 1900D) i
+  propDragArea 6,0 (abans 7,0, la proporcio a l ala del G-72). Les derivades
+  eren les del G-72 i reaccionaven igual per unitat de moment d empenta; el
+  que el feia picar mes (10,1 graus en 10 s, G-72 8,1, G-42 8,7) era una
+  relacio potencia/pes de 293 W/kg (G-72 177, G-42 192). Ara 8,9 graus.
+  Consequencia: a potencia maxima el Mi-9 crema una mica menys i puja una mica
+  menys (1.815 fpm al harness, dins de [1.500, 2.800]). El balanc economic
+  (tools/balance.mjs) fa servir FlightRecords sintetics i no canvia.
+- Tots els turbohelix piquen amb potencia (empenta per sobre del CG, sense
+  efecte de l estela sobre la cua) i els jets amb motors sota l ala
+  s encabriten; es el comportament del model de sempre i no es toca aqui.
+  powerPitch de l expect de cada avio guarda que cap avio no surti del rang
+  de la seva familia.
+- X-90: les derivades adimensionals eren totes dins del rang (interpolacio
+  G-72 / M-200) i la longitudinal es queda. La lateral i direccional no: amb
+  fuselatge llarg i envergadura curta (Izz/(m b2) 0,093, la resta
+  0,046-0,056) donava el balanceig holandes menys esmorteit i la relacio
+  phi/beta mes alta de tots. Cnb 0,142 -> 0,185 i Cnr -0,23 -> -0,39 pel brac
+  de la deriva (lt/b 1,3 vegades el del M-200; Cnb escala amb el brac i Cnr
+  amb el quadrat) i Clb -0,122 -> -0,105 perque phi/beta quedi com la del
+  M-200. Geometria 3D sense tocar (F6).
+- Observacio, sense canvi: el X-90 fa un 40 % mes de velocitat de balanceig per
+  unitat d aleto que el M-200 (envergadura curta). Es potencia de control, no
+  estabilitat; si en Marc el troba massa viu, es Clda.

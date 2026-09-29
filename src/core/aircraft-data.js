@@ -21,7 +21,9 @@ import { DEG } from './constants.js';
              from these stall speeds when the flight model is built.
    engines   static thrust (jets, N) or shaft power (turboprop, W) per engine + positions
    gear      strut positions (x,y) and geometry, spring rates are derived from load share
-   expect    realistic ranges for the category, checked by the headless test harness   */
+   expect    realistic ranges for the category, checked by the headless test harness. brakePitch/brakeSettle: transient
+             after releasing the brakes at full power (deg, s); tdBounces/tdSettle: 400 fpm touchdown (bounces, s);
+             powerPitch: pitch excursion in 10 s after an idle to full power step from a trimmed idle glide (deg)   */
 
 export const AIRCRAFT = {
 
@@ -74,7 +76,8 @@ export const AIRCRAFT = {
     test: { toMass: 23000, ldgMass: 22350, rotPitch: 8, climbPitchMax: 14 },
     expect: {
       vr: [100, 118], toRoll: [750, 1350], to35: [1000, 1650], climb: [1000, 2100],
-      vsClean: [108, 118], vsFull: [87, 96], vapp: [108, 122], appPitch: [0, 1], ldgRoll: [400, 850], ldgDist: [800, 1400]
+      vsClean: [108, 118], vsFull: [87, 96], vapp: [108, 122], appPitch: [0, 1], ldgRoll: [400, 850], ldgDist: [800, 1400],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
     }
   },
 
@@ -124,7 +127,8 @@ export const AIRCRAFT = {
     test: { toMass: 73500, ldgMass: 64500, rotPitch: 10, climbPitchMax: 17 },
     expect: {
       vr: [135, 155], toRoll: [1200, 2000], to35: [1500, 2400], climb: [2000, 3800],
-      vsClean: [148, 160], vsFull: [107, 116], vapp: [132, 146], appPitch: [2.5, 3.5], ldgRoll: [650, 1300], ldgDist: [1100, 1900]
+      vsClean: [148, 160], vsFull: [107, 116], vapp: [132, 146], appPitch: [2.5, 3.5], ldgRoll: [650, 1300], ldgDist: [1100, 1900],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
     }
   },
 
@@ -176,7 +180,8 @@ export const AIRCRAFT = {
     test: { toMass: 300000, ldgMass: 251300, rotPitch: 7.5, climbPitchMax: 16 },
     expect: {
       vr: [150, 178], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
-      vsClean: [160, 172], vsFull: [117, 126], vapp: [146, 160], appPitch: [2, 3], ldgRoll: [900, 1800], ldgDist: [1350, 2400]
+      vsClean: [160, 172], vsFull: [117, 126], vapp: [146, 160], appPitch: [2, 3], ldgRoll: [900, 1800], ldgDist: [1350, 2400],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [5, 8.5]
     }
   },
 
@@ -229,7 +234,8 @@ export const AIRCRAFT = {
     test: { toMass: 350000, ldgMass: 285800, rotPitch: 9, climbPitchMax: 15 },
     expect: {
       vr: [150, 175], toRoll: [1800, 3000], to35: [2200, 3500], climb: [1500, 3200],
-      vsClean: [165, 178], vsFull: [119, 128], vapp: [148, 163], appPitch: [1, 2.5], ldgRoll: [1000, 2000], ldgDist: [1400, 2600]
+      vsClean: [165, 178], vsFull: [119, 128], vapp: [148, 163], appPitch: [1, 2.5], ldgRoll: [1000, 2000], ldgDist: [1400, 2600],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [3.5, 6.5]
     }
   },
 
@@ -259,10 +265,10 @@ export const AIRCRAFT = {
     flapTO: 1, flapLDG: 2, flapRate: 0.35,
     limits: { vmo: 248, mmo: 0.48, vle: 180, ceiling: 25000 },
     engines: {
-      n: 2, power: 1200e3, staticThrust: 12000, propEff: 0.85, flatRate: 1.10,
+      n: 2, power: 950e3, staticThrust: 12000, propEff: 0.85, flatRate: 1.10,   // 950 kW: classe PT6A-67D (Beech 1900D)
       psfc: 0.30 / 3.6e6, idleFF: 0.019,
       spool: { a0: 0.30, a1: 0.85 },
-      reverseFrac: 0.50, propDragArea: 7.0,
+      reverseFrac: 0.50, propDragArea: 6.0,  // mateixa proporcio a S que el G-72 (12,1 m2 sobre 61 m2)
       pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]]
     },
     gear: {
@@ -279,7 +285,8 @@ export const AIRCRAFT = {
     test: { toMass: 9000, ldgMass: 8800, rotPitch: 8, climbPitchMax: 14 },
     expect: {
       vr: [95, 112], toRoll: [550, 1000], to35: [800, 1350], climb: [1500, 2800],
-      vsClean: [96, 106], vsFull: [78, 88], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 700], ldgDist: [700, 1200]
+      vsClean: [96, 106], vsFull: [78, 88], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 700], ldgDist: [700, 1200],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
     }
   },
 
@@ -295,8 +302,11 @@ export const AIRCRAFT = {
       CL0: 0.31, CLa: 5.36, CLde: 0.376, CD0: 0.0228, e: 0.80, Mcrit: 0.76,
       Cm0: 0.053, Cma: -1.34, Cmq: -20.8, Cmadot: -4.4, Cmde: -1.45,
       CYb: -0.93, CYdr: 0.188,
-      Clb: -0.122, Clp: -0.452, Clr: 0.124, Clda: 0.112, Cldr: 0.0074,
-      Cnb: 0.142, Cnp: -0.072, Cnr: -0.23, Cnda: -0.0132, Cndr: 0.103,
+      // Cnb, Cnr i Clb no son interpolats: amb fuselatge llarg i envergadura curta, Izz/(m b2) es 0,093 (la resta, 0,046-0,056)
+      // i el brac de la deriva sobre b es 1,3 vegades el del M-200. Cnb x 1,3 i Cnr x 1,3^2 pel brac, i Clb reduit perque
+      // phi/beta i l esmorteiment del balanceig holandes quedin com els del M-200 (docs/DECISIONS.md, 29/09/2026)
+      Clb: -0.105, Clp: -0.452, Clr: 0.124, Clda: 0.112, Cldr: 0.0074,
+      Cnb: 0.185, Cnp: -0.072, Cnr: -0.39, Cnda: -0.0132, Cndr: 0.103,
       dCDgear: 0.0208, deMax: 25 * DEG, daMax: 20 * DEG, drMax: 25 * DEG,
       trimRange: [-13.7 * DEG, 4.4 * DEG], slatDAlpha: 6.5 * DEG, flapDAlpha: -1.5 * DEG, clmaxCal: 1.0
     },
@@ -329,7 +339,8 @@ export const AIRCRAFT = {
     test: { toMass: 39000, ldgMass: 36000, rotPitch: 9, climbPitchMax: 17 },
     expect: {
       vr: [135, 155], toRoll: [1200, 2000], to35: [1600, 2500], climb: [2000, 3800],
-      vsClean: [140, 152], vsFull: [105, 115], vapp: [132, 146], appPitch: [2.5, 4], ldgRoll: [600, 1200], ldgDist: [1000, 1800]
+      vsClean: [140, 152], vsFull: [105, 115], vapp: [132, 146], appPitch: [2.5, 4], ldgRoll: [600, 1200], ldgDist: [1000, 1800],
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [3, 6]
     }
   }
 };
@@ -349,7 +360,8 @@ AIRCRAFT.tpShort = variant('tp', {
   test: { toMass: 18600, ldgMass: 18300, rotPitch: 8, climbPitchMax: 14 },
   expect: {
     vr: [95, 112], toRoll: [600, 1100], to35: [850, 1450], climb: [1200, 2300],
-    vsClean: [97, 108], vsFull: [79, 89], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 750], ldgDist: [750, 1250]
+    vsClean: [97, 108], vsFull: [79, 89], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 750], ldgDist: [750, 1250],
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
   }
 });
 
@@ -364,7 +376,8 @@ AIRCRAFT.nbShort = variant('nb', {
   test: { toMass: 66000, ldgMass: 59500, rotPitch: 10, climbPitchMax: 18 },
   expect: {
     vr: [130, 150], toRoll: [1100, 1900], to35: [1500, 2400], climb: [2200, 3800],
-    vsClean: [141, 152], vsFull: [103, 112], vapp: [128, 142], appPitch: [2.5, 3.5], ldgRoll: [600, 1200], ldgDist: [1000, 1800]
+    vsClean: [141, 152], vsFull: [103, 112], vapp: [128, 142], appPitch: [2.5, 3.5], ldgRoll: [600, 1200], ldgDist: [1000, 1800],
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
   }
 });
 
@@ -379,7 +392,8 @@ AIRCRAFT.nbStretch = variant('nb', {
   test: { toMass: 80000, ldgMass: 66000, rotPitch: 8.5, climbPitchMax: 16 },
   expect: {
     vr: [145, 165], toRoll: [1300, 2200], to35: [1800, 2800], climb: [2000, 3800],
-    vsClean: [148, 160], vsFull: [107, 116], vapp: [135, 150], appPitch: [2.5, 3.5], ldgRoll: [700, 1300], ldgDist: [1100, 1900]
+    vsClean: [148, 160], vsFull: [107, 116], vapp: [135, 150], appPitch: [2.5, 3.5], ldgRoll: [700, 1300], ldgDist: [1100, 1900],
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
   }
 });
 
@@ -394,7 +408,8 @@ AIRCRAFT.wbEr = variant('wb', {
   test: { toMass: 300000, ldgMass: 223000, rotPitch: 8, climbPitchMax: 16 },
   expect: {
     vr: [150, 175], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
-    vsClean: [150, 162], vsFull: [110, 119], vapp: [138, 152], appPitch: [2, 3], ldgRoll: [800, 1600], ldgDist: [1250, 2200]
+    vsClean: [150, 162], vsFull: [110, 119], vapp: [138, 152], appPitch: [2, 3], ldgRoll: [800, 1600], ldgDist: [1250, 2200],
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [5, 8.5]
   }
 });
 
