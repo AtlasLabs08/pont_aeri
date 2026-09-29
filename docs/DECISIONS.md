@@ -273,3 +273,58 @@ En Marc ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
   amb retard. Compta AGL (D4, alcada del tren sobre el terreny), i
   l altimetre del HUD es MSL: la diferencia es l elevacio de l aeroport mes
   l alcada del tren. L etiqueta de la llista ara diu "ft AGL".
+
+## 2026-09-29 - C3: llicons 6 a 8 i darrers canvis per tancar C3+C4
+
+En Marc ha provat les 8 llicons (PR #22). Decisions:
+
+- Reinici de camera: un doble clic amb el boto dret torna la camera a l angle
+  per defecte, igual que Home, que es mante com a alternativa. El navegador no
+  dona dblclick del boto dret: Input (index.html) mesura dos mousedown del boto
+  dret en menys de 400 ms. L instructor de la llico 1 ensenya el doble clic i
+  menciona Home (la tecla surt de CONTROL_KEYS).
+- Llico 3 (taxi): la linia verda discontinua segueix el cami per les calles de
+  rodatge, no una recta (substitueix la "linia recta" de l entrada anterior del
+  29/09). world/taxi.js fa un graf de la geometria de taxiways que ja existia,
+  sense redibuixar-la (cruilles en T i creuaments), i en busca el cami mes curt
+  (A*) des de l avio fins al capcal, amb la rodona al final. A LEBL tota la
+  xarxa queda connectada. El cami es recalcula si l avio se n allunya mes de
+  taxi.rerouteM (40 m, lessons.js).
+- D4 canviada: la llico 4 fa servir la mateixa altitud que l altimetre del HUD
+  (MSL), no AGL, perque el jugador vegi el mateix numero a tot arreu. Totes les
+  llicons son a LEBL, gairebe a nivell del mar. maxAltFt en viu es l altitud
+  MSL arrodonida a 10 ft, com l altimetre, i l etiqueta de la llista torna a
+  dir "ft". La resta de D4 (LEBL, meteo calma) no canvia.
+- Llicons 7 i 8 separades, abans indistingibles (totes dues a 10 nm sobre la
+  senda):
+  - Llico 7 (aterratge): comenca a 3 nm en final curt, alineada i
+    estabilitzada. Tot va de l arrodoniment.
+  - Llico 8 (ILS): comenca a 12 nm, 2 nm fora de l eix amb 25 graus d angle
+    d intercepcio, anivellada a 2.000 ft (per sota de la senda), tren amunt i
+    flaps d aproximacio. L instructor explica les dues agulles (localitzador i
+    senda) i guia la intercepcio per fases. Criteri nou ilsFlown: haver seguit
+    l ILS vol dir que, entre 1.500 i 500 ft AGL, cap de les dues agulles no
+    passa d 1 punt de desviacio i el senyal es valid en tot el tram.
+  Distancies, angles i llindars a lessons.js (spawn, ilsTolerance, guidance).
+  El mode 'final' de Game.spawn accepta per opts la distancia, l offset, l angle
+  d intercepcio i l altura, amb el mateix trimAircraft (cap fisica nova); per
+  defecte, Free Flight, no canvia.
+
+Consequencies tecniques, nomes registrades:
+
+- L altura del tram d ilsFlown es l altura sobre la pista (hatFt, de l hW
+  d ILS.nav), no el radioaltimetre: a 12 nm de la 07L hi ha turons d uns
+  600 ft, i amb l AGL del terreny l avio ja entrava al tram al punt de sortida,
+  amb l agulla fora.
+- Llico 6: el comptador dels 10 s nomes avanca a menys de 3 nm del llindar i
+  per sota de 500 ft AGL, dues condicions de D6 que no eren a la llista, i
+  l instructor deia "estabilitza't abans dels 500 ft". Ara la llista mostra
+  totes les condicions de D6 i el missatge de final diu les del comptador.
+  D6 no canvia. Amb el circuit de la llico (1.500 ft a 1,5 nm del llindar) i
+  un descens d uns 500 fpm, s arriba als 500 ft gairebe al llindar: per tenir
+  els 10 s abans cal baixar mes (uns 900 fpm a base). No s ha tocat el spawn.
+- Panell DEV: llancar una llico amb una altra en marxa cancel la la que hi ha
+  (cancelFlight, no compta com a intent, D3) i comenca la nova.
+- Game.opts conservava els camps spawn* d una llico (Object.assign del
+  launcher): ara es treuen abans de cada vol, perque un Free Flight 'final' no
+  hereti la distancia ni l offset de la llico 8.
