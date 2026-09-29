@@ -8,8 +8,10 @@
  *   3. en vol trimat a ralenti, pas a potencia maxima: desviacio maxima de
  *      capcineig en 10 s (cap amunt / cap avall)
  *   4. el mateix pas de potencia (ralenti -> maxima i maxima -> ralenti) seguit
- *      60 s, fugoide inclosa (Harness.powerResponse): desviacio maxima de
- *      capcineig i d altitud, sobreoscil.lacions i temps fins que s apaga
+ *      60 s, fugoide inclosa (Harness.powerResponse): excés de capcineig i
+ *      desviacio d altitud respecte de l equilibri final (actitud i trajectoria
+ *      amb la palanca nova i el mateix trim), sobreoscil.lacions i, nomes com a
+ *      informacio, el temps fins que s apaga
  * I una segona taula de qualitats de vol (nomes aqui, no al harness), per
  * comparar l estabilitat i l amortiment dels avions entre ells: a 10.000 ft,
  * jets a 250 kt i turbohelix a 1,6 x la velocitat de perdua neta, massa
@@ -50,10 +52,10 @@ table(rows);
 
 /* ---- canvi gran de potencia, 60 s ---- */
 console.log('');
-const pr = [['avio', 'pas', 'capcineig (deg)', 'altitud (ft)', 'sobreoscil.lacions', 't (s)', 'canvi d altitud en 60 s (ft)']];
+const pr = [['avio', 'pas', 'capcineig (deg)', 'altitud (ft)', 'sobreoscil.lacions', 't (s, info)', 'equilibri: actitud (deg)', 'equilibri: vs (fpm)']];
 for (const id of ids) for (const dir of ['up', 'down']) {
   const r = Harness.powerResponse(AIRCRAFT[id], dir);
-  pr.push([`${id} (${AIRCRAFT[id].name})`, dir === 'up' ? 'ralenti -> max' : 'max -> ralenti', f(r.pitchDev, 1), f(r.altDev, 0), r.overshoots, f(r.tSettle, 1), f(r.altChange, 0)]);
+  pr.push([`${id} (${AIRCRAFT[id].name})`, dir === 'up' ? 'ralenti -> max' : 'max -> ralenti', f(r.pitchDev, 1), f(r.altDev, 0), r.overshoots, f(r.tSettle, 1), f(r.thEq, 1), f(r.vsEq, 0)]);
 }
 table(pr);
 

@@ -280,16 +280,44 @@ export const Harness = {
     return { gamma: hi * RAD, trimOk: tr.ok, up, down, dev: Math.max(up, down), dIas: f.out.ias - cas / KT };
   },
 
+  /** vol estabilitzat amb la palanca i el trim donats (comandaments centrats, ales anivellades): resol alfa, TAS i
+      trajectoria perque les acceleracions i la q siguin zero, amb el mateix pas de prova que trimAircraft.
+      x0 = [alfa, tas, gamma] inicials (rad, m/s, rad). Deixa el model a l equilibri; torna { alpha, tas, gamma, ok } */
+  equilibrium(f, { throttle, trim, alt, mass, fuel }, x0) {
+    const ctl = newCtl(); ctl.gearDown = false; ctl.throttle = throttle; ctl.trim = trim;
+    const evalF = x => {
+      f.reset({ alt, theta: x[0] + x[2], tas: x[1], gamma: x[2], flaps: 0, gearDown: false, throttle, mass, fuel });
+      const v0 = [f.vn, f.vd], h = 1e-4; f.step(h, ctl, FLAT_ENV_AIR);
+      return [(f.vn - v0[0]) / h, (f.vd - v0[1]) / h, f.q / h];
+    };
+    let x = x0.slice(), ok = false; const d = [1e-4, 0.01, 1e-4];
+    for (let it = 0; it < 60; it++) {
+      const r = evalF(x);
+      if (Math.abs(r[0]) < 1e-4 && Math.abs(r[1]) < 1e-4 && Math.abs(r[2]) < 1e-5) { ok = true; break; }
+      const J = [0, 1, 2].map(() => [0, 0, 0]);
+      for (let j = 0; j < 3; j++) { const xp = x.slice(); xp[j] += d[j]; const rp = evalF(xp); for (let i = 0; i < 3; i++) J[i][j] = (rp[i] - r[i]) / d[j]; }
+      const det3 = A => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+      const det = det3(J); if (Math.abs(det) < 1e-14) break;
+      const dx = [0, 1, 2].map(k => det3(J.map((row, i) => row.map((v, j) => (j === k ? r[i] : v)))) / det);
+      x = [clamp(x[0] - 0.7 * dx[0], -0.15, 0.4), Math.max(20, x[1] - 0.7 * dx[1]), clamp(x[2] - 0.7 * dx[2], -0.6, 0.6)];
+    }
+    evalF(x);
+    return { alpha: x[0], tas: x[1], gamma: x[2], ok };
+  },
+
   /** resposta al canvi gran de potencia durant 60 s, fugoide inclosa. Mateixa condicio que powerStep (massa tipica, net,
       tren amunt, 5.000 ft, 1,6 x Vs neta, comandament i trim quiets, ales anivellades). dir 'up': planeig trimat a ralenti
       i pas a potencia maxima; 'down': pujada trimada a potencia maxima i pas a ralenti.
-        pitchDev    desviacio maxima de capcineig respecte de l actitud trimada (graus)
-        altDev      desviacio maxima d altitud respecte de la recta entre l inici i el final de la finestra (ft): la
-                    transicio d una trajectoria a l altra mes l oscil.lacio; una transicio neta queda a prop de la recta
-        overshoots  inversions del capcineig de mes d 1 grau respecte de l extrem anterior, sense comptar la primera
-                    excursio (la resposta natural): cada una es un pas de la fugoide per sobre o per sota
-        tSettle     ultim instant en que la velocitat de capcineig passa de 0,2 graus/s o l acceleracio vertical de
-                    60 fpm/s (una fugoide de 40 s d 1 grau o de 60 ft d amplitud ja queda per sota); 60 si no s apaga */
+      Tot es mesura respecte de l equilibri FINAL (equilibrium(): la palanca nova amb el mateix trim), no de l estat
+      inicial: el canvi d actitud i de trajectoria fins a l equilibri nou es la resposta que toca, no un defecte.
+        pitchDev    desviacio de capcineig: abans d arribar per primer cop a l actitud d equilibri, el que el morro es mou
+                    en sentit contrari; a partir d aleshores, la desviacio maxima respecte d aquesta actitud (graus)
+        altDev      desviacio d altitud respecte de la trajectoria d equilibri (la recta amb la seva velocitat vertical)
+                    que passa pel punt on la velocitat vertical hi arriba per primer cop (ft)
+        overshoots  vegades que el morro passa mes d 1 grau per sobre o per sota de l actitud d equilibri despres
+                    d haver-hi arribat (cada pas de la fugoide)
+        tSettle     nomes informatiu: ultim instant fora d 1 grau de l actitud d equilibri o de 200 fpm de la seva
+                    velocitat vertical; 60 si no s apaga (amb la fugoide, cap avio no s apaga en 60 s) */
   powerResponse(cfg, dir) {
     const f = new FlightModel(cfg), ap = new Autopilot(f), ctl = newCtl(), T = 60;
     const mass = cfg.mass.typical, fuel = cfg.mass.typFuel, from = dir === 'up' ? 0 : 1;
@@ -301,24 +329,29 @@ export const Harness = {
     const tr = trimAt(from ? lo : hi);
     ctl.gearDown = false; ctl.trim = tr.trim; ctl.throttle = 1 - from;
     ap.resetLoops();
-    const th0 = f.out.pitch, h0 = f.h, s = [];
+    const th0 = f.out.pitch, h0 = f.h, s = []; let ma = 0, mv = 0, mg = 0;
     for (let i = 1; i <= 120 * T; i++) {
       ctl.roll = ap.rollLoop(0, PHYS_DT);
       f.step(PHYS_DT, ctl, FLAT_ENV_AIR);
-      s.push({ t: i * PHYS_DT, th: f.out.pitch, h: (f.h - h0) / FT, q: f.q * RAD, vs: f.out.vsFpm });
+      s.push({ t: i * PHYS_DT, th: f.out.pitch, h: (f.h - h0) / FT, vs: f.out.vsFpm });
+      ma += f.out.alpha * DEG; mv += f.out.tasMs; mg += Math.atan2(-f.vd, Math.hypot(f.vn, f.ve));
     }
-    const hEnd = s[s.length - 1].h;
-    let pitchDev = 0, altDev = 0, tSettle = 0, ext = th0, turns = 0, sense = 0;
-    for (let i = 0; i < s.length; i++) {
-      const p = s[i], acc = i ? (p.vs - s[i - 1].vs) / PHYS_DT : 0;
-      pitchDev = Math.max(pitchDev, Math.abs(p.th - th0)); altDev = Math.max(altDev, Math.abs(p.h - hEnd * p.t / T));
-      if (Math.abs(p.q) > 0.2 || Math.abs(acc) > 60) tSettle = p.t;
-      // inversions amb histeresi d 1 grau: sense es el sentit en que es mou el morro, ext l extrem d aquest tram
-      if (sense === 0) { if (Math.abs(p.th - th0) > 1) { sense = Math.sign(p.th - th0); ext = p.th; } continue; }
-      if ((p.th - ext) * sense > 0) ext = p.th;
-      else if ((ext - p.th) * sense > 1) { turns++; sense = -sense; ext = p.th; }
+    const n = s.length, hEnd = f.h;
+    const eq = Harness.equilibrium(new FlightModel(cfg), { throttle: ctl.throttle, trim: tr.trim, alt: hEnd, mass: f.mass, fuel: f.fuel }, [ma / n, mv / n, mg / n]);
+    const thEq = (eq.alpha + eq.gamma) * RAD, vsEq = eq.tas * Math.sin(eq.gamma) / FPM, sg = Math.sign(thEq - th0) || 1;
+    let pitchDev = 0, altDev = 0, tSettle = 0, iTh = -1, iVs = -1, over = 0, ext = 0;
+    for (let i = 0; i < n; i++) {
+      const p = s[i], e = p.th - thEq;
+      if (Math.abs(e) > 1 || Math.abs(p.vs - vsEq) > 200) tSettle = p.t;
+      if (iVs < 0 && (p.vs - vsEq) * Math.sign(vsEq - s[0].vs) >= 0) iVs = i;
+      if (iVs >= 0) altDev = Math.max(altDev, Math.abs(p.h - s[iVs].h - vsEq * (p.t - s[iVs].t) / 60));
+      if (iTh < 0) { if (e * sg >= 0) { iTh = i; ext = 0; } else { pitchDev = Math.max(pitchDev, (th0 - p.th) * sg); continue; } }
+      pitchDev = Math.max(pitchDev, Math.abs(e));
+      // cada excursio de mes d 1 grau fora de l actitud d equilibri compta un cop, amb histeresi
+      if (ext === 0 && Math.abs(e) > 1) { over++; ext = Math.sign(e); }
+      else if (ext !== 0 && e * ext < 0) ext = 0;
     }
-    return { gamma: (from ? lo : hi) * RAD, trimOk: tr.ok, pitchDev, altDev, overshoots: Math.max(0, turns - 1), tSettle, altChange: hEnd };
+    return { gamma: (from ? lo : hi) * RAD, trimOk: tr.ok, eqOk: eq.ok, thEq, vsEq, pitchDev, altDev, overshoots: over, tSettle, altChange: (hEnd - h0) / FT };
   },
 
   /** run everything for one aircraft and grade it */
