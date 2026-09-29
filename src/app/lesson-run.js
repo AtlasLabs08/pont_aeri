@@ -79,9 +79,10 @@
  *     escrita a ma per llico: una fila per criteri, amb el valor actual
  *     (params.value) i el llindar (params.target), i ok = el criteri es
  *     compleix. Per metric, no per llico: altDeviationMaxFt mostra la
- *     desviacio actual; stabilizedOnFinal s expandeix en les condicions de
- *     finalStabilized (tren, flaps, velocitat, sink, alineacio) mes el temps
- *     sostingut. Si la llico te durationS, primer una fila timeLeft.
+ *     desviacio actual; stabilizedOnFinal s expandeix en totes les
+ *     condicions de finalStabilized (distancia al llindar, altura AGL, tren,
+ *     flaps, velocitat, sink, alineacio), una fila per condicio de D6, mes el
+ *     temps sostingut: si el comptador no avanca, alguna fila no te tic. Si la llico te durationS, primer una fila timeLeft.
  *     labelKey = 'school.objective.' + id, amb messageText.
  *   run.circuit -> { phase, side, turnNow } | null   darrera guia de la
  *     llico 'circuit'; null fins a la primera instantania amb asg*.
@@ -93,7 +94,8 @@
  *   traduible.
  * messageText({ key, params, tParams }) -> text amb t(): cada tParams[nom]
  *   es una clau i18n que es tradueix i s interpola com a {nom}. Els params
- *   numerics (menys count, que tria el plural) es formaten amb fmtNumber.
+ *   numerics (menys count, que tria el plural) es formaten amb fmtNumber:
+ *   els enters sense decimals, la resta amb una.
  * circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, guidance)
  *   -> { phase, side, turnNow }   fase del circuit segons la posicio respecte
  *   de la pista (els angles i distancies son a LESSONS['circuit'].guidance):
@@ -165,10 +167,13 @@ export function circuitGuidance({ alongM, latM, hdgDeg, rwyHdgDeg }, G) {
   return { phase: 'finalTurn', side: sideOf(toFinal), turnNow: true };
 }
 
-/** condicions de D6 (finalStabilized de lessons.js) en una instantania */
+/** condicions de D6 (finalStabilized de lessons.js) en una instantania. El comptador
+ * de sustainedS nomes avanca si es compleixen totes; la llista d objectius en mostra
+ * una fila per clau, en aquest ordre, perque el jugador vegi sempre quina li falta */
 function stabilizedChecks(snap, T) {
   return {
-    gate: snap.aglFt <= T.aglFt && snap.distThrNm != null && snap.distThrNm <= T.maxDistNm,
+    distance: snap.distThrNm != null && snap.distThrNm <= T.maxDistNm,
+    height: snap.aglFt <= T.aglFt,
     alignment: snap.rwyHdgDeg != null && headingDelta(snap.hdgDeg, snap.rwyHdgDeg) <= T.hdgToleranceDeg,
     gear: snap.gearDown === true,
     flaps: snap.flapsLanding === true,
@@ -179,6 +184,8 @@ function stabilizedChecks(snap, T) {
 
 const NO_VALUE = '—';
 const shown = v => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : NO_VALUE);
+/** com shown, amb una decimal (distancies en nm) */
+const shown1 = v => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : NO_VALUE);
 const row = (id, params, ok) => ({ id, labelKey: 'school.objective.' + id, params, ok: ok === true });
 
 /** files d objectiu dels metrics que no son un sol valor contra un llindar.
@@ -190,6 +197,8 @@ const OBJECTIVE_ROWS = {
     const T = run.lesson.finalStabilized, sn = run._snap, ok = sn ? stabilizedChecks(sn, T) : {};
     const vref = sn && sn.vrefKt != null ? sn.vrefKt : null;
     return [
+      row('distance', { value: shown1(sn?.distThrNm), target: T.maxDistNm }, ok.distance),
+      row('height', { value: shown(sn?.aglFt), target: T.aglFt }, ok.height),
       row('gear', {}, ok.gear),
       row('flaps', {}, ok.flaps),
       row('speed', { value: shown(sn?.iasKt), low: shown(vref === null ? null : vref + T.vrefLowKt),
@@ -225,7 +234,9 @@ export function keyLabel(code) {
 
 export function messageText({ key, params, tParams }) {
   const all = {};
-  for (const [name, v] of Object.entries(params || {})) all[name] = typeof v === 'number' && name !== 'count' ? fmtNumber(v) : v;
+  for (const [name, v] of Object.entries(params || {})) {
+    all[name] = typeof v === 'number' && name !== 'count' ? fmtNumber(v, Number.isInteger(v) ? 0 : 1) : v;
+  }
   for (const [name, k] of Object.entries(tParams || {})) all[name] = t(k);
   return t(key, all);
 }
@@ -391,7 +402,8 @@ export class LessonRun {
       case 'downwind': return { key: 'school.circuit.downwind', params: { ft: this.lesson.spawn.aglFt } };
       case 'base': return turnNow ? { key: 'school.circuit.turnBase', ...sideKey } : { key: 'school.circuit.descend' };
       case 'finalTurn': return { key: 'school.circuit.turnFinal', ...sideKey };
-      default: return { key: 'school.circuit.final', params: { ft: this.lesson.finalStabilized.aglFt } };
+      default: { const T = this.lesson.finalStabilized;
+        return { key: 'school.circuit.final', params: { ft: T.aglFt, nm: T.maxDistNm, s: T.sustainedS } }; }
     }
   }
 

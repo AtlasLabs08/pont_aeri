@@ -404,7 +404,7 @@ describe('llico circuit: guia per fases, a banda i banda de la pista', () => {
     run.sample(snapAt({ alongM: -3300, latM: 800, hdgDeg: 340 }));
     assert.equal(messageText(run.instructorMessage()), 'Turn left onto final now.');
     run.sample(snapAt({ alongM: -2500, latM: 20, hdgDeg: 250 }));
-    assert.equal(messageText(run.instructorMessage()), 'On final: be stabilised before 500 ft.');
+    assert.equal(messageText(run.instructorMessage()), 'On final: below 500 ft AGL and within 3 nm of the threshold, stay stabilised for 10 s.');
     setLang('ca');
     run.sample(snapAt({ alongM: -3300, latM: -800, hdgDeg: 160 }));
     assert.equal(messageText(run.instructorMessage()), 'Gira a la dreta cap a final ara.');
@@ -415,6 +415,63 @@ describe('llico circuit: guia per fases, a banda i banda de la pista', () => {
     const run = new LessonRun('circuit');
     run.sample(snap());
     assert.equal(run.instructorMessage().key, L.goalKey);
+  });
+});
+
+describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina condicio falta', () => {
+  const T = LESSONS.find(l => l.id === 'circuit').finalStabilized;
+  // el que va veure en Marc: tren, flaps, velocitat, sink i rumb bons, estabilitzat per sobre dels
+  // 500 ft (l instructor deia "estabilitza't abans dels 500 ft") a 2 nm del llindar
+  const marc = () => snap({ aglFt: T.aglFt + 200, distThrNm: 2, rwyHdgDeg: 66, hdgDeg: 66, gearDown: true,
+    flapsLanding: true, vrefKt: 97, iasKt: 102, vsFpm: -550 });
+  const byId = run => Object.fromEntries(run.objectives().map(o => [o.id, o]));
+
+  test('comptador a 0 amb tot en verd: alguna fila ho ha d explicar', () => {
+    const run = new LessonRun('circuit');
+    for (let i = 0; i < 20; i++) run.sample(marc());
+    const rows = run.objectives();
+    const streak = rows.find(o => o.id === 'stabilizedOnFinal');
+    assert.equal(streak.params.value, 0);
+    const missing = rows.filter(o => o.id !== 'stabilizedOnFinal' && !o.ok).map(o => o.id);
+    assert.deepEqual(missing, ['height']);
+  });
+
+  const breaks = [
+    ['distance', { distThrNm: T.maxDistNm + 0.5 }], ['distance', { distThrNm: null }],
+    ['height', { aglFt: T.aglFt + 1 }], ['gear', { gearDown: false }], ['flaps', { flapsLanding: false }],
+    ['speed', { iasKt: 150 }], ['sink', { vsFpm: -T.sinkMaxFpm - 1 }], ['alignment', { hdgDeg: 90 }]
+  ];
+  for (const [id, over] of breaks) {
+    test(id + ' ' + JSON.stringify(over) + ': el comptador no avanca i nomes aquesta fila falla', () => {
+      const run = new LessonRun('circuit');
+      for (let i = 0; i < 5; i++) run.sample({ ...marc(), aglFt: T.aglFt - 50, ...over });
+      const rows = run.objectives();
+      assert.equal(rows.find(o => o.id === 'stabilizedOnFinal').params.value, 0);
+      assert.deepEqual(rows.filter(o => o.id !== 'stabilizedOnFinal' && !o.ok).map(o => o.id), [id]);
+    });
+  }
+
+  test('per sota de 500 ft i a menys de 3 nm el comptador avanca i la llista ho diu', () => {
+    const run = new LessonRun('circuit');
+    for (let i = 0; i < 4; i++) run.sample({ ...marc(), aglFt: T.aglFt - 50, distThrNm: 1.46 });
+    const by = byId(run);
+    assert.equal(by.stabilizedOnFinal.params.value, 4);
+    assert.deepEqual(by.distance.params, { value: 1.5, target: T.maxDistNm });
+    assert.deepEqual(by.height.params, { value: T.aglFt - 50, target: T.aglFt });
+    setLang('en');
+    assert.equal(messageText({ key: by.distance.labelKey, params: by.distance.params }), 'Distance to threshold: 1.5 nm (max 3 nm)');
+    assert.equal(messageText({ key: by.height.labelKey, params: by.height.params }), 'Height: 450 ft AGL (below 500 ft)');
+    setLang('ca');
+    assert.equal(messageText({ key: by.distance.labelKey, params: by.distance.params }), 'Distància al llindar: 1,5 nm (màx. 3 nm)');
+    setLang('en');
+  });
+
+  test('a final, l instructor diu les condicions del comptador, amb els numeros de lessons.js', () => {
+    const run = new LessonRun('circuit');
+    run.sample({ ...marc(), asgAlongM: -3000, asgLatM: 0, asgHdgDeg: 66 });
+    const msg = run.instructorMessage();
+    assert.equal(msg.key, 'school.circuit.final');
+    assert.deepEqual(msg.params, { ft: T.aglFt, nm: T.maxDistNm, s: T.sustainedS });
   });
 });
 
@@ -435,7 +492,7 @@ describe('llico ils: ilsFlown amb world/ils.js', () => {
 });
 
 describe('objectives: llista del HUD generada dels criteris', () => {
-  const EXPANDED = { stabilizedOnFinal: ['gear', 'flaps', 'speed', 'sink', 'alignment', 'stabilizedOnFinal'] };
+  const EXPANDED = { stabilizedOnFinal: ['distance', 'height', 'gear', 'flaps', 'speed', 'sink', 'alignment', 'stabilizedOnFinal'] };
 
   test('cada llico: una fila per criteri (en ordre), mes timeLeft si te durationS', () => {
     for (const l of LESSONS) {
