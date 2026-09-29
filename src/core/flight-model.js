@@ -236,6 +236,7 @@ export class FlightModel {
     if (this.fuel <= 0) { this.fuelOut = true; xCmd = 0; }
     let thrustTot = 0, MyT = 0, MzT = 0, ffTot = 0;
     const dirF = lerp(1, -E.reverseFrac, this.revPos);
+    const TP = E.thrustPos || E.pos;                                          // punt d aplicacio de l empenta (nomes fisica)
     for (let i = 0; i < E.n; i++) {
       const en = this.eng[i];
       const rate = (E.spool.a0 + E.spool.a1 * en.x) * en.rate;
@@ -264,7 +265,7 @@ export class FlightModel {
       }
       if (this.fuelOut) { T = c.type === 'jet' ? 0 : -qbar * E.propDragArea * 0.05; ff = 0; }
       en.thrust = T; en.ff = ff; thrustTot += T; ffTot += ff;
-      MyT += E.pos[i][2] * T; MzT -= E.pos[i][1] * T;
+      MyT += TP[i][2] * T; MzT -= TP[i][1] * T;
     }
     this.fuel = Math.max(0, this.fuel - ffTot * dt);
     this.mass = this.zfm + this.fuel;

@@ -19,7 +19,8 @@ import { DEG } from './constants.js';
    flaps     per detent: slat extension (0..1), drag/pitching increments, 1-g stall speed (kt CAS at
              vsRefMass) and the flap limit speed VFE. CLmax for every detent is DERIVED
              from these stall speeds when the flight model is built.
-   engines   static thrust (jets, N) or shaft power (turboprop, W) per engine + positions
+   engines   static thrust (jets, N) or shaft power (turboprop, W) per engine + positions (pos: nacelles, also drawn in 3D;
+             thrustPos: physics-only point where the thrust acts, defaults to pos)
    gear      strut positions (x,y) and geometry, spring rates are derived from load share
    expect    realistic ranges for the category, checked by the headless test harness. brakePitch/brakeSettle: transient
              after releasing the brakes at full power (deg, s); tdBounces/tdSettle: 400 fpm touchdown (bounces, s), also at the
@@ -274,7 +275,11 @@ export const AIRCRAFT = {
       psfc: 0.30 / 3.6e6, idleFF: 0.019,
       spool: { a0: 0.30, a1: 0.85 },
       reverseFrac: 0.50, propDragArea: 6.0,  // mateixa proporcio a S que el G-72 (12,1 m2 sobre 61 m2)
-      pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]]
+      pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]],
+      // punt d aplicacio efectiu de l empenta (nomes fisica; les gondoles es dibuixen amb pos): la linia d empenta
+      // quasi pel CG, com l ajusta el fabricant d un avio d escola perque la potencia no mogui el morro. Amb -0,75 el
+      // Mi-9 era el turbohelix que mes es desviava en donar o treure potencia de cop (docs/DECISIONS.md, 29/09/2026)
+      thrustPos: [[0.95, -2.9, -0.1], [0.95, 2.9, -0.1]]
     },
     gear: {
       zStatic: 1.10, stroke: 0.46, tireDefl: 0.04, orifice: 0.15,
@@ -427,3 +432,5 @@ AIRCRAFT.wbEr = variant('wb', {
 export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo', 'commuter', 'rj', 'tpShort', 'nbShort', 'nbStretch', 'wbEr'];
 // static strut deflection = oleo at 80 % of its stroke + tyre deflection (used by the flight model and the 3D gear)
 for (const id in AIRCRAFT) { const g = AIRCRAFT[id].gear; g.staticDefl = 0.80 * g.stroke + g.tireDefl; }
+// punt d aplicacio de l empenta: per defecte, el de les gondoles
+for (const id in AIRCRAFT) { const e = AIRCRAFT[id].engines; if (!e.thrustPos) e.thrustPos = e.pos; }
