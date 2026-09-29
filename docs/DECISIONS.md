@@ -317,8 +317,8 @@ En Marc ha provat les 8 llicons (PR #22). Decisions:
   La resta de D6 (500 ft AGL, 3 nm, 10 s, rumb, tren, flaps, velocitat, sink)
   no canvia. Volat sencer sense navegador (FlightModel, Autopilot i World
   reals, des del spawn 'downwind', velocitat vertical fixa des del gir a base):
-  amb 400 a 700 fpm a base els 10 s es compleixen a 1,32 nm del llindar, en
-  quan l avio queda alineat a final (a 448, 394, 332, 208 i 83 ft AGL amb
+  amb 400 a 700 fpm a base els 10 s es compleixen a 1,32 nm del llindar, tan
+  aviat com l avio queda alineat a final (a 448, 394, 332, 208 i 83 ft AGL amb
   400, 450, 500, 600 i 700 fpm). El ritme bo es 400-500 fpm: a 600 fpm o mes
   ja s es per sota dels 500 ft abans del gir a final i, sense aplanar el
   descens, molt per sota de la senda (uns 460 ft a 1,3 nm). Amb 300 fpm
