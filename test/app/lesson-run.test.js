@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance } from '../../src/app/lesson-run.js';
 import { LESSONS, CONTROL_KEYS, BALANCE, evaluate } from '../../src/career/index.js';
 import { setLang } from '../../src/i18n/index.js';
+import { AIRPORTS } from '../../src/world/index.js';
 import en from '../../src/i18n/en.js';
 import ca from '../../src/i18n/ca.js';
 
@@ -179,6 +180,51 @@ describe('thresholdMark: ressaltat del capcal nomes a la llico taxi', () => {
     const run = new LessonRun('taxi');
     run.finish(record());
     assert.equal(run.thresholdMark(), null);
+  });
+});
+
+describe('llico 3: taxiPath, cami per les calles de rodatge fins a la rodona', () => {
+  const A = AIRPORTS.LEBL, en = A.allEnds[0], T = LESSONS.find(l => l.id === 'taxi').taxi;
+  const gate = A.gates.find(g => g.size === 'M'), from = [gate.a, gate.c];
+  const len = pts => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+
+  test('des de la porta: no es una recta i acaba al centre de la rodona', () => {
+    const run = new LessonRun('taxi'), path = run.taxiPath(A, en, from);
+    const m = run.thresholdMark(), s = (m.fromM + m.toM) / 2;
+    assert.deepEqual(path[0], from);
+    assert.deepEqual(path[path.length - 1], [en.thr[0] + en.dir[0] * s, en.thr[1] + en.dir[1] * s]);
+    assert.ok(path.length > 2);
+    assert.ok(len(path) > Math.hypot(en.thr[0] - from[0], en.thr[1] - from[1]));
+  });
+
+  test('seguint el cami no el recalcula: comenca a l avio i no torna enrere', () => {
+    const run = new LessonRun('taxi'), full = run.taxiPath(A, en, from);
+    const onRoute = [full[2][0] - 100, full[2][1] + 5];      // sobre la paral lela, 5 m de l eix
+    const path = run.taxiPath(A, en, onRoute);
+    assert.deepEqual(path[0], onRoute);
+    assert.deepEqual(path.slice(2), full.slice(3));
+    assert.ok(len(path) < len(full));
+  });
+
+  test('allunyar-se mes de rerouteM el recalcula des de la posicio nova', () => {
+    const run = new LessonRun('taxi'), full = run.taxiPath(A, en, from);
+    const off = [full[2][0] - 100, full[2][1] - T.rerouteM - 30];
+    const path = run.taxiPath(A, en, off);
+    assert.deepEqual(path[0], off);
+    assert.equal(run._taxi.pts, path);
+    // a menys de rerouteM, el mateix cami de sempre
+    const near = [full[2][0] - 100, full[2][1] - T.rerouteM + 5];
+    const again = new LessonRun('taxi'); again.taxiPath(A, en, from);
+    const kept = again._taxi.pts;
+    again.taxiPath(A, en, near);
+    assert.equal(again._taxi.pts, kept);
+  });
+
+  test('nomes a la llico taxi i mentre l intent es en marxa', () => {
+    assert.equal(new LessonRun('takeoff').taxiPath(A, en, from), null);
+    const run = new LessonRun('taxi');
+    run.finish(record());
+    assert.equal(run.taxiPath(A, en, from), null);
   });
 });
 

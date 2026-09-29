@@ -31,7 +31,10 @@
  *                        parametre val la primera tecla del comandament
  *                        (app/lesson-run.js, LessonRun.tips).
  *       taxi            (llico 'taxi') { maxDistToThrM, maxLatOffsetM,
- *                        maxGroundKt }: llindars de reachedThreshold.
+ *                        maxGroundKt, rerouteM }: els tres primers son els
+ *                        llindars de reachedThreshold; rerouteM, metres que
+ *                        l avio es pot allunyar del cami per les calles de
+ *                        rodatge abans de recalcular-lo (LessonRun.taxiPath).
  *       durationS       (llico 'maneuvers') segons de D5 abans d avaluar.
  *       finalStabilized (llico 'circuit') llindars de D6 per a
  *                        stabilizedOnFinal: { maxDistNm, aglFt, sustainedS,
@@ -107,7 +110,7 @@ export const LESSONS = [
   { id: 'taxi', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.taxi.title', goalKey: 'school.lesson.taxi.goal',
     criteria: [{ metric: 'reachedThreshold', op: 'eq', value: true }],
-    taxi: { maxDistToThrM: 60, maxLatOffsetM: 25, maxGroundKt: 20 },
+    taxi: { maxDistToThrM: 60, maxLatOffsetM: 25, maxGroundKt: 20, rerouteM: 40 },
     tips: [{ key: 'school.tip.taxi', keys: { left: 'steerLeft', right: 'steerRight', more: 'throttleUp',
       less: 'throttleDown', brake: 'brake', park: 'parkBrake' } }] },
   { id: 'takeoff', aircraftTypeId: 'commuter',

@@ -8,7 +8,8 @@
  * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
  *          circuitGuidance
  *
- * IMPORTA: LESSONS, CONTROL_KEYS, factsFromRecord i evaluate de career/; t de i18n/.
+ * IMPORTA: LESSONS, CONTROL_KEYS, factsFromRecord i evaluate de career/; t de i18n/;
+ *   taxiRoute i nearestOnPolyline de world/.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   new LessonRun(lessonId)   llanca amb l id si es desconegut a LESSONS
@@ -42,11 +43,20 @@
  *     de la pista assignada mentre l intent es en marxa: nomes les llicons
  *     amb dades taxi (lessons.js). index.html hi pinta una rodona verda
  *     fluorescent a terra, centrada al mig del tram sobre l eix i de radi
- *     halfWidthM, i una linia recta discontinua des de l avio fins a la
- *     rodona (docs/DECISIONS.md, 29/09/2026). fromM i toM son
+ *     halfWidthM, i una linia discontinua des de l avio fins a la rodona
+ *     pel cami de taxiPath (docs/DECISIONS.md, 29/09/2026). fromM i toM son
  *     metres respecte del llindar en el sentit d aterratge (negatiu = abans),
  *     halfWidthM a cada banda de l eix. Surt dels llindars de reachedThreshold:
  *     maxDistToThrM a cada banda del llindar i maxLatOffsetM d amplada.
+ *   run.taxiPath(A, en, pos) -> [[a, c], ...] | null   cami per les calles
+ *     de rodatge (world/taxi.js, taxiRoute) des de pos fins al centre de
+ *     thresholdMark, en coordenades locals d A (l aeroport, makeAirport); en
+ *     es el cap de pista assignat i pos la posicio de l avio [a, c]. Comenca a
+ *     pos, continua pel punt del cami mes proper (mai enrere del que ja ha
+ *     fet) i acaba al centre de la rodona. El cami es desa i nomes es
+ *     recalcula si canvia A o en, o si l avio se n allunya mes de
+ *     LESSONS[..].taxi.rerouteM. null si la llico no te dades taxi, si
+ *     l intent ha acabat o si no hi ha cami.
  *   run.facts   fets en viu acumulats fins ara (sempre inclou crashed)
  *   run.done   true un cop tancat (crash o finish)
  *   run.readyToEnd()   true si toca tancar l intent: crashed, criteris en
@@ -117,6 +127,7 @@
 
 import { LESSONS, CONTROL_KEYS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
 import { t, fmtNumber } from '../i18n/index.js';
+import { taxiRoute, nearestOnPolyline } from '../world/index.js';
 
 const SECONDS_PER_MINUTE = 60;
 
@@ -263,6 +274,7 @@ export class LessonRun {
     this.circuit = null;
     this._snap = null;
     this._devFt = null;
+    this._taxi = null;
     if (this.lesson.id === 'exterior') this.facts.viewsVisited = 0;
     if (this.lesson.id === 'cockpit') this.facts.controlsIdentified = 0;
     if (this.lesson.id === 'taxi') this.facts.reachedThreshold = false;
@@ -301,6 +313,22 @@ export class LessonRun {
     const T = this.lesson.taxi;
     if (!T || this.done) return null;
     return { fromM: -T.maxDistToThrM, toM: T.maxDistToThrM, halfWidthM: T.maxLatOffsetM };
+  }
+
+  taxiPath(A, en, pos) {
+    const mark = this.thresholdMark();
+    if (!mark) return null;
+    const s = (mark.fromM + mark.toM) / 2, goal = [en.thr[0] + en.dir[0] * s, en.thr[1] + en.dir[1] * s];
+    let r = this._taxi;
+    const near = r && r.A === A && r.en === en && r.pts ? nearestOnPolyline(r.pts, pos, r.seg) : null;
+    if (!near || near.dist > this.lesson.taxi.rerouteM) {
+      const pts = taxiRoute(A, pos, goal);
+      r = this._taxi = { A, en, pts, seg: 0 };
+      if (!pts) return null;
+      return pts;
+    }
+    r.seg = near.seg;
+    return [pos, near.point, ...r.pts.slice(near.seg + 1)];
   }
 
   /** proper comandament que l instructor demana (llico 'cockpit'), o null */

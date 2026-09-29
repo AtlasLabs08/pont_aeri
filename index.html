@@ -2310,13 +2310,13 @@ const HUD = {
     if (!want) { if (this.drawn) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.cv.width, this.cv.height); this.drawn = false; } return; }
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.w, this.h); this.drawn = true;
     if (cockpit) { if (this.on) this.drawHUD(c, S); } else if (box) this.drawBox(c, S);
-    if (mark) this.drawTarget(c, mark, f);
+    if (mark) this.drawTarget(c, mark, f, lesson);
   },
   /** escola, llico 'taxi': rodona verda fluorescent a terra al punt objectiu (centre del tram de thresholdMark sobre l eix de la
-   *  pista assignada, Game.activeEnd; radi halfWidthM) i linia recta discontinua del mateix color des de l avio fins a la rodona.
-   *  Linia recta, no el cami per les taxiways. Es redibuixa a cada frame, en qualsevol camera */
+   *  pista assignada, Game.activeEnd; radi halfWidthM) i linia discontinua del mateix color des de l avio fins a la rodona pel cami
+   *  de les calles de rodatge (LessonRun.taxiPath, world/taxi.js). Es redibuixa a cada frame, en qualsevol camera */
   targetGreen: '#39ff14',
-  drawTarget(c, m, f) {
+  drawTarget(c, m, f, lesson) {
     const A = Game.airport, en = Game.activeEnd; if (!A || !en) return;
     const y = A.elev + 0.3, s = (m.fromM + m.toM) / 2, r = m.halfWidthM, P = A.toWorld(en.thr[0] + en.dir[0] * s, en.thr[1] + en.dir[1] * s);
     c.save(); c.strokeStyle = this.targetGreen; c.shadowColor = 'rgba(57,255,20,0.7)'; c.shadowBlur = 6; c.lineJoin = 'round'; c.lineCap = 'round';
@@ -2325,10 +2325,19 @@ const HUD = {
     c.beginPath(); let pen = false; for (const p of ring) { if (!p) { pen = false; continue; } if (pen) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); pen = true; }
     if (ring.every(Boolean)) { c.closePath(); c.fillStyle = 'rgba(57,255,20,0.28)'; c.fill(); }
     c.lineWidth = 3; c.stroke();
-    // linia: de l avio (a terra) fins a la vora de la rodona
-    const dx = P[0] - f.e, dy = P[1] - f.n, d = Math.hypot(dx, dy);
-    if (d > r) { const k = (d - r) / d, seg = this.groundSegment(f.e, f.n, f.e + dx * k, f.n + dy * k, y);
-      if (seg) { c.setLineDash([12, 9]); c.lineWidth = 2.5; this.line(c, seg[0], seg[1]); } }
+    // linia: de l avio (a terra) fins a la vora de la rodona, pel cami de les calles de rodatge
+    const path = lesson.taxiPath(A, en, A.toLocal(f.e, f.n));
+    if (path) {
+      const W = path.map(p => A.toWorld(p[0], p[1])), inside = q => Math.hypot(q[0] - P[0], q[1] - P[1]) <= r;
+      while (W.length > 1 && inside(W[W.length - 2])) W.pop();
+      if (W.length > 1 && inside(W[W.length - 1])) {      // talla el darrer tram a la vora de la rodona
+        const a = W[W.length - 2], b = W[W.length - 1], ux = b[0] - a[0], uy = b[1] - a[1], px = a[0] - P[0], py = a[1] - P[1];
+        const A2 = ux * ux + uy * uy, B = px * ux + py * uy, C = px * px + py * py - r * r, k = (-B - Math.sqrt(Math.max(0, B * B - A2 * C))) / A2;
+        W[W.length - 1] = [a[0] + ux * k, a[1] + uy * k];
+      }
+      c.setLineDash([12, 9]); c.lineWidth = 2.5;
+      for (let i = 0; i + 1 < W.length; i++) { const seg = this.groundSegment(W[i][0], W[i][1], W[i + 1][0], W[i + 1][1], y); if (seg) this.line(c, seg[0], seg[1]); }
+    }
     c.restore();
   },
   /** extrems en pantalla d un segment a l altura y, retallat davant de la camera (a la cabina l avio queda darrere); null si no se n veu res */
