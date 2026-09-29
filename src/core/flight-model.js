@@ -20,6 +20,11 @@ import { hash2 } from './noise.js';
 export const PHYS_DT = 1 / 120;
 export const SURF = { PAVED: 0, GRASS: 1, TERRAIN: 2, WATER: 3 };
 export const STALL_W = 0.022;          // width (rad) of the attached->separated flow blend
+/* Amortiment d extensio del tren, en fraccio del critic de cada pota (vegeu _buildGear). Nomes frena l extensio: la
+   compressio (i per tant el pic de g del contacte) no canvia. 2,5 per pota deixa el conjunt gairebe critic: un cop,
+   sense rebot, i l oscil.lacio de capcineig i d alcada s apaga en menys d 1 s a tots els avions (docs/DECISIONS.md,
+   29/09/2026). */
+const GEAR_REBOUND_ZETA = 2.5;
 
 /** default environment: flat paved ground at sea level, calm. The game swaps in the real world. */
 export const FLAT_ENV = {
@@ -84,7 +89,18 @@ export class FlightModel {
       return { x, y, z: zFull, nose: isNose, stroke: S, soS, soMax: 0.90 * S, dg, F0: 0.08 * load, kt, ct: 2 * 0.10 * Math.sqrt(kt * mEq), Cc, Cr: 14 * Cc, c1: (kt + kAir) * PHYS_DT * 0.27, tireMax: g.tireDefl * 3.2, so: 0, soDot: 0, comp: 0, load: 0 };
     };
     this.legs.push(mk(g.nose.x, g.nose.y, W * noseShare, true));
-    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
+    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }
+    // Rebound damping. The orifice term above is quadratic (vanishes at small stroke speeds) and the only linear term, c1, is a
+    // numerical one tied to PHYS_DT (~4 % of critical), so small pitch / heave motions on the gear rang for seconds. Each leg gets
+    // a linear damper on its total extension rate, sized as a fraction of critical for the leg's static stiffness (tyre in series
+    // with the air spring) and the mass the aircraft presents at that leg: pitching about the mains for the nose leg, about the
+    // nose leg for the mains. The nose leg carries ~10 % of the weight but must stop the whole pitch inertia, hence mApp.
+    const Iyy = this.cfg.inertia.Iyy * m / this.cfg.inertia.refMass, xn = g.nose.x, L2 = (xn - xm) * (xn - xm);
+    for (const leg of this.legs) {
+      const load = leg.F0 / 0.08, kAir = 1.3 * load / (leg.dg - leg.soS), k = leg.kt * kAir / (leg.kt + kAir);
+      const mApp = leg.nose ? (Iyy + m * xm * xm) / L2 : (Iyy + m * xn * xn) / L2 / g.mains.length;
+      leg.cReb = 2 * GEAR_REBOUND_ZETA * Math.sqrt(k * mApp);
+    }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
     // structural contact points
     const ct = this.cfg.contact, P = [];
     P.push({ n: 'wing', p: ct.wingtip }, { n: 'wing', p: [ct.wingtip[0], -ct.wingtip[1], ct.wingtip[2]] });
@@ -340,6 +356,7 @@ export class FlightModel {
         const vo = (so - leg.so) / dt; leg.so = so; leg.soDot = vo;
         const dTire = comp - leg.so;
         let N = leg.kt * dTire + leg.ct * (compRate - vo);
+        if (compRate < 0) N += leg.cReb * compRate;                                          // rebound damping (extension only)
         if (dTire > leg.tireMax) N += 6 * leg.kt * (dTire - leg.tireMax);                   // rim / bottoming
         if (N <= 0) { leg.comp = comp; continue; }
         leg.comp = comp; leg.load = N;
