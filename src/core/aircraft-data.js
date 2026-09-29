@@ -259,10 +259,10 @@ export const AIRCRAFT = {
     flapTO: 1, flapLDG: 2, flapRate: 0.35,
     limits: { vmo: 248, mmo: 0.48, vle: 180, ceiling: 25000 },
     engines: {
-      n: 2, power: 1200e3, staticThrust: 12000, propEff: 0.85, flatRate: 1.10,
+      n: 2, power: 950e3, staticThrust: 12000, propEff: 0.85, flatRate: 1.10,   // 950 kW: classe PT6A-67D (Beech 1900D)
       psfc: 0.30 / 3.6e6, idleFF: 0.019,
       spool: { a0: 0.30, a1: 0.85 },
-      reverseFrac: 0.50, propDragArea: 7.0,
+      reverseFrac: 0.50, propDragArea: 6.0,  // mateixa proporcio a S que el G-72 (12,1 m2 sobre 61 m2)
       pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]]
     },
     gear: {
