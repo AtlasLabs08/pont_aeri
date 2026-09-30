@@ -108,6 +108,17 @@ describe('openAirline: els cinc estats de loadCareer (E8)', () => {
     assert.equal(entryScreen(currentCareer()), 'school');
   });
 
+  test('carregar la partida emet career:changed (el panell DEV la veu despres de recarregar)', () => {
+    createAirline('Marta', SEED);
+    _resetAirline();
+    const seen = [];
+    on('career:changed', p => seen.push(p.state));
+    openAirline();
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0], currentCareer());
+    assert.equal(seen[0].pilot.name, 'Marta');
+  });
+
   test('balanceMismatch: queda pendent fins que el jugador tria', () => {
     createAirline('Marta', SEED);
     store.setItem(CAREER_KEY, JSON.stringify({ ...stored(), balanceVersion: BALANCE.version + 1 }));

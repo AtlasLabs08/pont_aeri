@@ -24,7 +24,8 @@
  *     la deixa a pendingCareer() fins que la UI tria acceptBalanceMismatch()
  *     o startOver(). 'invalid' fa backupCareer() de seguida i en retorna la
  *     clau (null si no s ha pogut): loadCareer no esborra mai res. 'none':
- *     no hi ha partida.
+ *     no hi ha partida. Sempre emet 'career:changed' amb la partida en
+ *     memoria (o null), perque qui en mostra l estat (panell DEV) s actualitzi.
  *   currentCareer() -> CareerState | null ; pendingCareer() -> idem
  *   entryScreen(state) -> 'name' | 'school' | 'graduation' | 'ops' (pura):
  *     sense partida el nom; si needsGraduation, la graduacio; graduat, el
@@ -94,7 +95,8 @@ export function openAirline() {
   career = null; pending = null;
   if (status === 'ok' || status === 'migrated') career = state;
   else if (status === 'balanceMismatch') pending = state;
-  else if (status === 'invalid') return { status, backupKey: backupCareer() };
+  emit('career:changed', { state: career });
+  if (status === 'invalid') return { status, backupKey: backupCareer() };
   return { status };
 }
 
