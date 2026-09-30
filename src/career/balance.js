@@ -55,7 +55,27 @@ export const BALANCE = deepFreeze({
   },
   // B5: compra a terminis. Entrada downPct del preu; la resta en quotes per vol,
   // mai pel pas del temps (DESIGN.md, "Escala economica")
-  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340 },
+  // reserveFlights (D2+D5, G6): regla de compra, cash - entrada (o preu) >= reserveFlights * quotes per vol
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340, reserveFlights: 10 },
+  // D2+D5: mercat d ocasio i categories d avio (docs/DECISIONS.md, 30/09/2026, G2-G4 i G9)
+  market: {
+    listings: [8, 12],                      // anuncis per llista, enter uniforme (sense comptar garanties)
+    regenMinutes: 1440,                     // una llista nova per dia de partida (clock.minute)
+    mix: { rated: 0.50, next: 0.35, other: 0.15 },
+    tierWeights: { basic: 0.25, standard: 0.35, premium: 0.25, deluxe: 0.15 },
+    tiers: [                                // ordre de pitjor a millor
+      { key: 'basic',    priceFactor: [0.6, 0.8], ageYears: [20, 30], condition: [55, 75],  revenueMult: 0.90, wearMult: 1.25 },
+      { key: 'standard', priceFactor: [0.8, 1.0], ageYears: [12, 22], condition: [70, 88],  revenueMult: 1.00, wearMult: 1.00 },
+      { key: 'premium',  priceFactor: [1.0, 1.2], ageYears: [5, 14],  condition: [85, 96],  revenueMult: 1.08, wearMult: 0.90 },
+      { key: 'deluxe',   priceFactor: [1.2, 1.4], ageYears: [1, 6],   condition: [94, 100], revenueMult: 1.15, wearMult: 0.80 }
+    ],
+    referenceYear: 2026,                    // fins que hi hagi rellotge (E1)
+    ageWeight: 0.5,                         // pes de l edat al preu; la resta es l estat
+    hoursPerYear:  { commuter: 1200, turboprop: 1800, narrowbody: 2600, widebody: 4200 },
+    hoursPerCycle: { commuter: 0.8,  turboprop: 1.0,  narrowbody: 1.5,  widebody: 5.0 },
+    hoursJitter: 0.3,
+    sellFee: 0.10
+  },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min

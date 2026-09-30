@@ -195,3 +195,54 @@ describe('BALANCE: contractacio de tripulacio (B5)', () => {
     }
   });
 });
+
+describe('BALANCE: mercat d ocasio i categories (D2+D5)', () => {
+  const M = BALANCE.market;
+  const EPS = 1e-9;   // tolerancia de coma flotant en sumar pesos
+  const sum = o => Object.values(o).reduce((s, v) => s + v, 0);
+
+  test('mix i tierWeights sumen 1', () => {
+    assert.ok(Math.abs(sum(M.mix) - 1) < EPS, 'mix');
+    assert.ok(Math.abs(sum(M.tierWeights) - 1) < EPS, 'tierWeights');
+    assert.deepEqual(Object.keys(M.mix).sort(), ['next', 'other', 'rated']);
+  });
+
+  test('tierWeights te un pes per a cada categoria de tiers, i cap mes', () => {
+    assert.deepEqual(Object.keys(M.tierWeights).sort(), M.tiers.map(t => t.key).sort());
+  });
+
+  test('priceFactor: trams consecutius i sense forats, de 0,6 a 1,4', () => {
+    assert.equal(M.tiers[0].priceFactor[0], 0.6);
+    assert.equal(M.tiers[M.tiers.length - 1].priceFactor[1], 1.4);
+    for (const t of M.tiers) assert.ok(t.priceFactor[0] < t.priceFactor[1], t.key);
+    pairs(M.tiers, (lo, hi) => assert.equal(hi.priceFactor[0], lo.priceFactor[1], lo.key + ' -> ' + hi.key));
+  });
+
+  test('standard te revenueMult i wearMult exactament 1', () => {
+    const s = M.tiers.find(t => t.key === 'standard');
+    assert.equal(s.revenueMult, 1);
+    assert.equal(s.wearMult, 1);
+  });
+
+  test('trams d edat i estat ben formats i dins de l escala 0-100', () => {
+    for (const t of M.tiers) {
+      assert.ok(Number.isInteger(t.ageYears[0]) && t.ageYears[0] >= 0 && t.ageYears[0] < t.ageYears[1], t.key + '.ageYears');
+      assert.ok(t.condition[0] >= 0 && t.condition[0] < t.condition[1] && t.condition[1] <= 100, t.key + '.condition');
+      assert.ok(t.revenueMult > 0 && t.wearMult > 0, t.key + ' mults');
+    }
+  });
+
+  test('llistes, regeneracio, hores i financament ben formats', () => {
+    assert.ok(Number.isInteger(M.listings[0]) && M.listings[0] >= 1 && M.listings[0] <= M.listings[1]);
+    assert.ok(Number.isInteger(M.regenMinutes) && M.regenMinutes > 0);
+    assert.ok(M.ageWeight >= 0 && M.ageWeight <= 1);
+    assert.ok(M.hoursJitter >= 0 && M.hoursJitter < 1);
+    assert.ok(M.sellFee >= 0 && M.sellFee < 1);
+    for (const cls of new Set(Object.values(BALANCE.fleetTypes).map(ft => ft.cls))) {
+      assert.ok(M.hoursPerYear[cls] > 0, 'hoursPerYear.' + cls);
+      assert.ok(M.hoursPerCycle[cls] > 0, 'hoursPerCycle.' + cls);
+    }
+    const r = BALANCE.financing.reserveFlights;
+    assert.ok(Number.isInteger(r) && r >= 0, 'financing.reserveFlights');
+  });
+});
