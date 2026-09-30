@@ -440,6 +440,16 @@ Seguiment del PR #24. Mesures abans i despres amb tools/estabilitat.mjs
   G-42 1.101/689). El valor es el minim de l escombrat entre -0,75 i +0,2 m.
   Ara, en els primers 10 s amb tota la potencia, el Mi-9 aixeca el morro
   7,4 graus en lloc d abaixar-lo 8,9 (fila powerPitch, dins de [6,5, 9,5]).
+- Cost del thrustPos del Mi-9 a l arrodoniment: abans, en treure potencia,
+  desapareixia el moment d empenta que abaixava el morro i el morro pujava
+  sol, cosa que ajudava l arrodoniment. Ara aquesta ajuda gairebe no hi es i
+  cal ~1 grau mes d arrodoniment o comencar-lo abans. Al harness (mateix
+  pilot automatic d arrodoniment, 5 graus des de 8 m), el contacte del Mi-9
+  passa de 63 a 155 fpm (rang [30, 360]); el 63 era el punt optim de
+  l escombrat. Comprovat amb el harness: amb 6 graus en lloc de 5 el contacte
+  torna a 83 fpm (48 amb 6,5), i comencant-lo a 9 m en lloc de 8, a 67 fpm.
+  El harness no es toca (els seus parametres d arrodoniment son de tots els
+  turbohelix). Es valida jugant: si a l escola costa massa, es pot revisar.
 - Tren: l amortidor d extensio (GEAR_REBOUND_ZETA) es dimensionava un sol
   cop amb la massa tipica. La massa aparent de cada pota es proporcional a la
   massa, aixi que el coeficient s escala amb sqrt(massa / massa tipica)
