@@ -224,6 +224,14 @@ describe('BALANCE: mercat d ocasio i categories (D2+D5)', () => {
     assert.equal(s.wearMult, 1);
   });
 
+  test('revenueMult estrictament creixent i wearMult estrictament decreixent, de basic a deluxe', () => {
+    assert.deepEqual(M.tiers.map(t => t.key), ['basic', 'standard', 'premium', 'deluxe']);
+    pairs(M.tiers, (lo, hi) => {
+      assert.ok(hi.revenueMult > lo.revenueMult, lo.key + ' -> ' + hi.key + ' revenueMult');
+      assert.ok(hi.wearMult < lo.wearMult, lo.key + ' -> ' + hi.key + ' wearMult');
+    });
+  });
+
   test('trams d edat i estat ben formats i dins de l escala 0-100', () => {
     for (const t of M.tiers) {
       assert.ok(Number.isInteger(t.ageYears[0]) && t.ageYears[0] >= 0 && t.ageYears[0] < t.ageYears[1], t.key + '.ageYears');

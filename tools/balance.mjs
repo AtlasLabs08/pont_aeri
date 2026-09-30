@@ -151,7 +151,7 @@ const CRITERIA = {
   median: { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, firstCrewMin: 8, firstCrewMax: 12,
             negativePctMax: 12, actHoursMax: 16 },
   p90: { jumpMax: 60, actHoursMax: 20 },
-  negativeCashSeedsMax: 0,      // llavors amb cash < 0 despres d una compra (D2+D5), a tots els modes
+  negativeCashSeedsMax: 0,      // llavors amb cash < 0 despres d una compra (D2+D5): nomes el mode per defecte (A)
   // Criteri B (D2+D5): cap categoria no domina, respecte de --tier standard
   tiers: { medianMaxDiff: 8, p90MaxOver: 5, negativePctMax: 12 },
   curveMaxDev: 0.20             // cada tipus dins del +-20 % de la Corba objectiu
@@ -549,7 +549,8 @@ export function formatSeeds(s) {
     (s.minCash === null ? '-' : fmt(s.minCash)));
   p('');
   p('Criteris (seccio 10, sobre ' + CRITERIA.seeds + ' llavors)' +
-    (s.seeds === CRITERIA.seeds ? '' : ' — ATENCIO: aquesta passada en fa ' + s.seeds));
+    (s.seeds === CRITERIA.seeds ? '' : ' — ATENCIO: aquesta passada en fa ' + s.seeds) +
+    (s.tier === null ? '' : ' — criteri A, del mode per defecte: amb --tier nomes es informacio (el B es a --tiers)'));
   for (const c of s.criteria) p('  ' + c.text + ' -> ' + (c.ok ? 'compleix' : 'NO compleix'));
   return out.join('\n');
 }
@@ -561,7 +562,9 @@ export function formatSeeds(s) {
  * Corre runSeeds al mode per defecte i a cada categoria i avalua el criteri B
  * de cada categoria respecte de --tier standard: mediana de cada salt a
  * +-medianMaxDiff vols, p90 de cada salt com a molt p90MaxOver vols per sobre,
- * vols en negatiu < negativePctMax % (mediana) i 0 llavors amb cash < 0.
+ * vols en negatiu < negativePctMax % (mediana). Les llavors amb cash < 0 i el
+ * cash minim de cada categoria s imprimeixen com a informacio, fora de B
+ * (docs/DECISIONS.md, 30/09/2026).
  */
 export function runTiers({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights } = {}) {
   const T = CRITERIA.tiers;
@@ -575,8 +578,7 @@ export function runTiers({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.fl
     const ok = {
       median: jumps.every((r, i) => Math.abs(r.median - ref[i].median) <= T.medianMaxDiff),
       p90: jumps.every((r, i) => r.p90 <= ref[i].p90 + T.p90MaxOver),
-      negative: neg < T.negativePctMax,
-      cash: s.negativeCashSeeds <= CRITERIA.negativeCashSeedsMax
+      negative: neg < T.negativePctMax
     };
     return { key, run: s, jumps, neg, ok, pass: Object.values(ok).every(Boolean) };
   });
@@ -602,7 +604,7 @@ export function formatTiers(r) {
   p('');
   p('Criteri B (per a cada categoria, respecte de standard): mediana de cada salt a +-' + T.medianMaxDiff +
     ' vols, p90 de cada salt com a molt ' + T.p90MaxOver + ' vols per sobre, vols en negatiu < ' + T.negativePctMax +
-    ' %, 0 llavors amb cash < 0');
+    ' % (cash<0 i cash minim de les categories: informacio, fora de B)');
   p('revenueMult / wearMult: ' + BALANCE.market.tiers.map(t => t.key + ' ' + t.revenueMult + ' / ' + t.wearMult).join(', '));
   return out.join('\n');
 }
