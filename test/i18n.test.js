@@ -82,6 +82,21 @@ describe('t', () => {
     for (const k of Object.keys(ca)) assert.ok(Object.hasOwn(en, k), k);
   });
 
+  test('C5+D1: cada rang de BALANCE.ranks i cada habilitacio de BALANCE.ratings te nom en tots dos idiomes', () => {
+    for (const key of [...BALANCE.ranks.map(r => 'rank.' + r.key), ...Object.keys(BALANCE.ratings).map(k => 'rating.' + k)]) {
+      assert.ok(Object.hasOwn(en, key), 'en: ' + key);
+      assert.ok(Object.hasOwn(ca, key), 'ca: ' + key);
+    }
+  });
+
+  test('C5+D1: els textos de les pantalles noves estan traduits al catala', () => {
+    const prefixes = ['menu.', 'airline.', 'school.status.', 'school.col.', 'school.attempts.', 'save.', 'graduation.',
+      'rank.', 'rating.', 'topbar.', 'ops.', 'guide.'];
+    const keys = Object.keys(en).filter(k => prefixes.some(p => k.startsWith(p)) && k !== 'rank.up');
+    assert.ok(keys.length > 50);
+    for (const k of keys) assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
+  });
+
   test('cada clau de BALANCE.landingBands existeix en tots dos idiomes', () => {
     for (const { key } of BALANCE.landingBands) {
       assert.ok(Object.hasOwn(en, key), 'en: ' + key);

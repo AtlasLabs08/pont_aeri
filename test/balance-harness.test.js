@@ -7,7 +7,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runBalance, formatReport, HARNESS } from '../tools/balance.mjs';
+import { runBalance, startState, formatReport, HARNESS } from '../tools/balance.mjs';
+import { createCareer, graduate, startingCompany, LESSONS } from '../src/career/index.js';
+
+/** graduate de career/, la del joc, sobre una partida nova amb totes les llicons aprovades */
+function gameGraduation(seed) {
+  const s = createCareer({ name: 'Joc', seed, createdAt: '' });
+  return graduate({ ...s, school: { ...s.school, lessonsPassed: LESSONS.map(l => l.id) } });
+}
 
 describe('harness economic', () => {
   test('la mateixa llavor dona exactament el mateix resultat dues vegades', () => {
@@ -34,5 +41,17 @@ describe('harness economic', () => {
     const values = [m.firstCrew, ...m.jumps, m.negativePct, ...Object.values(m.actHours)];
     assert.ok(m.jumps.length > 0 && Object.keys(m.actHours).length > 0);
     for (const v of values) assert.ok(Number.isFinite(v), String(v));
+  });
+
+  test('el joc es gradua exactament al punt de partida del harness: saldo, credit, reputacio, base i pilot', () => {
+    const h = startState({ seed: 777 }), g = gameGraduation(777);
+    for (const k of ['cash', 'loans', 'reputation', 'bases']) assert.deepEqual(g.company[k], h.company[k], k);
+    assert.deepEqual(g.company, { ...h.company });
+    assert.deepEqual(g.network, h.network);
+    assert.deepEqual(g.pilot, { ...h.pilot, name: 'Joc' });
+    assert.equal(g.school.graduated, true);
+    // tots dos surten de la funcio compartida, no de numeros copiats
+    const shared = startingCompany(createCareer({}).company);
+    for (const k of ['cash', 'loans', 'reputation', 'bases']) assert.deepEqual(h.company[k], shared[k], k);
   });
 });

@@ -678,14 +678,21 @@ describe('llico 8 (ils): l instructor guia la intercepcio', () => {
   });
 });
 
-describe('llico 7 (landing): l instructor parla de l arrodoniment', () => {
-  test('tip amb l altura de la barra d arrodoniment de lessons.js', () => {
-    const L = LESSONS.find(l => l.id === 'landing');
+describe('llico 7 (landing): sense barra d arrodoniment, amb el tip de la V/S (E4)', () => {
+  test('tip de la V/S, a en i a ca', () => {
     const tips = new LessonRun('landing').tips();
-    assert.deepEqual(tips, [{ key: 'school.tip.flare', params: { ft: L.flareBar.startAglFt } }]);
+    assert.deepEqual(tips, [{ key: 'school.tip.verticalSpeed', params: {} }]);
+    assert.match(messageText(tips[0]), /vertical speed \(V\/S\) as close to 0 as you can, without letting the airspeed drop below Vref/);
     setLang('ca');
-    assert.match(messageText(tips[0]), /Des de 50 ft segueix la barra d'arrodoniment/);
+    assert.match(messageText(tips[0]), /velocitat vertical \(V\/S\) tan a prop de 0 com puguis/);
     setLang('en');
+  });
+
+  test('aids: la barra d arrodoniment desactivada i el debrief automatic es queda', () => {
+    const L = LESSONS.find(l => l.id === 'landing');
+    assert.deepEqual(L.aids, { flareBar: false, autoDebrief: true });
+    // les dades de la barra es queden: el codi no s esborra
+    assert.ok(L.flareBar && L.flareBar.startAglFt > 0);
   });
 });
 
@@ -810,6 +817,13 @@ describe('attemptMessage', () => {
   test('crash, gracia, aprovat i suspes', () => {
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: true }).key, 'school.instructor.crashed');
     assert.equal(attemptMessage({ passed: true, mercy: true, crashed: false }).key, 'school.instructor.mercyPassed');
+    // E3: l aprovat per gracia diu la nota, a en i a ca
+    const mercy = attemptMessage({ passed: true, mercy: true, crashed: false, score: 34 });
+    assert.deepEqual(mercy, { key: 'school.instructor.mercyPassed', params: { score: 34 } });
+    assert.equal(messageText(mercy), 'Provisional pass with 34. You still need practice: come back to the school whenever you like.');
+    setLang('ca');
+    assert.equal(messageText(mercy), "Aprovat provisional amb 34. Encara et falta ofici: torna a l'escola quan vulguis.");
+    setLang('en');
     assert.equal(attemptMessage({ passed: true, mercy: false, crashed: false }).key, 'school.instructor.passed');
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: false }).key, 'school.instructor.failed');
     const reason = { key: 'school.instructor.altDeviation', params: { ft: 250 } };

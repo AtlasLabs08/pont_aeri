@@ -40,7 +40,9 @@ test('app exporta el que ha d exportar', () => {
     'setFlightLauncher', 'launchFlight', 'onFlightFinished', 'cancelFlight', 'isFlightInProgress',
     'CAREER_KEY', 'loadCareer', 'saveCareer', 'backupCareer', 'discardCareer',
     'LessonRun', 'lessonGoalParams', 'attemptMessage',
-    'debriefRows', 'BOUNCE_PENALTY_PTS', 'TAIL_STRIKE_PENALTY_PTS'
+    'debriefRows', 'BOUNCE_PENALTY_PTS', 'TAIL_STRIKE_PENALTY_PTS',
+    'openAirline', 'currentCareer', 'entryScreen', 'createAirline', 'recordLesson',
+    'needsGraduation', 'graduateCareer', 'exportCareer', 'importCareer', 'topBarModel'
   ]) {
     assert.ok(name in app, `falta l export: ${name}`);
   }

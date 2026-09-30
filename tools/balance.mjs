@@ -10,7 +10,7 @@
  *                                         metriques sobre N llavors seguides,
  *                                         a partir de la llavor)
  *
- * EXPORTA: runBalance metrics runSeeds formatReport formatSeeds HARNESS
+ * EXPORTA: runBalance startState metrics runSeeds formatReport formatSeeds HARNESS
  *
  * Tot l atzar surt de draw(state): la mateixa llavor dona sempre el mateix
  * resultat. Cap Math.random().
@@ -25,8 +25,8 @@ import { pathToFileURL } from 'node:url';
 import {
   BALANCE, createCareer, draw, routeFor, routeForDistance, demandPax,
   computeFlightResult, applyFlightWear, checksDue, performCheck, failureChance, assessDamage,
-  rankForXp, flightXp, applyXp, purchaseRating, financeAircraft, makeLoan, payInstalment,
-  maxCrew, hireCrew, validate
+  flightXp, applyXp, purchaseRating, financeAircraft, payInstalment,
+  maxCrew, hireCrew, validate, graduate, LESSONS
 } from '../src/career/index.js';
 import { distanceKm } from '../src/world/index.js';
 
@@ -55,7 +55,6 @@ export const HARNESS = Object.freeze({
     wb:       ['LEBL', 'KJFK', 'LEBL', 'EGLL', 'LEBL', 'SBGR', 'LEBL', 'EDDF'],
     jumbo:    ['LEBL', 'KJFK', 'LEBL', 'SBGR']
   },
-  base: 'LEBL',
 
   // Coordenades dels aeroports que world/ encara no te (F1)
   coords: {
@@ -221,23 +220,26 @@ function newAirframe(typeId, n, price, loanId) {
     reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
     typeId, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
     condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
-    location: H.base, status: 'ready', groundedUntilMinute: 0,
+    location: BALANCE.startingBase, status: 'ready', groundedUntilMinute: 0,
     maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours, deferred: [] },
     finance: { purchasePrice: price, loanId, leaseId: null },
     value: price
   };
 }
 
-/** Graduacio de l escola (DESIGN.md): habilitacio commuter, XP i capital inicial amb el credit. */
-function graduate(state) {
-  const xp = BALANCE.school.graduationXp;
-  const bought = purchaseRating({ ...state.pilot, xp, rank: rankForXp(xp) }, 0, 'commuter');
-  state.pilot = bought.pilot;
-  state.school.graduated = true;
-  state.company.cash = BALANCE.startingCash;
-  state.company.bases = [H.base];
-  state.company.loans = [{ id: 'L0', ...makeLoan(BALANCE.startingLoan.principal,
-    BALANCE.startingLoan.ratePerFlight, BALANCE.startingLoan.termFlights) }];
+/** Graduacio de l escola: la mateixa graduate de career/ que fa servir el joc (habilitacio
+ *  commuter, XP, capital inicial amb el credit, reputacio i base, startingCompany de finance.js),
+ *  amb totes les llicons aprovades. Modifica state, com la resta del harness. */
+function graduateHarness(state) {
+  const graduated = graduate({ ...state, school: { ...state.school, lessonsPassed: LESSONS.map(l => l.id) } });
+  Object.assign(state, graduated);
+}
+
+/** Partida nova ja graduada: el punt de partida de la simulacio. */
+export function startState({ seed = H.seed } = {}) {
+  const state = createCareer({ name: 'Harness', seed, createdAt: '' });
+  graduateHarness(state);
+  return state;
 }
 
 /**
@@ -245,8 +247,7 @@ function graduate(state) {
  * @param {{seed?:number, flights?:number}} opts
  */
 export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
-  const state = createCareer({ name: 'Harness', seed, createdAt: '' });
-  graduate(state);
+  const state = startState({ seed });
   const co = state.company;
 
   const log = [], purchases = [], crews = [], ranks = [{ key: state.pilot.rank, flight: 0 }], checks = [];
