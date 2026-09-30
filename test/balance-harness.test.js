@@ -7,8 +7,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runBalance, startState, formatReport, HARNESS } from '../tools/balance.mjs';
-import { createCareer, graduate, startingCompany, LESSONS } from '../src/career/index.js';
+import { runBalance, startState, formatReport, HARNESS, harnessPurchase } from '../tools/balance.mjs';
+import { createCareer, graduate, startingCompany, LESSONS, BALANCE, tierOf } from '../src/career/index.js';
 
 /** graduate de career/, la del joc, sobre una partida nova amb totes les llicons aprovades */
 function gameGraduation(seed) {
@@ -53,5 +53,38 @@ describe('harness economic', () => {
     // tots dos surten de la funcio compartida, no de numeros copiats
     const shared = startingCompany(createCareer({}).company);
     for (const k of ['cash', 'loans', 'reputation', 'bases']) assert.deepEqual(h.company[k], shared[k], k);
+  });
+});
+
+describe('harness economic: compres (D2+D5)', () => {
+  test('mode per defecte: preu usedPrice, estat 100, categoria standard i multiplicadors 1', () => {
+    const b = harnessPurchase('nb', 2);
+    assert.equal(b.listing.price, BALANCE.usedPrice.nb);
+    assert.equal(b.listing.tier, 'standard');
+    assert.deepEqual(b.listing.condition, { engines: 100, gear: 100, airframe: 100, avionics: 100 });
+    assert.deepEqual([b.revenueMult, b.wearMult], [1, 1]);
+  });
+
+  test('--tier: punt mig del priceFactor i del condition, i els multiplicadors de la categoria', () => {
+    for (const t of BALANCE.market.tiers) {
+      const b = harnessPurchase('tp', 1, t.key), c = (t.condition[0] + t.condition[1]) / 2;
+      assert.equal(b.listing.price, Math.round(BALANCE.usedPrice.tp * (t.priceFactor[0] + t.priceFactor[1]) / 2), t.key);
+      assert.equal(b.listing.tier, t.key);
+      assert.deepEqual(b.listing.condition, { engines: c, gear: c, airframe: c, avionics: c });
+      assert.deepEqual([b.revenueMult, b.wearMult], [t.revenueMult, t.wearMult]);
+    }
+    assert.throws(() => runBalance({ flights: 1, tier: 'gold' }), /gold/);
+  });
+
+  test('--tier: tots els avions de la categoria, estat final valid i determinista', () => {
+    for (const tier of [null, 'basic', 'deluxe']) {
+      const r = runBalance({ seed: 20260927, flights: 120, tier });
+      assert.ok(r.purchases.length >= 2, String(tier));
+      assert.equal(r.valid.ok, true, r.valid.errors.join('; '));
+      for (const a of r.state.fleet) assert.equal(a.tier, tierOf(tier).key);
+      assert.ok(Number.isFinite(r.metrics.minCash));
+      const again = runBalance({ seed: 20260927, flights: 120, tier });
+      assert.deepEqual(again.log, r.log);
+    }
   });
 });

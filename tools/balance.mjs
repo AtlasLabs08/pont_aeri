@@ -9,8 +9,21 @@
  *          npm run balance -- --seeds N  (mediana i percentil 90 de les
  *                                         metriques sobre N llavors seguides,
  *                                         a partir de la llavor)
+ *          npm run balance -- --tier <basic|standard|premium|deluxe>
+ *                                        (cada compra d aquella categoria;
+ *                                         es combina amb --seeds)
+ *
+ * Compres (D2+D5, docs/DECISIONS.md 30/09/2026): les fa buyAircraft de
+ * career/ amb la regla de compra purchaseRule (G6), la mateixa del joc. El
+ * primer avio es paga al comptat (financat si la regla no ho permet, com un
+ * Mi-9 deluxe) i la resta, financats. Mode per defecte:
+ * preu usedPrice, estat 100, revenueMult i wearMult 1 (categoria standard).
+ * Amb --tier: preu = usedPrice * punt mig del priceFactor de la categoria,
+ * estat inicial = punt mig del seu condition, i revenueMult i wearMult de la
+ * categoria a computeFlightResult i applyFlightWear.
  *
  * EXPORTA: runBalance startState metrics runSeeds formatReport formatSeeds HARNESS
+ *          harnessPurchase
  *
  * Tot l atzar surt de draw(state): la mateixa llavor dona sempre el mateix
  * resultat. Cap Math.random().
@@ -25,8 +38,8 @@ import { pathToFileURL } from 'node:url';
 import {
   BALANCE, createCareer, draw, routeFor, routeForDistance, demandPax,
   computeFlightResult, applyFlightWear, checksDue, performCheck, failureChance, assessDamage,
-  flightXp, applyXp, purchaseRating, financeAircraft, payInstalment,
-  maxCrew, hireCrew, validate, graduate, LESSONS
+  flightXp, applyXp, purchaseRating, payInstalment,
+  maxCrew, hireCrew, validate, graduate, LESSONS, purchaseRule, buyAircraft, tierOf
 } from '../src/career/index.js';
 import { distanceKm } from '../src/world/index.js';
 
@@ -135,6 +148,7 @@ const CRITERIA = {
   median: { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, firstCrewMin: 8, firstCrewMax: 12,
             negativePctMax: 12, actHoursMax: 16 },
   p90: { jumpMax: 60, actHoursMax: 20 },
+  negativeCashSeedsMax: 0,      // llavors amb cash < 0 despres d una compra (D2+D5)
   curveMaxDev: 0.20             // cada tipus dins del +-20 % de la Corba objectiu
 };
 
@@ -215,15 +229,27 @@ function syntheticRecord(state, typeId, from, to, km, pax) {
 // ---------------------------------------------------------------------------
 // Partida
 
-function newAirframe(typeId, n, price, loanId) {
+const CONDITION_MAX = 100;         // escala de condicio 0..100
+const mid = ([a, b]) => (a + b) / 2;
+
+/**
+ * Anunci sintetic que compra el jugador simulat (Listing de career/types.js)
+ * i els multiplicadors de la categoria. tier null: mode per defecte (preu
+ * usedPrice, estat 100, categoria standard); si no, la categoria de --tier.
+ */
+export function harnessPurchase(typeId, n, tier = null) {
+  const t = tierOf(tier);
+  const c = tier === null ? CONDITION_MAX : mid(t.condition);
   return {
-    reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
-    typeId, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
-    condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
-    location: BALANCE.startingBase, status: 'ready', groundedUntilMinute: 0,
-    maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours, deferred: [] },
-    finance: { purchasePrice: price, loanId, leaseId: null },
-    value: price
+    listing: {
+      reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
+      typeId, tier: t.key, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
+      condition: { engines: c, gear: c, airframe: c, avionics: c },
+      maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours },
+      price: tier === null ? BALANCE.usedPrice[typeId] : Math.round(BALANCE.usedPrice[typeId] * mid(t.priceFactor))
+    },
+    revenueMult: tier === null ? 1 : t.revenueMult,
+    wearMult: tier === null ? 1 : t.wearMult
   };
 }
 
@@ -244,41 +270,49 @@ export function startState({ seed = H.seed } = {}) {
 
 /**
  * Simula la partida. Retorna les dades en brut; formatReport les imprimeix.
- * @param {{seed?:number, flights?:number}} opts
+ * tier: null (mode per defecte) o una categoria de BALANCE.market.tiers.
+ * @param {{seed?:number, flights?:number, tier?:string|null}} opts
  */
-export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
-  const state = startState({ seed });
-  const co = state.company;
+export function runBalance({ seed = H.seed, flights = H.flights, tier = null } = {}) {
+  if (tier !== null) tierOf(tier);                       // llanca si la categoria no existeix
+  let state = startState({ seed });
+  let co = state.company;
+  let mults = { revenueMult: 1, wearMult: 1 };
+  let minCash = Infinity;                                // cash minim despres de la primera compra
 
   const log = [], purchases = [], crews = [], ranks = [{ key: state.pilot.rank, flight: 0 }], checks = [];
   const affordableAt = {};   // primer vol en que hi havia diners per al seguent salt
-  let rung = 0, legIndex = 0, crewCount = 0, loanSeq = 1;
+  let rung = 0, legIndex = 0, crewCount = 0;
 
-  /** Compra el tipus del graó `i` de l escala. Retorna true si l ha comprat. */
+  /** Compra el tipus del graó `i` de l escala. Retorna true si l ha comprat. La regla de compra
+   *  (G6) es purchaseRule de career/, sobre el cash que queda despres de pagar l habilitacio. */
   function tryBuy(i, flight) {
     const typeId = H.ladder[i];
-    const price = BALANCE.usedPrice[typeId];
+    const buy = harnessPurchase(typeId, state.fleet.length, tier);
     const rating = BALANCE.fleetTypes[typeId].rating;
     const needsRating = !state.pilot.ratings.includes(rating);
     const ratingCost = needsRating ? BALANCE.ratings[rating].cost : 0;
-    const outright = state.fleet.length === 0;           // el primer avio es paga sencer
-    const fin = outright ? null : financeAircraft(price);
-    const upfront = (outright ? price : fin.downPayment) + ratingCost;
-    if (co.cash < upfront) return false;
+    // el primer avio es paga sencer si la regla ho permet (sempre, al mode per defecte); si no
+    // (un Mi-9 deluxe val mes que el capital inicial), financat. La resta, financats.
+    const ruleFor = mode => purchaseRule({ cash: co.cash - ratingCost, loans: co.loans, price: buy.listing.price, mode });
+    let mode = state.fleet.length === 0 ? 'cash' : 'financed';
+    let rule = ruleFor(mode);
+    if (!rule.ok && mode === 'cash') rule = ruleFor(mode = 'financed');
+    if (!rule.ok) return false;
     affordableAt[typeId] ??= flight;
     if (needsRating) {
       const r = purchaseRating(state.pilot, co.cash, rating);
       if (!r.ok) return false;                           // normalment 'rank'
       state.pilot = r.pilot;
+      co.cash -= ratingCost;
     }
-    let loanId = null;
-    if (fin) {
-      loanId = 'L' + loanSeq++;
-      co.loans.push({ id: loanId, ...fin.loan });
-    }
-    co.cash -= upfront;
-    state.fleet.push(newAirframe(typeId, state.fleet.length, price, loanId));
-    purchases.push({ typeId, flight, price, downPayment: outright ? price : fin.downPayment, ratingCost });
+    const b = buyAircraft(state, buy.listing, mode);
+    if (!b.ok) throw new Error('harness: buyAircraft ha refusat una compra que purchaseRule acceptava: ' + b.reason);
+    state = b.state;
+    co = state.company;
+    mults = { revenueMult: buy.revenueMult, wearMult: buy.wearMult };
+    minCash = Math.min(minCash, co.cash);
+    purchases.push({ typeId, flight, price: buy.listing.price, downPayment: rule.upfront, ratingCost });
     crewCount = 0;                                       // tripulacio nova per a la classe nova
     legIndex = 0;
     return true;
@@ -304,14 +338,14 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
       weatherSeverity: hardWeatherDemand ? H.weatherSeverityMax : 0, reputation: co.reputation });
 
     const { record, turbulence, hardWeather } = syntheticRecord(state, typeId, from, to, km, pax);
-    const input = { record, mode: 'own', ticketPrice: model.pRef, paxOnBoard: pax };
+    const input = { record, mode: 'own', ticketPrice: model.pRef, paxOnBoard: pax, revenueMult: mults.revenueMult };
     const res = computeFlightResult({ ...input, crewCount });
     // El mateix vol sense tripulacio i amb la tripulacio completa, per a la Corba objectiu
     const netSolo = computeFlightResult({ ...input, crewCount: 0 }).net;
     const netFull = computeFlightResult({ ...input, crewCount: maxCrew(cls) }).net;
 
     // Desgast, manteniment i danys: euros reals, fora de K
-    const worn = applyFlightWear(airframe, record);
+    const worn = applyFlightWear(airframe, record, mults.wearMult);
     let af = worn.airframe;
     const dmg = assessDamage({ record, airframeValue: af.value, mode: 'own' });
     let maint = worn.cycleCost;
@@ -337,6 +371,7 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
 
     const flightResult = res.net - maint - dmg.playerCost;
     co.cash += flightResult - instalments;
+    minCash = Math.min(minCash, co.cash);
     co.flightsFlown++;
     co.lifetimeRevenue += res.revenue.tickets + res.revenue.punctuality + res.revenue.fuelSaving;
 
@@ -368,7 +403,7 @@ export function runBalance({ seed = H.seed, flights = H.flights } = {}) {
     }
   }
 
-  const r = { seed, flights, log, purchases, crews, ranks, checks, affordableAt, valid: validate(state), state };
+  const r = { seed, flights, tier, log, purchases, crews, ranks, checks, affordableAt, minCash, valid: validate(state), state };
   r.metrics = metrics(r);
   return r;
 }
@@ -382,6 +417,7 @@ const CLOSABLE_ACTS = [...new Set(Object.values(H.acts))].slice(0, -1);
  *   jumps        vols de cada salt de classe fet (sense els que falten)
  *   negativePct  % de vols en negatiu (resultat - manteniment - danys, sense quotes)
  *   actHours     { acte: hores de joc } dels actes tancats
+ *   minCash      cash minim despres de la primera compra (D2+D5), o null si no n hi ha cap
  */
 export function metrics(r) {
   const jumps = r.purchases.slice(1).map((c, i) => c.flight - r.purchases[i].flight);
@@ -393,7 +429,8 @@ export function metrics(r) {
   }
   return {
     firstCrew: r.crews.length ? r.crews[0].flight : null,
-    jumps, negativePct: 100 * neg / r.log.length, actHours
+    jumps, negativePct: 100 * neg / r.log.length, actHours,
+    minCash: r.minCash === Infinity ? null : r.minCash
   };
 }
 
@@ -414,10 +451,12 @@ function percentile(xs, p) {
  * torna, per a cada metrica, els valors, la mediana i el percentil 90. Un
  * salt o un acte que no arriba, o una tripulacio que no es contracta, compta
  * com a Infinity (pitjor que qualsevol valor) i es compta a `missing`.
- * @param {{seed?:number, seeds?:number, flights?:number}} opts
+ * Tambe el nombre de llavors on el cash baixa de 0 despres d una compra
+ * (negativeCashSeeds) i el cash minim de totes (minCash).
+ * @param {{seed?:number, seeds?:number, flights?:number, tier?:string|null}} opts
  */
-export function runSeeds({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights } = {}) {
-  const results = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights }));
+export function runSeeds({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights, tier = null } = {}) {
+  const results = Array.from({ length: seeds }, (_, i) => runBalance({ seed: seed + i, flights, tier }));
   const runs = results.map(r => r.metrics);
   const rows = [];
   const add = (key, label, values) => rows.push({
@@ -445,11 +484,14 @@ export function runSeeds({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.fl
       devSolo: avg('netSolo') / ts - 1, devFull: avg('netFull') / tf - 1 });
   }
 
-  return { seed, seeds, flights, rows, curve, criteria: seedCriteria(rows, curve) };
+  const cashMins = runs.map(m => m.minCash).filter(v => v !== null);
+  const cash = { negativeCashSeeds: cashMins.filter(v => v < 0).length,
+    minCash: cashMins.length ? Math.min(...cashMins) : null };
+  return { seed, seeds, flights, tier, rows, curve, ...cash, criteria: seedCriteria(rows, curve, cash) };
 }
 
 /** Avalua CRITERIA sobre les files de runSeeds. Torna [{ text, ok }]. */
-function seedCriteria(rows, curve) {
+function seedCriteria(rows, curve, cash) {
   const M = CRITERIA.median, P = CRITERIA.p90;
   const row = key => rows.find(r => r.key === key);
   const jumps = rows.filter(r => r.key.startsWith('jump'));
@@ -473,7 +515,9 @@ function seedCriteria(rows, curve) {
     { text: 'Corba objectiu dins del +-' + 100 * CRITERIA.curveMaxDev + ' %: ' +
         curve.map(c => c.typeId + ' ' + Math.round(100 * c.devSolo) + '/' + Math.round(100 * c.devFull)).join(', '),
       ok: curve.length === H.ladder.length &&
-        curve.every(c => Math.abs(c.devSolo) <= CRITERIA.curveMaxDev && Math.abs(c.devFull) <= CRITERIA.curveMaxDev) }
+        curve.every(c => Math.abs(c.devSolo) <= CRITERIA.curveMaxDev && Math.abs(c.devFull) <= CRITERIA.curveMaxDev) },
+    { text: 'llavors amb cash < 0 despres d una compra: ' + cash.negativeCashSeeds + ' (maxim ' + CRITERIA.negativeCashSeedsMax + ')',
+      ok: cash.negativeCashSeeds <= CRITERIA.negativeCashSeedsMax }
   ];
 }
 
@@ -483,7 +527,8 @@ export function formatSeeds(s) {
   const p = x => out.push(x);
   const num = v => v === Infinity ? 'no arriba' : Number.isInteger(v) ? String(v) : v.toFixed(1);
   p('Harness economic de Pont Aeri — ' + s.seeds + ' llavors (' + s.seed + ' a ' + (s.seed + s.seeds - 1) + '), ' +
-    s.flights + ' vols, K = ' + BALANCE.K + ', termini ' + BALANCE.financing.termFlights + ' vols');
+    s.flights + ' vols, K = ' + BALANCE.K + ', termini ' + BALANCE.financing.termFlights + ' vols, reserva ' +
+    BALANCE.financing.reserveFlights + ' vols' + tierLabel(s.tier));
   p('');
   p('  metrica                           mediana        p90   no arriba');
   for (const r of s.rows) {
@@ -498,6 +543,9 @@ export function formatSeeds(s) {
       pad(fmt(c.full), 14) + '  ' + dev(c.devFull));
   }
   p('');
+  p('Cash despres de cada compra: ' + s.negativeCashSeeds + ' de ' + s.seeds + ' llavors baixen de 0; cash minim de totes: ' +
+    (s.minCash === null ? '-' : fmt(s.minCash)));
+  p('');
   p('Criteris (seccio 10, sobre ' + CRITERIA.seeds + ' llavors)' +
     (s.seeds === CRITERIA.seeds ? '' : ' — ATENCIO: aquesta passada en fa ' + s.seeds));
   for (const c of s.criteria) p('  ' + c.text + ' -> ' + (c.ok ? 'compleix' : 'NO compleix'));
@@ -509,13 +557,14 @@ export function formatSeeds(s) {
 
 const fmt = n => Math.round(n).toLocaleString('en-US');
 const pad = (s, n) => String(s).padStart(n);
+const tierLabel = tier => tier === null ? '' : ', categoria ' + tier;
 
 /** Text de l informe de runBalance. */
 export function formatReport(r) {
   const out = [];
   const p = s => out.push(s);
   p('Harness economic de Pont Aeri — llavor ' + r.seed + ', ' + r.flights + ' vols, K = ' + BALANCE.K +
-    ', termini ' + BALANCE.financing.termFlights + ' vols');
+    ', termini ' + BALANCE.financing.termFlights + ' vols, reserva ' + BALANCE.financing.reserveFlights + ' vols' + tierLabel(r.tier));
   p('');
 
   p('Corba de cash (cada 10 vols; deute = prestecs vius)');
@@ -527,7 +576,7 @@ export function formatReport(r) {
     }
   }
   const minCash = r.log.reduce((m, e) => Math.min(m, e.cash), Infinity);
-  p('  cash minim: ' + fmt(minCash));
+  p('  cash minim: ' + fmt(minCash) + (r.minCash === Infinity ? '' : ' (despres de cada compra: ' + fmt(r.minCash) + ')'));
   p('');
 
   p('Compres (vol 0 = en sortir de l escola)');
@@ -632,29 +681,39 @@ export function formatReport(r) {
   return out.join('\n');
 }
 
-/** Arguments de la linia d ordres: [llavor] [vols] i --seeds N. Amb
+/** Arguments de la linia d ordres: [llavor] [vols], --seeds N i --tier T. Amb
  * npm run balance --seeds N (sense --), npm es queda el --seeds
- * (npm_config_seeds = 'true') i passa nomes la N: es el primer posicional. */
+ * (npm_config_seeds = 'true') i passa nomes la N: es el primer posicional.
+ * Igual amb --tier: npm_config_tier = 'true' i la T es el primer posicional
+ * (si hi ha --seeds, despres de la N). */
 function parseArgs(argv, env) {
   const pos = [];
-  let seeds = null;
+  let seeds = null, tier = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--seeds') seeds = Number(argv[++i]);
     else if (argv[i].startsWith('--seeds=')) seeds = Number(argv[i].slice('--seeds='.length));
+    else if (argv[i] === '--tier') tier = argv[++i];
+    else if (argv[i].startsWith('--tier=')) tier = argv[i].slice('--tier='.length);
     else pos.push(argv[i]);
   }
   if (seeds === null && env.npm_config_seeds !== undefined) {
     seeds = Number(env.npm_config_seeds === 'true' ? pos.shift() : env.npm_config_seeds);
   }
+  if (tier === null && env.npm_config_tier !== undefined) {
+    tier = env.npm_config_tier === 'true' ? pos.shift() : env.npm_config_tier;
+  }
   if (seeds !== null && !(Number.isInteger(seeds) && seeds >= 1)) throw new Error('--seeds ha de ser un enter >= 1');
+  if (tier !== null && !BALANCE.market.tiers.some(t => t.key === tier)) {
+    throw new Error('--tier ha de ser ' + BALANCE.market.tiers.map(t => t.key).join(', '));
+  }
   return {
     seed: pos[0] !== undefined ? Number(pos[0]) : H.seed,
     flights: pos[1] !== undefined ? Number(pos[1]) : H.flights,
-    seeds
+    seeds, tier
   };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const { seed, flights, seeds } = parseArgs(process.argv.slice(2), process.env);
-  console.log(seeds === null ? formatReport(runBalance({ seed, flights })) : formatSeeds(runSeeds({ seed, seeds, flights })));
+  const { seed, flights, seeds, tier } = parseArgs(process.argv.slice(2), process.env);
+  console.log(seeds === null ? formatReport(runBalance({ seed, flights, tier })) : formatSeeds(runSeeds({ seed, seeds, flights, tier })));
 }
