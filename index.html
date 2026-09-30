@@ -88,7 +88,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
 <div id="replaybar" hidden><b>Replay</b><span id="replaytime"></span><span class="hint">C switches tower / chase</span><button id="replayStop">Back to the flight</button></div>
 
 <section id="pause" class="panel" hidden><h2>Paused</h2><div class="row"><label for="pauseVol">Sound</label><input id="pauseVol" type="range" min="0" max="100" step="5"></div><div class="row"><label for="pauseQuality">Graphics</label><select id="pauseQuality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-  <div class="btns"><button id="btnResume">Resume</button><button id="btnRestart">Restart flight</button><button id="btnMixer2">Sound mixer</button><button id="btnHelp">Controls</button><button id="btnMenu">Main menu</button></div></section>
+  <div class="btns"><button id="btnResume">Resume</button><button id="btnRestart">Restart flight</button><button id="btnMixer2">Sound mixer</button><button id="btnHelp">Controls</button><button id="btnGuide"></button><button id="btnMenu">Main menu</button></div></section>
 <section id="mixer" class="panel" hidden><h2>Sound</h2>
   <div class="row"><label for="mixMaster">Master volume</label><input id="mixMaster" type="range" min="0" max="100" step="5"><span class="val" id="mixMasterVal"></span></div>
   <h3>Mix</h3>
@@ -142,12 +142,14 @@ import {
 
 import { IS_DEV } from './src/platform/index.js';
 import { t } from './src/i18n/index.js';
-import { LESSONS, CONTROL_KEYS, isLessonAvailable, recordLessonAttempt } from './src/career/index.js';
+import { LESSONS, CONTROL_KEYS, isLessonAvailable } from './src/career/index.js';
 import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
-  startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson
+  startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
+  currentCareer, recordLesson, unlockAllLessons, discardAirline, on
 } from './src/app/index.js';
+import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide } from './src/ui/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -1963,11 +1965,11 @@ const Cameras = {
      'Runway excursion'  -> excursion      'Fuselage impact'   -> fuselage
      'Gear-up landing'   -> gearUp         'Hard impact'       -> hardImpact */
 const Recorder = new FlightRecorder();
-/* Escola de vol (tasca C3 d ENGINEERING.md). school nomes viu en memoria
- * (D2, docs/DECISIONS.md 27/09/2026): no es desa ni es carrega enlloc.
+/* Escola de vol (tasca C3 d ENGINEERING.md). L escola viu dins de la partida
+ * d Airline (app/airline.js, currentCareer().school) i es desa despres de cada
+ * intent (E1, docs/DECISIONS.md 30/09/2026; substitueix la D2 del C3+C4).
  * currentLesson() (app/lesson-session.js) es la LessonRun de l intent en marxa,
  * o null fora de l escola. */
-let school = { lessonsPassed: [], attempts: {}, graduated: false };
 /** instantania plana per a app/lesson-run.js: vegeu la capcalera del fitxer */
 function lessonSnapshot() {
   const f = Game.fdm, o = f.out, c = Game.ctl, nav = Game.nav, cfg = f.cfg;
@@ -1991,12 +1993,13 @@ function lessonSnapshot() {
 }
 /** desa l intent que startLesson acaba de tancar amb el FlightRecord de Game (crash o report.shown) */
 function concludeLesson({ lessonId, facts, record, reason }) {
-  const result = recordLessonAttempt(school, lessonId, facts);
-  school = result.school;
-  const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed, reason });
+  if (!currentCareer()) return;   // sense partida (panell DEV sense Airline): no hi ha on desar l intent
+  const result = recordLesson(lessonId, facts);
+  const msg = attemptMessage({ passed: result.passed, mercy: result.mercy, crashed: facts.crashed, reason, score: facts.score });
   UI.toast(messageText(msg), 6);
   const lesson = LESSONS.find(l => l.id === lessonId);
-  if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record);
+  // aprovat per gracia (E3): el debrief tambe ho diu
+  if (lesson.aids && lesson.aids.autoDebrief && record.touchdown) UI.showDebrief(record, result.mercy ? messageText(msg) : null);
   if (IS_DEV && DevSchoolPanel.el) DevSchoolPanel.render();
 }
 /** treu d opts els camps spawn* de l escola (LESSONS[..].spawn): Game.opts els conserva despres d una llico
@@ -2006,7 +2009,9 @@ function dropSpawnOpts(o) { for (const k of Object.keys(o)) if (k.startsWith('sp
  * Espill de Best.startFlight(), pero passant per launchFlight() (C2) en comptes
  * de Game.spawn() directe: aixi el launcher injectat es l unic que hi toca. */
 async function launchLesson(lessonId, unlockAll) {
-  if (!unlockAll && !isLessonAvailable(school, lessonId)) { UI.toast('Lesson not available yet', 3); return; }
+  const career = currentCareer();
+  if (!unlockAll && (!career || !isLessonAvailable(career.school, lessonId))) { UI.toast('Lesson not available yet', 3); return; }
+  hideAirlineUi();
   const lesson = LESSONS.find(l => l.id === lessonId);
   // exterior a la pista (correccio del PR #22): a la porta, els edificis de la terminal tapaven una camera
   const start = lesson.id === 'cockpit' || lesson.id === 'taxi' ? 'gate'
@@ -2029,27 +2034,36 @@ async function launchLesson(lessonId, unlockAll) {
   lessonDone.then(outcome => { if (outcome) concludeLesson(outcome); }).catch(err => { if (IS_DEV) console.error(err); });
 }
 /* Panell DEV de l escola (D1, docs/DECISIONS.md 27/09/2026): fora d i18n,
- * nomes visible amb IS_DEV. El boto "unlock all" nomes marca les llicons
- * com a aprovades a la memoria (school), sense passar per recordLessonAttempt. */
+ * nomes visible amb IS_DEV. Des de l E10 (30/09/2026) actua sobre la partida
+ * carregada: "unlock all" marca totes les llicons com a aprovades a la seva
+ * escola i la desa (sense recordLessonAttempt); "delete career" la llenca amb
+ * discardCareer, que en fa copia abans. */
 const DevSchoolPanel = {
   init() {
     const el = document.createElement('div');
     el.id = 'devSchoolPanel';
-    el.style.cssText = 'position:fixed;left:8px;top:32px;z-index:9999;font:12px system-ui;background:rgba(20,20,20,.85);color:#fff;padding:6px 8px;border-radius:6px;max-width:220px';
+    el.style.cssText = 'position:fixed;right:8px;bottom:180px;z-index:9999;font:12px system-ui;background:rgba(20,20,20,.85);color:#fff;padding:6px 8px;border-radius:6px;max-width:220px';
     document.body.appendChild(el);
     this.el = el;
     this.render();
   },
   render() {
+    const career = currentCareer(), school = career && career.school;
     const rows = LESSONS.map(l => {
-      const available = isLessonAvailable(school, l.id), passed = school.lessonsPassed.includes(l.id);
+      const available = !!school && isLessonAvailable(school, l.id), passed = !!school && school.lessonsPassed.includes(l.id);
       return `<div style="margin:2px 0"><button data-lesson="${l.id}" ${available ? '' : 'disabled'}>${l.id}</button> ${passed ? '✓' : ''}</div>`;
     }).join('');
-    this.el.innerHTML = '<b>DEV school</b>' + rows + '<div style="margin-top:4px"><button data-unlock="1">unlock all (DEV)</button></div>';
+    this.el.innerHTML = '<b>DEV school</b>' + (career ? '' : '<div>no career loaded</div>') + rows +
+      `<div style="margin-top:4px"><button data-unlock="1" ${career ? '' : 'disabled'}>unlock all (DEV)</button></div>` +
+      `<div style="margin-top:4px"><button data-discard="1" ${career ? '' : 'disabled'}>delete career (DEV)</button></div>`;
     this.el.querySelectorAll('button[data-lesson]').forEach(b => b.addEventListener('click', () => launchLesson(b.dataset.lesson, false)));
     this.el.querySelector('button[data-unlock]').addEventListener('click', () => {
-      school = { ...school, lessonsPassed: LESSONS.map(l => l.id) };
-      this.render();
+      // E2: amb totes aprovades surt la graduacio; si s esta volant, en tornar al menu
+      if (unlockAllLessons() && Game.state === 'menu') showAirlineHome();
+    });
+    this.el.querySelector('button[data-discard]').addEventListener('click', () => {
+      if (!discardAirline()) { UI.toast('DEV: the backup failed, nothing deleted', 4); return; }
+      if (Game.state === 'menu') { UI.el.menu.hidden = true; showMainMenu(); }
     });
   }
 };
@@ -2706,11 +2720,17 @@ const Main = {
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
     setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, opts); Game.spawn(); });
-    if (IS_DEV) DevSchoolPanel.init();
+    // capa d Airline (ui/): menu principal, escola, graduacio i centre d operacions (C5+D1)
+    initAirlineUi({
+      launchLesson: id => launchLesson(id, false),
+      openFreeFlight: () => { UI.showMenu(true); },
+      onShow: () => { UI.el.menu.hidden = true; UI.el.hud.hidden = true; }
+    });
+    if (IS_DEV) { DevSchoolPanel.init(); on('career:changed', () => DevSchoolPanel.render()); }
     Env.update(Game.opts.hours, 100, [0, 0, -1]);
     prog(0.7, 'Generating terrain'); await tick();
     await this.preloadTerrain(prog);
-    UI.loading(1, ''); UI.showMenu(true); Game.state = 'menu'; Cameras.mode = 'orbit'; UI.photoNote();
+    UI.loading(1, ''); Game.state = 'menu'; Cameras.mode = 'orbit'; UI.photoNote(); showMainMenu();
     requestAnimationFrame(t => this.loop(t));
     setTimeout(() => UI.runHarness(), 1200);        // flight-model self test runs in the background, results under key I
   },
@@ -2780,7 +2800,14 @@ const UI = {
     this.$('optWindDir').addEventListener('input', e => { O.windDir = +e.target.value; windTxt(); }); this.$('optWindKt').addEventListener('input', e => { O.windKt = +e.target.value; windTxt(); });
     this.$('btnFly').addEventListener('click', () => this.startFlight());
     this.$('btnResume').addEventListener('click', () => this.pause(false)); this.$('btnRestart').addEventListener('click', () => { this.pause(false); this.restart(); }); this.$('btnMenu').addEventListener('click', () => this.toMenu());
-    this.$('btnHelp').addEventListener('click', () => this.toggleHelp()); this.$('pauseQuality').addEventListener('change', e => { applyQuality(e.target.value); Terrain.reset(); });
+    this.$('btnHelp').addEventListener('click', () => this.toggleHelp());
+    // guia de consulta (E5): des de la pausa; el panell de pausa s amaga mentre es llegeix
+    this.$('btnGuide').textContent = t('guide.open');
+    this.$('btnGuide').addEventListener('click', () => { this.el.pause.hidden = true; showGuide(() => { if (Game.state === 'paused') this.el.pause.hidden = false; }); });
+    // tornar del menu de Free Flight al menu principal (E8)
+    const back = document.createElement('button'); back.type = 'button'; back.className = 'pa-backlink'; back.textContent = t('menu.back');
+    back.addEventListener('click', () => { this.el.menu.hidden = true; showMainMenu(); });
+    this.el.menu.prepend(back); this.$('pauseQuality').addEventListener('change', e => { applyQuality(e.target.value); Terrain.reset(); });
     this.$('crashRestart').addEventListener('click', () => this.restart()); this.$('crashMenu').addEventListener('click', () => this.toMenu());
     this.$('reportClose').addEventListener('click', () => { this.el.report.hidden = true; }); this.$('reportRestart').addEventListener('click', () => this.restart()); this.$('reportMenu').addEventListener('click', () => this.toMenu());
     this.$('helpClose').addEventListener('click', () => this.toggleHelp());
@@ -2809,8 +2836,10 @@ const UI = {
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
   restart() { this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
-  toMenu() { this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit'; this.showMenu(true); },
-  pause(on) { if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
+  toMenu() { const lesson = lastLessonId() !== null; this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; this.hideDebrief(); if (isAirlineUiOpen()) hideAirlineUi(); abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit';
+    // una llico torna a Airline (escola, o la graduacio si ja toca); Free Flight, al seu menu
+    if (lesson) showAirlineHome(); else this.showMenu(true); },
+  pause(on) { if (!on && isAirlineUiOpen()) hideAirlineUi(); if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
   /** photo scenery: a line in the menu and the data credits in a corner */
   photoNote() {
@@ -2862,7 +2891,8 @@ const UI = {
     } else if (this._flareEl) this._flareEl.style.display = 'none';
   },
   /** debrief detallat (D8): nomes la llico 7, s obre sol despres de cada intent */
-  showDebrief(record) {
+  hideDebrief() { const el = document.getElementById('debriefPanel'); if (el) el.style.display = 'none'; },
+  showDebrief(record, mercyText) {
     const td = record.touchdown, ptsMax = Game.scoreReport(Game.report).ptsMax;
     const rows = debriefRows(td, { tailStrike: record.tailStrike, ptsMax });
     const line = r => {
@@ -2873,6 +2903,7 @@ const UI = {
     let el = document.getElementById('debriefPanel');
     if (!el) { el = document.createElement('div'); el.id = 'debriefPanel'; el.style.cssText = 'position:fixed;right:12px;top:12px;z-index:70;background:rgba(15,20,25,.92);color:#fff;font:13px system-ui;padding:10px 12px;border-radius:8px;max-width:280px'; document.body.appendChild(el); }
     el.innerHTML = `<b>${t('debrief.title')}</b><table>${rows.map(line).join('')}</table>`;
+    if (mercyText) { const p = document.createElement('p'); p.style.cssText = 'margin:.5em 0 0;color:#f5b83d;font-weight:600'; p.textContent = mercyText; el.append(p); }
     el.style.display = 'block';
   },
   frame(S, dt, fps) {
