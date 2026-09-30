@@ -177,6 +177,7 @@ export default {
   'graduation.xp': 'XP guanyada',
   'graduation.xpValue': '+{xp} XP',
   'graduation.cash': 'Saldo',
+  'graduation.cashNote': 'El saldo inclou el crèdit inicial de {loan}.',
   'graduation.open': 'Obre el centre d\'operacions',
   'rank.student': 'Alumne',
   'rank.private': 'Pilot privat',

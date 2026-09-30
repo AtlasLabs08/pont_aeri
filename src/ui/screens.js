@@ -110,6 +110,7 @@ export function graduationScreen(state, result, { onOpen }) {
       el('div', { class: 'pa-kv' }, el('span', {}, t('graduation.rating')), el('b', {}, t('rating.' + result.rating))),
       el('div', { class: 'pa-kv' }, el('span', {}, t('graduation.xp')), el('b', {}, t('graduation.xpValue', { xp: fmtNumber(result.xpGained) }))),
       el('div', { class: 'pa-kv' }, el('span', {}, t('graduation.cash')), el('b', {}, fmtMoney(result.cash)))),
+    el('p', { class: 'pa-dim' }, t('graduation.cashNote', { loan: fmtMoney(result.loan) })),
     el('div', { class: 'pa-btns' }, button(t('graduation.open'), onOpen, true)));
 }
 

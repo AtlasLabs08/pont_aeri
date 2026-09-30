@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import {
   rankForXp, nextRank, rankPayMult, dispatchLimits, flightXp, applyXp,
   canFlyType, purchaseRating, purchaseEndorsement, assessDamage,
-  graduate, createCareer, validate, LESSONS, BALANCE
+  graduate, createCareer, validate, LESSONS, BALANCE, startingCompany
 } from '../../src/career/index.js';
 
 /** Pilot minim; over sobreescriu camps. */
@@ -408,9 +408,19 @@ describe('graduate (C5, E2)', () => {
     const s = career(), before = clone(s);
     const g = graduate(s);
     assert.deepEqual(s, before);
-    assert.deepEqual(g.company, s.company);
+    assert.deepEqual(g.fleet, s.fleet);
+    assert.deepEqual(g.network, s.network);
     assert.deepEqual(g.school.lessonsPassed, s.school.lessonsPassed);
     assert.ok(validate(g).ok);
+  });
+
+  test('la companyia queda al punt de partida: startingCompany, amb el saldo que inclou el credit', () => {
+    const s = career(), g = graduate(s);
+    assert.deepEqual(g.company, startingCompany(s.company));
+    assert.equal(g.company.cash, BALANCE.startingCash);
+    assert.equal(g.company.loans.length, 1);
+    assert.equal(g.company.loans[0].principal, BALANCE.startingLoan.principal);
+    assert.equal(g.company.reputation, BALANCE.reputation.start);
   });
 
   test('llanca si canGraduate es fals', () => {

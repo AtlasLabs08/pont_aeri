@@ -187,7 +187,8 @@ describe('graduacio (E2)', () => {
     assert.equal(needsGraduation(), true);
     const g = graduateCareer();
     assert.deepEqual(g, { rating: 'commuter', xpGained: BALANCE.school.graduationXp,
-      xp: BALANCE.school.graduationXp, rank: 'student', cash: 0, saved: true });
+      xp: BALANCE.school.graduationXp, rank: 'student', cash: BALANCE.startingCash,
+      loan: BALANCE.startingLoan.principal, saved: true });
     const after = JSON.stringify(currentCareer());
     assert.equal(graduateCareer(), null);
     assert.equal(JSON.stringify(currentCareer()), after);
@@ -283,7 +284,7 @@ describe('topBarModel (E6)', () => {
     const s = base(), ready = { ...s, school: { ...s.school, lessonsPassed: allLessons() } };
     const m = topBarModel(graduate(ready));
     assert.deepEqual(m, { name: 'Marta', rankKey: 'student', xp: 250, xpFloor: 0, xpNext: 600,
-      xpProgress: 250 / 600, atMaxRank: false, cash: 0, reputation: BALANCE.reputation.start,
+      xpProgress: 250 / 600, atMaxRank: false, cash: BALANCE.startingCash, reputation: BALANCE.reputation.start,
       fleetReady: 0, fleetTotal: 0, base: null });
   });
 

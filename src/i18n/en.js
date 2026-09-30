@@ -180,6 +180,7 @@ export default {
   'graduation.xp': 'XP earned',
   'graduation.xpValue': '+{xp} XP',
   'graduation.cash': 'Balance',
+  'graduation.cashNote': 'The balance includes the starting loan of {loan}.',
   'graduation.open': 'Open the operations centre',
   'rank.student': 'Student',
   'rank.private': 'Private pilot',

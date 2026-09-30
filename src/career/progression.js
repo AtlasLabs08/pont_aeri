@@ -46,12 +46,15 @@
  *     Rep i retorna la partida sencera, no modifica l entrada: afegeix
  *     GRADUATION_RATING ('commuter') a pilot.ratings si no hi es, suma
  *     BALANCE.school.graduationXp amb applyXp (el rang surt de l XP) i posa
- *     school.graduated = true. Llanca un Error si canGraduate(state.school)
+ *     school.graduated = true.
+ *     La companyia queda al punt de partida del harness economic
+ *     (startingCompany de finance.js: saldo, credit inicial i reputacio). Llanca un Error si canGraduate(state.school)
  *     es fals o si ja es graduat.
  */
 
 import { BALANCE } from './balance.js';
 import { canGraduate } from './school.js';
+import { startingCompany } from './finance.js';
 
 /** @typedef {import('./types.js').Pilot} Pilot */
 
@@ -163,5 +166,6 @@ export function graduate(state) {
   if (state.school.graduated) throw new Error('graduate: el pilot ja es graduat');
   const { pilot } = applyXp(state.pilot, BALANCE.school.graduationXp);
   const ratings = pilot.ratings.includes(GRADUATION_RATING) ? pilot.ratings : [...pilot.ratings, GRADUATION_RATING];
-  return { ...state, pilot: { ...pilot, ratings }, school: { ...state.school, graduated: true } };
+  return { ...state, pilot: { ...pilot, ratings }, company: startingCompany(state.company),
+    school: { ...state.school, graduated: true } };
 }

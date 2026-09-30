@@ -41,8 +41,9 @@
  *     ({ school, passed, mercy, attempt, results }) mes saved. Llanca si no
  *     hi ha partida o si la llico no es disponible.
  *   needsGraduation(state = currentCareer()) -> canGraduate i no graduat
- *   graduateCareer() -> { rating, xpGained, xp, rank, cash, saved } o null
+ *   graduateCareer() -> { rating, xpGained, xp, rank, cash, loan, saved } o null
  *     si no toca (s aplica un sol cop encara que es demani dues vegades).
+ *     cash ja inclou el credit inicial; loan = el seu principal.
  *   exportCareer() -> text JSON o null
  *   importCareer(text) -> { ok, saved? }   si importJson falla, ok false i
  *     la partida en memoria no canvia.
@@ -145,7 +146,8 @@ export function graduateCareer() {
   const saved = set(graduate(career));
   return {
     rating: GRADUATION_RATING, xpGained: career.pilot.xp - before, xp: career.pilot.xp,
-    rank: career.pilot.rank, cash: career.company.cash, saved
+    rank: career.pilot.rank, cash: career.company.cash,
+    loan: career.company.loans.reduce((sum, l) => sum + l.principal, 0), saved
   };
 }
 

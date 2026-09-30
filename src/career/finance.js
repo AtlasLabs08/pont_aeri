@@ -3,7 +3,8 @@
  * no modifica el prestec que rep, en retornen un de nou. Aplicar-les a la
  * partida (restar la quota del cash a cada vol) es feina d app/.
  *
- * EXPORTA: downPayment makeLoan financeAircraft payInstalment
+ * EXPORTA: downPayment makeLoan financeAircraft payInstalment startingCompany
+ *          STARTING_LOAN_ID
  *
  * INTERFICIE (no la canviis, app/, tools/balance.mjs i els tests en depenen):
  *   downPayment(price) -> round(price * financing.downPct), en euros.
@@ -25,6 +26,14 @@
  *     termini, perque l arrodoniment no deixi cap resta. balance nou =
  *     balance + interest - paid; flightsPaid + 1. Un prestec ja tornat
  *     (balance 0) retorna paid 0 i interest 0 i no canvia.
+ *   startingCompany(company) -> Company nova, el punt de partida de la
+ *     companyia en graduar-se (docs/DECISIONS.md, 30/09/2026): cash =
+ *     BALANCE.startingCash (ja inclou el credit, DESIGN.md: 150 k propis +
+ *     250 k de credit), loans = [{ id: STARTING_LOAN_ID, ...makeLoan(
+ *     startingLoan.principal, startingLoan.ratePerFlight,
+ *     startingLoan.termFlights) }], reputation = BALANCE.reputation.start.
+ *     La resta de camps no canvien. No modifica l entrada. La fan servir
+ *     graduate (progression.js) i, a traves seu, tools/balance.mjs.
  */
 
 import { BALANCE } from './balance.js';
@@ -73,5 +82,19 @@ export function payInstalment(loan) {
   return {
     loan: { ...loan, balance: due - paid, flightsPaid: loan.flightsPaid + 1 },
     paid, interest
+  };
+}
+
+/** Id del credit inicial, el primer prestec de la partida. */
+export const STARTING_LOAN_ID = 'L0';
+
+/** Punt de partida de la companyia en graduar-se. Vegeu la capcalera. */
+export function startingCompany(company) {
+  const L = BALANCE.startingLoan;
+  return {
+    ...company,
+    cash: BALANCE.startingCash,
+    reputation: BALANCE.reputation.start,
+    loans: [{ id: STARTING_LOAN_ID, ...makeLoan(L.principal, L.ratePerFlight, L.termFlights) }]
   };
 }
