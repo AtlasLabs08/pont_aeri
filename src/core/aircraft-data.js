@@ -377,7 +377,7 @@ AIRCRAFT.tpShort = variant('tp', {
     vr: [95, 112], toRoll: [600, 1100], to35: [850, 1450], climb: [1200, 2300],
     vsClean: [97, 108], vsFull: [79, 89], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 750], ldgDist: [750, 1250],
     brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
-      powerPitch: [6.5, 9.5], phugPitch: [12.5, 17], phugAlt: [650, 1300]
+    powerPitch: [6.5, 9.5], phugPitch: [12.5, 17], phugAlt: [650, 1300]
   }
 });
 
@@ -394,7 +394,7 @@ AIRCRAFT.nbShort = variant('nb', {
     vr: [130, 150], toRoll: [1100, 1900], to35: [1500, 2400], climb: [2200, 3800],
     vsClean: [141, 152], vsFull: [103, 112], vapp: [128, 142], appPitch: [2.5, 3.5], ldgRoll: [600, 1200], ldgDist: [1000, 1800],
     brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
-      powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
+    powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
   }
 });
 
@@ -411,7 +411,7 @@ AIRCRAFT.nbStretch = variant('nb', {
     vr: [145, 165], toRoll: [1300, 2200], to35: [1800, 2800], climb: [2000, 3800],
     vsClean: [148, 160], vsFull: [107, 116], vapp: [135, 150], appPitch: [2.5, 3.5], ldgRoll: [700, 1300], ldgDist: [1100, 1900],
     brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
-      powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
+    powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
   }
 });
 
@@ -428,7 +428,7 @@ AIRCRAFT.wbEr = variant('wb', {
     vr: [150, 175], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
     vsClean: [150, 162], vsFull: [110, 119], vapp: [138, 152], appPitch: [2, 3], ldgRoll: [800, 1600], ldgDist: [1250, 2200],
     brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
-      powerPitch: [5, 8.5], phugPitch: [18, 35], phugAlt: [2800, 7000]
+    powerPitch: [5, 8.5], phugPitch: [18, 35], phugAlt: [2800, 7000]
   }
 });
 
