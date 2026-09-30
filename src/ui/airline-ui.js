@@ -6,7 +6,7 @@
  * No importa Game ni render/: el que toca el simulador arriba com a hooks.
  *
  * EXPORTA: initAirlineUi showMainMenu enterAirline showAirlineHome
- *          hideAirlineUi isAirlineUiOpen
+ *          hideAirlineUi isAirlineUiOpen showGuide
  *
  * INTERFICIE (no la canviis, index.html en depen):
  *   initAirlineUi({ launchLesson(lessonId), openFreeFlight(), onShow() })
@@ -19,6 +19,9 @@
  *     (tornar d una llico, boto DEV): nom, escola, graduacio o centre
  *   hideAirlineUi()    amaga la capa (desa si hi ha partida)
  *   isAirlineUiOpen() -> boolean
+ *   showGuide(onClose)   guia de consulta (E5). Des de la pausa de Free
+ *     Flight: no crida onShow ni desa, i onClose (qui l ha obert) decideix
+ *     que es torna a veure. Des de l escola hi ha un boto.
  */
 
 import { t } from '../i18n/index.js';
@@ -30,6 +33,7 @@ import {
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
 import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen } from './screens.js';
+import { guideScreen } from './guide.js';
 
 let root = null, hooks = {}, bannerTimer = 0;
 
@@ -43,14 +47,19 @@ export function initAirlineUi(h) {
 
 export function isAirlineUiOpen() { return !!root && !root.hidden; }
 
-/** tanca la pantalla actual (desa, E1) i obre la nova */
-function mount(node, wide) {
-  if (isAirlineUiOpen() && currentCareer()) saveAirline();
+/** tanca la pantalla actual (desa, E1) i obre la nova. overlay: la guia
+ *  oberta des de la pausa, que no toca ni la partida ni la resta de la UI */
+function mount(node, wide, overlay) {
+  if (!overlay && isAirlineUiOpen() && currentCareer()) saveAirline();
   root.className = 'pa-ui ' + (wide ? 'pa-wide' : 'pa-side');
   root.replaceChildren(node);
   root.hidden = false;
   root.scrollTop = 0;
-  if (hooks.onShow) hooks.onShow();
+  if (!overlay && hooks.onShow) hooks.onShow();
+}
+
+export function showGuide(onClose) {
+  mount(guideScreen({ onClose: () => { root.hidden = true; root.replaceChildren(); if (onClose) onClose(); } }), false, true);
 }
 
 export function hideAirlineUi() {
@@ -142,6 +151,7 @@ function showSchool() {
   const state = currentCareer();
   mount(schoolScreen(state, {
     onFly: id => { hideAirlineUi(); hooks.launchLesson(id); },
+    onGuide: () => mount(guideScreen({ onClose: showSchool })),
     onOps: state.school.graduated ? showOps : null,
     onBack: showMainMenu,
     ...saveActions()

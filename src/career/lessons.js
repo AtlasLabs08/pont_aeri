@@ -112,7 +112,15 @@ export const CONTROL_KEYS = {
   brake: ['KeyB'],
   // vol (Input.update): W i S mouen el morro (W avall, S amunt), A i D inclinen; les fletxes fan el mateix
   pitchDown: ['KeyW', 'ArrowUp'], pitchUp: ['KeyS', 'ArrowDown'],
-  rollLeft: ['KeyA', 'ArrowLeft'], rollRight: ['KeyD', 'ArrowRight']
+  rollLeft: ['KeyA', 'ArrowLeft'], rollRight: ['KeyD', 'ArrowRight'],
+  // guia de consulta (E5, docs/DECISIONS.md 30/09/2026): la resta de tecles que llegeixen Input i
+  // Game.onKey, perque la guia no n escrigui cap al text. Nomes dades: Input no les llegeix d aqui.
+  flapsDown: ['KeyF'], flapsUp: ['KeyV'],
+  trimDown: ['KeyZ'], trimUp: ['KeyX'], autoTrim: ['KeyU'], mouseYoke: ['KeyM'],
+  autopilot: ['KeyJ'], autothrottle: ['KeyT'], approach: ['KeyY'], timeAccel: ['KeyN'],
+  landingLights: ['KeyL'], camera: ['KeyC'], hudToggle: ['KeyO'], sound: ['Digit0', 'Numpad0'],
+  brightnessDown: ['Comma'], brightnessUp: ['Period'], help: ['KeyH'], debug: ['KeyI'],
+  pause: ['Escape'], replayExit: ['Escape', 'Space', 'Enter']
 };
 
 /** llindars de D7 de la barra d arrodoniment (llico 'landing') */

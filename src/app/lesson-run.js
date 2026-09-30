@@ -305,7 +305,8 @@ function objectiveRows(run) {
   return rows;
 }
 
-const KEY_SYMBOLS = { Minus: '-', NumpadSubtract: '-', NumpadAdd: '+' };
+const KEY_SYMBOLS = { Minus: '-', NumpadSubtract: '-', NumpadAdd: '+', Numpad0: 'Num 0', Comma: ',', Period: '.',
+  Escape: 'Esc', ArrowUp: '\u2191', ArrowDown: '\u2193', ArrowLeft: '\u2190', ArrowRight: '\u2192' };
 
 export function keyLabel(code) {
   if (Object.hasOwn(KEY_SYMBOLS, code)) return KEY_SYMBOLS[code];
