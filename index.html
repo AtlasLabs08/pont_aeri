@@ -856,7 +856,12 @@ const Sea = {
     this.U = { uWaveA: { value: this.waves.map(w => new THREE.Vector4(w.dx, w.dz, w.k, w.amp)) }, uWaveB: { value: this.waves.map(w => new THREE.Vector2(0, w.w)) },
       uSdf: { value: tex }, uSdfRect: { value: new THREE.Vector4(G.e0 - G.cell * 0.5, G.n0 - G.cell * 0.5, 1 / (G.nx * G.cell), 1 / (G.ny * G.cell)) }, uOrigin: { value: new THREE.Vector2() },
       uSunDir: U.uSunDir, uMoonDir: U.uMoonDir, uSunE: U.uSunE, uMoonE: U.uMoonE, uFogColor: U.uFogColor, uFogDelta: U.uFogDelta, uFogSunDir: U.uFogSunDir, uFogDensity: U.uFogDensity, uTime: U.uTime, uSunColor: U.uSunColor, uSunI: U.uSunI };
-    const g = new THREE.PlaneGeometry(1200000, 1200000, 1, 1); g.rotateX(-Math.PI / 2);
+    // same flat 1200 km plane, but as a 64 x 64 grid whose cells grow geometrically from ~2 m under the camera to
+    // ~190 km at the rim: two giant triangles lose float precision when the GPU clips and interpolates them, and the
+    // sea depth then wobbles by metres at the coast whenever the camera moves (the shoreline z-fights the terrain)
+    const g = new THREE.PlaneGeometry(2, 2, 64, 64), gp = g.attributes.position, grow = u => Math.sign(u) * 600000 * (Math.pow(1.45, Math.abs(u) * 32) - 1) / (Math.pow(1.45, 32) - 1);
+    for (let i = 0; i < gp.count; i++) gp.setXY(i, grow(gp.getX(i)), grow(gp.getY(i)));
+    g.rotateX(-Math.PI / 2);
     let frag = SHADERS.seaFrag;
     if (Photo.on && Photo.U) {
       Object.assign(this.U, { uPhOn: Photo.U.uPhOn, uPhBorder: Photo.U.uPhBorder, uPhRectA: Photo.U.uPhRectA, uPhCoast: Photo.U.uPhCoast });
