@@ -280,12 +280,12 @@ describe('topBarModel (E6)', () => {
     groundedUntilMinute: 0, maintenance: { nextAHours: 500, nextCHours: 6000, deferred: [] },
     finance: { purchasePrice: 350000, loanId: null, leaseId: null }, value: 350000 });
 
-  test('recent graduat: 250 de 600 XP, saldo, reputacio, flota 0/0 i sense base', () => {
+  test('recent graduat: 250 de 600 XP, saldo, reputacio, flota 0/0 i la base inicial', () => {
     const s = base(), ready = { ...s, school: { ...s.school, lessonsPassed: allLessons() } };
     const m = topBarModel(graduate(ready));
     assert.deepEqual(m, { name: 'Marta', rankKey: 'student', xp: 250, xpFloor: 0, xpNext: 600,
       xpProgress: 250 / 600, atMaxRank: false, cash: BALANCE.startingCash, reputation: BALANCE.reputation.start,
-      fleetReady: 0, fleetTotal: 0, base: null });
+      fleetReady: 0, fleetTotal: 0, base: BALANCE.startingBase });
   });
 
   test('barra d XP a mig rang', () => {

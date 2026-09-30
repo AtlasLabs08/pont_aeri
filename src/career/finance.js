@@ -31,7 +31,8 @@
  *     BALANCE.startingCash (ja inclou el credit, DESIGN.md: 150 k propis +
  *     250 k de credit), loans = [{ id: STARTING_LOAN_ID, ...makeLoan(
  *     startingLoan.principal, startingLoan.ratePerFlight,
- *     startingLoan.termFlights) }], reputation = BALANCE.reputation.start.
+ *     startingLoan.termFlights) }], reputation = BALANCE.reputation.start,
+ *     bases = [BALANCE.startingBase].
  *     La resta de camps no canvien. No modifica l entrada. La fan servir
  *     graduate (progression.js) i, a traves seu, tools/balance.mjs.
  */
@@ -95,6 +96,7 @@ export function startingCompany(company) {
     ...company,
     cash: BALANCE.startingCash,
     reputation: BALANCE.reputation.start,
+    bases: [BALANCE.startingBase],
     loans: [{ id: STARTING_LOAN_ID, ...makeLoan(L.principal, L.ratePerFlight, L.termFlights) }]
   };
 }

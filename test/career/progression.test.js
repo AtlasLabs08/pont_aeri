@@ -421,6 +421,8 @@ describe('graduate (C5, E2)', () => {
     assert.equal(g.company.loans.length, 1);
     assert.equal(g.company.loans[0].principal, BALANCE.startingLoan.principal);
     assert.equal(g.company.reputation, BALANCE.reputation.start);
+    assert.deepEqual(g.company.bases, [BALANCE.startingBase]);
+    assert.equal(BALANCE.startingBase, 'LEBL');
   });
 
   test('llanca si canGraduate es fals', () => {

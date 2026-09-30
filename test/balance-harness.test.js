@@ -43,13 +43,15 @@ describe('harness economic', () => {
     for (const v of values) assert.ok(Number.isFinite(v), String(v));
   });
 
-  test('el joc es gradua exactament al punt de partida del harness: saldo, credit, reputacio i pilot', () => {
+  test('el joc es gradua exactament al punt de partida del harness: saldo, credit, reputacio, base i pilot', () => {
     const h = startState({ seed: 777 }), g = gameGraduation(777);
-    for (const k of ['cash', 'loans', 'reputation']) assert.deepEqual(g.company[k], h.company[k], k);
+    for (const k of ['cash', 'loans', 'reputation', 'bases']) assert.deepEqual(g.company[k], h.company[k], k);
+    assert.deepEqual(g.company, { ...h.company });
+    assert.deepEqual(g.network, h.network);
     assert.deepEqual(g.pilot, { ...h.pilot, name: 'Joc' });
     assert.equal(g.school.graduated, true);
     // tots dos surten de la funcio compartida, no de numeros copiats
-    assert.deepEqual({ cash: h.company.cash, loans: h.company.loans, reputation: h.company.reputation },
-      (({ cash, loans, reputation }) => ({ cash, loans, reputation }))(startingCompany(createCareer({}).company)));
+    const shared = startingCompany(createCareer({}).company);
+    for (const k of ['cash', 'loans', 'reputation', 'bases']) assert.deepEqual(h.company[k], shared[k], k);
   });
 });

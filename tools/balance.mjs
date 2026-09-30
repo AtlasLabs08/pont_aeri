@@ -55,7 +55,6 @@ export const HARNESS = Object.freeze({
     wb:       ['LEBL', 'KJFK', 'LEBL', 'EGLL', 'LEBL', 'SBGR', 'LEBL', 'EDDF'],
     jumbo:    ['LEBL', 'KJFK', 'LEBL', 'SBGR']
   },
-  base: 'LEBL',
 
   // Coordenades dels aeroports que world/ encara no te (F1)
   coords: {
@@ -221,7 +220,7 @@ function newAirframe(typeId, n, price, loanId) {
     reg: 'EC-B' + String.fromCharCode(65 + Math.floor(n / 26)) + String.fromCharCode(65 + n % 26),
     typeId, yearBuilt: H.yearBuilt, hours: 0, cycles: 0,
     condition: { engines: 100, gear: 100, airframe: 100, avionics: 100 },
-    location: H.base, status: 'ready', groundedUntilMinute: 0,
+    location: BALANCE.startingBase, status: 'ready', groundedUntilMinute: 0,
     maintenance: { nextAHours: BALANCE.checks.A.intervalHours, nextCHours: BALANCE.checks.C.intervalHours, deferred: [] },
     finance: { purchasePrice: price, loanId, leaseId: null },
     value: price
@@ -229,12 +228,11 @@ function newAirframe(typeId, n, price, loanId) {
 }
 
 /** Graduacio de l escola: la mateixa graduate de career/ que fa servir el joc (habilitacio
- *  commuter, XP, capital inicial amb el credit i reputacio, startingCompany de finance.js),
+ *  commuter, XP, capital inicial amb el credit, reputacio i base, startingCompany de finance.js),
  *  amb totes les llicons aprovades. Modifica state, com la resta del harness. */
 function graduateHarness(state) {
   const graduated = graduate({ ...state, school: { ...state.school, lessonsPassed: LESSONS.map(l => l.id) } });
   Object.assign(state, graduated);
-  state.company.bases = [H.base];
 }
 
 /** Partida nova ja graduada: el punt de partida de la simulacio. */

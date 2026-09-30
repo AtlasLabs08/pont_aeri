@@ -28,6 +28,7 @@ export const BALANCE = deepFreeze({
 
   startingCash: 400000,
   startingLoan: { principal: 250000, ratePerFlight: 0.004, termFlights: 340 },   // termini = financing
+  startingBase: 'LEBL',                     // base en graduar-se: on es fa l escola (DECISIONS.md, 30/09/2026)
   reputation: { start: 50 },                // els limits 0..100 son de l esquema (state.js)
 
   fuelPricePerKg: 0.90,
