@@ -541,3 +541,8 @@ superior).
 - E10. Panell DEV (nomes IS_DEV, fora d i18n): el boto "desbloqueja-les
   totes" actua sobre l escola de la partida carregada i la desa. Boto nou
   "esborra la partida", amb discardCareer (que fa copia abans).
+
+Consequencia tecnica de l E4, nomes registrada: el tip antic de la llico 7
+(school.tip.flare, "des de 50 ft segueix la barra d arrodoniment") deia al
+jugador que seguis una barra que ja no surt. El tip nou de la V/S el
+substitueix i la clau antiga surt d en.js i ca.js.

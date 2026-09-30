@@ -100,7 +100,7 @@ export default {
   'school.tip.cameraDrag': 'Outside views: hold the right mouse button and drag to turn the camera. Double-click the right button to put it back to the default angle ({reset} does it too).',
   'school.tip.taxi': 'Taxiing: {left} and {right} steer the nosewheel, {more} adds power and {less} takes it off, hold {brake} to brake. {park} sets or releases the parking brake.',
   'school.tip.flight': 'In flight: {down} lowers the nose and {up} raises it, {left} banks left and {right} banks right.',
-  'school.tip.flare': 'Short final, already aligned and stabilised: hold the speed and the path. From {ft} ft follow the flare bar and raise the nose gently to cut the sink before touching down.',
+  'school.tip.verticalSpeed': 'Just before touchdown, pull back gently to bring the vertical speed (V/S) as close to 0 as you can, without letting the airspeed drop below Vref.',
   'school.tip.ilsNeedles': 'The ILS has two needles. The vertical one is the localiser: it shows where the runway centreline is, left or right. The horizontal one is the glideslope: it shows where the 3° path is, above or below. Always fly towards the needles.',
   'school.tip.rudder': 'Remember: {left} and {right} steer the nosewheel on the ground and move the rudder in the air.',
   'school.side.left': 'left',

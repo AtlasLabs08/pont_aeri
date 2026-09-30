@@ -63,7 +63,8 @@
  *                        d arrodoniment: { startAglFt, sinkAtStartFpm,
  *                        sinkAtContactFpm }.
  *       aids            (llico 'landing') { flareBar, autoDebrief }: marques
- *                        de D8, mai condicions al codi.
+ *                        de D8, mai condicions al codi. flareBar es false
+ *                        des de l E4 (30/09/2026): la barra no surt.
  *       spawn           (llicons 'maneuvers', 'circuit', 'landing', 'ils') posicio inicial
  *                        que index.html passa a Game.spawn() via opts
  *                        (correccio del PR #22): { aglFt, offshoreNm,
@@ -160,10 +161,11 @@ export const LESSONS = [
     criteria: [{ metric: 'landed', op: 'eq', value: true },
                { metric: 'score', op: 'gte', value: SCHOOL_PASS }],
     flareBar: FLARE_BAR,
-    aids: { flareBar: true, autoDebrief: true },
+    // barra d arrodoniment desactivada (E4, docs/DECISIONS.md 30/09/2026): el codi es queda
+    aids: { flareBar: false, autoDebrief: true },
     // final curt: alineat, a la senda i en configuracio d aterratge; tot va de l arrodoniment
     spawn: { distNm: 3 },
-    tips: [{ key: 'school.tip.flare', params: { ft: FLARE_BAR.startAglFt } }] },
+    tips: [{ key: 'school.tip.verticalSpeed' }] },
   { id: 'ils', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.ils.title', goalKey: 'school.lesson.ils.goal',
     criteria: [{ metric: 'ilsFlown', op: 'eq', value: true },

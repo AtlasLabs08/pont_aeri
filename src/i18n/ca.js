@@ -97,7 +97,7 @@ export default {
   'school.tip.cameraDrag': 'Vistes exteriors: mantén premut el botó dret del ratolí i arrossega per girar la càmera. Fes doble clic amb el botó dret per tornar-la a l\'angle per defecte (també amb {reset}).',
   'school.tip.taxi': 'Rodatge: {left} i {right} giren la roda de morro, {more} dona potència i {less} en treu, mantén {brake} per frenar. {park} posa o treu el fre d\'aparcament.',
   'school.tip.flight': 'En vol: {down} baixa el morro i {up} l\'aixeca, {left} inclina a l\'esquerra i {right} a la dreta.',
-  'school.tip.flare': 'Final curt, ja alineat i estabilitzat: mantén la velocitat i la senda. Des de {ft} ft segueix la barra d\'arrodoniment i aixeca el morro suaument per reduir el descens abans de tocar terra.',
+  'school.tip.verticalSpeed': 'Just abans de tocar, estira suaument per portar la velocitat vertical (V/S) tan a prop de 0 com puguis, sense deixar caure la velocitat per sota de Vref.',
   'school.tip.ilsNeedles': 'L\'ILS té dues agulles. La vertical és el localitzador: diu on és l\'eix de la pista, a l\'esquerra o a la dreta. L\'horitzontal és la senda: diu on és el camí de 3°, per sobre o per sota. Vola sempre cap a les agulles.',
   'school.tip.rudder': 'Recorda: {left} i {right} giren la roda de morro a terra i mouen el timó de direcció en vol.',
   'school.side.left': 'a l\'esquerra',
