@@ -7,7 +7,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { draw, createCareer } from '../../src/career/index.js';
+import { draw, derivedRng, createCareer } from '../../src/career/index.js';
 
 describe('draw', () => {
   test('avanca rngCounter i retorna valors a [0, 1)', () => {
@@ -60,5 +60,37 @@ describe('draw', () => {
     const values = Array.from({ length: 1000 }, () => draw(s));
     assert.equal(new Set(values).size, values.length);
     for (let i = 1; i < values.length; i++) assert.notEqual(values[i], values[i - 1]);
+  });
+});
+
+describe('derivedRng (D2+D5)', () => {
+  const take = (r, n) => Array.from({ length: n }, () => r());
+
+  test('mateixa llavor, tag i key: mateixa sequencia', () => {
+    assert.deepEqual(take(derivedRng(12345, 'market', 7), 20), take(derivedRng(12345, 'market', 7), 20));
+  });
+
+  test('valors a [0, 1)', () => {
+    for (const x of take(derivedRng(1, 'market', 0), 2000)) assert.ok(x >= 0 && x < 1);
+  });
+
+  test('una key, un tag o una llavor diferents donen una altra sequencia', () => {
+    const base = take(derivedRng(12345, 'market', 7), 5);
+    assert.notDeepEqual(take(derivedRng(12345, 'market', 8), 5), base);
+    assert.notDeepEqual(take(derivedRng(12345, 'other', 7), 5), base);
+    assert.notDeepEqual(take(derivedRng(12346, 'market', 7), 5), base);
+  });
+
+  test('no toca la partida: rngCounter i draw no canvien', () => {
+    const s = { rngSeed: 99, rngCounter: 4 };
+    const before = draw({ ...s });
+    take(derivedRng(s.rngSeed, 'market', 0), 50);
+    assert.equal(s.rngCounter, 4);
+    assert.equal(draw(s), before);
+  });
+
+  test('llanca amb un tag buit o una key que no es un enter', () => {
+    assert.throws(() => derivedRng(1, '', 0), /tag/);
+    assert.throws(() => derivedRng(1, 'market', 1.5), /key/);
   });
 });
