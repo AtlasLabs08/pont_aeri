@@ -12,18 +12,21 @@
  *          npm run balance -- --tier <basic|standard|premium|deluxe>
  *                                        (cada compra d aquella categoria;
  *                                         es combina amb --seeds)
+ *          npm run balance -- --tiers [--seeds N]
+ *                                        (mode per defecte i les quatre
+ *                                         categories, amb el criteri B)
  *
  * Compres (D2+D5, docs/DECISIONS.md 30/09/2026): les fa buyAircraft de
- * career/ amb la regla de compra purchaseRule (G6), la mateixa del joc. El
- * primer avio es paga al comptat (financat si la regla no ho permet, com un
- * Mi-9 deluxe) i la resta, financats. Mode per defecte:
- * preu usedPrice, estat 100, revenueMult i wearMult 1 (categoria standard).
+ * career/ amb la regla de compra purchaseRule (G6), la mateixa del joc,
+ * sobre el cash que queda despres de pagar l habilitacio. Mode per defecte:
+ * el primer avio es paga al comptat i la resta, financats; amb --tier, totes
+ * les compres son financades. Mode per defecte: preu usedPrice, estat 100, revenueMult i wearMult 1 (categoria standard).
  * Amb --tier: preu = usedPrice * punt mig del priceFactor de la categoria,
  * estat inicial = punt mig del seu condition, i revenueMult i wearMult de la
  * categoria a computeFlightResult i applyFlightWear.
  *
  * EXPORTA: runBalance startState metrics runSeeds formatReport formatSeeds HARNESS
- *          harnessPurchase
+ *          harnessPurchase runTiers formatTiers
  *
  * Tot l atzar surt de draw(state): la mateixa llavor dona sempre el mateix
  * resultat. Cap Math.random().
@@ -148,7 +151,9 @@ const CRITERIA = {
   median: { jumpMin: 40, jumpMax: 50, firstJumpMax: 55, firstCrewMin: 8, firstCrewMax: 12,
             negativePctMax: 12, actHoursMax: 16 },
   p90: { jumpMax: 60, actHoursMax: 20 },
-  negativeCashSeedsMax: 0,      // llavors amb cash < 0 despres d una compra (D2+D5)
+  negativeCashSeedsMax: 0,      // llavors amb cash < 0 despres d una compra (D2+D5), a tots els modes
+  // Criteri B (D2+D5): cap categoria no domina, respecte de --tier standard
+  tiers: { medianMaxDiff: 8, p90MaxOver: 5, negativePctMax: 12 },
   curveMaxDev: 0.20             // cada tipus dins del +-20 % de la Corba objectiu
 };
 
@@ -292,12 +297,9 @@ export function runBalance({ seed = H.seed, flights = H.flights, tier = null } =
     const rating = BALANCE.fleetTypes[typeId].rating;
     const needsRating = !state.pilot.ratings.includes(rating);
     const ratingCost = needsRating ? BALANCE.ratings[rating].cost : 0;
-    // el primer avio es paga sencer si la regla ho permet (sempre, al mode per defecte); si no
-    // (un Mi-9 deluxe val mes que el capital inicial), financat. La resta, financats.
-    const ruleFor = mode => purchaseRule({ cash: co.cash - ratingCost, loans: co.loans, price: buy.listing.price, mode });
-    let mode = state.fleet.length === 0 ? 'cash' : 'financed';
-    let rule = ruleFor(mode);
-    if (!rule.ok && mode === 'cash') rule = ruleFor(mode = 'financed');
+    // mode per defecte: el primer avio es paga sencer, com abans de D2+D5; amb --tier, tots financats
+    const mode = tier === null && state.fleet.length === 0 ? 'cash' : 'financed';
+    const rule = purchaseRule({ cash: co.cash - ratingCost, loans: co.loans, price: buy.listing.price, mode });
     if (!rule.ok) return false;
     affordableAt[typeId] ??= flight;
     if (needsRating) {
@@ -553,6 +555,59 @@ export function formatSeeds(s) {
 }
 
 // ---------------------------------------------------------------------------
+// Categories (criteri B)
+
+/**
+ * Corre runSeeds al mode per defecte i a cada categoria i avalua el criteri B
+ * de cada categoria respecte de --tier standard: mediana de cada salt a
+ * +-medianMaxDiff vols, p90 de cada salt com a molt p90MaxOver vols per sobre,
+ * vols en negatiu < negativePctMax % (mediana) i 0 llavors amb cash < 0.
+ */
+export function runTiers({ seed = H.seed, seeds = CRITERIA.seeds, flights = H.flights } = {}) {
+  const T = CRITERIA.tiers;
+  const base = runSeeds({ seed, seeds, flights });
+  const byTier = Object.fromEntries(BALANCE.market.tiers.map(t => [t.key, runSeeds({ seed, seeds, flights, tier: t.key })]));
+  const std = byTier.standard;
+  const jumpRows = s => s.rows.filter(r => r.key.startsWith('jump'));
+  const tiers = Object.entries(byTier).map(([key, s]) => {
+    const jumps = jumpRows(s), ref = jumpRows(std);
+    const neg = s.rows.find(r => r.key === 'negativePct').median;
+    const ok = {
+      median: jumps.every((r, i) => Math.abs(r.median - ref[i].median) <= T.medianMaxDiff),
+      p90: jumps.every((r, i) => r.p90 <= ref[i].p90 + T.p90MaxOver),
+      negative: neg < T.negativePctMax,
+      cash: s.negativeCashSeeds <= CRITERIA.negativeCashSeedsMax
+    };
+    return { key, run: s, jumps, neg, ok, pass: Object.values(ok).every(Boolean) };
+  });
+  return { seed, seeds, flights, base, tiers, pass: tiers.every(t => t.pass) };
+}
+
+/** Taula de runTiers: una fila per mode. */
+export function formatTiers(r) {
+  const out = [], p = x => out.push(x);
+  const num = v => v === Infinity ? 'inf' : Number.isInteger(v) ? String(v) : v.toFixed(1);
+  const jumps = s => s.rows.filter(x => x.key.startsWith('jump'));
+  const T = CRITERIA.tiers;
+  p('Harness economic per categories — ' + r.seeds + ' llavors, reserva ' + BALANCE.financing.reserveFlights + ' vols');
+  p('  mode        salts (mediana)            salts (p90)          negatiu  cash<0     cash minim  criteri');
+  const row = (label, s, verdict) => p('  ' + label.padEnd(10) + jumps(s).map(x => num(x.median).padStart(5)).join('') + '  ' +
+    jumps(s).map(x => num(x.p90).padStart(5)).join('') + '   ' + (num(s.rows.find(x => x.key === 'negativePct').median) + ' %').padStart(7) +
+    String(s.negativeCashSeeds).padStart(8) + (s.minCash === null ? '-' : fmt(s.minCash)).padStart(15) + '  ' + verdict);
+  row('defecte', r.base, 'A: ' + (r.base.criteria.every(c => c.ok) ? 'compleix' : 'NO compleix'));
+  for (const t of r.tiers) {
+    const failed = Object.entries(t.ok).filter(([, v]) => !v).map(([k]) => k);
+    row(t.key, t.run, 'B: ' + (t.pass ? 'compleix' : 'NO compleix (' + failed.join(', ') + ')'));
+  }
+  p('');
+  p('Criteri B (per a cada categoria, respecte de standard): mediana de cada salt a +-' + T.medianMaxDiff +
+    ' vols, p90 de cada salt com a molt ' + T.p90MaxOver + ' vols per sobre, vols en negatiu < ' + T.negativePctMax +
+    ' %, 0 llavors amb cash < 0');
+  p('revenueMult / wearMult: ' + BALANCE.market.tiers.map(t => t.key + ' ' + t.revenueMult + ' / ' + t.wearMult).join(', '));
+  return out.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Informe
 
 const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -688,9 +743,10 @@ export function formatReport(r) {
  * (si hi ha --seeds, despres de la N). */
 function parseArgs(argv, env) {
   const pos = [];
-  let seeds = null, tier = null;
+  let seeds = null, tier = null, tiers = false;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--seeds') seeds = Number(argv[++i]);
+    if (argv[i] === '--tiers') tiers = true;
+    else if (argv[i] === '--seeds') seeds = Number(argv[++i]);
     else if (argv[i].startsWith('--seeds=')) seeds = Number(argv[i].slice('--seeds='.length));
     else if (argv[i] === '--tier') tier = argv[++i];
     else if (argv[i].startsWith('--tier=')) tier = argv[i].slice('--tier='.length);
@@ -699,6 +755,7 @@ function parseArgs(argv, env) {
   if (seeds === null && env.npm_config_seeds !== undefined) {
     seeds = Number(env.npm_config_seeds === 'true' ? pos.shift() : env.npm_config_seeds);
   }
+  if (env.npm_config_tiers !== undefined) tiers = true;
   if (tier === null && env.npm_config_tier !== undefined) {
     tier = env.npm_config_tier === 'true' ? pos.shift() : env.npm_config_tier;
   }
@@ -709,11 +766,12 @@ function parseArgs(argv, env) {
   return {
     seed: pos[0] !== undefined ? Number(pos[0]) : H.seed,
     flights: pos[1] !== undefined ? Number(pos[1]) : H.flights,
-    seeds, tier
+    seeds, tier, tiers
   };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const { seed, flights, seeds, tier } = parseArgs(process.argv.slice(2), process.env);
-  console.log(seeds === null ? formatReport(runBalance({ seed, flights, tier })) : formatSeeds(runSeeds({ seed, seeds, flights, tier })));
+  const { seed, flights, seeds, tier, tiers } = parseArgs(process.argv.slice(2), process.env);
+  if (tiers) console.log(formatTiers(runTiers({ seed, flights, seeds: seeds ?? CRITERIA.seeds })));
+  else console.log(seeds === null ? formatReport(runBalance({ seed, flights, tier })) : formatSeeds(runSeeds({ seed, seeds, flights, tier })));
 }

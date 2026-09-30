@@ -82,6 +82,9 @@ describe('harness economic: compres (D2+D5)', () => {
       assert.ok(r.purchases.length >= 2, String(tier));
       assert.equal(r.valid.ok, true, r.valid.errors.join('; '));
       for (const a of r.state.fleet) assert.equal(a.tier, tierOf(tier).key);
+      // mode per defecte: el primer avio al comptat; amb --tier, tots financats
+      assert.equal(r.purchases[0].downPayment === r.purchases[0].price, tier === null, String(tier));
+      assert.equal(r.state.fleet[0].finance.loanId === null, tier === null, String(tier));
       assert.ok(Number.isFinite(r.metrics.minCash));
       const again = runBalance({ seed: 20260927, flights: 120, tier });
       assert.deepEqual(again.log, r.log);
