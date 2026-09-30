@@ -122,6 +122,36 @@ describe('openAirline: els cinc estats de loadCareer (E8)', () => {
     assert.equal(loadCareer().status, 'ok');
   });
 
+  test('balanceMismatch i continuar: primer es fa copia de la partida antiga', () => {
+    createAirline('Marta', SEED);
+    const old = { ...stored(), balanceVersion: BALANCE.version + 1 };
+    store.setItem(CAREER_KEY, JSON.stringify(old));
+    openAirline();
+    const saved = [];
+    const setItem = store.setItem.bind(store);
+    store.setItem = (k, v) => { saved.push(k); setItem(k, v); };
+    assert.equal(acceptBalanceMismatch(), true);
+    // la copia (.bak) s escriu abans de sobreescriure la partida
+    assert.equal(saved.length, 2);
+    assert.ok(saved[0].startsWith(CAREER_KEY + '.bak.'));
+    assert.equal(saved[1], CAREER_KEY);
+    assert.deepEqual(JSON.parse(store.getItem(saved[0])), old);
+    assert.equal(stored().balanceVersion, BALANCE.version);
+  });
+
+  test('balanceMismatch i continuar: si la copia falla no se sobreescriu res', () => {
+    createAirline('Marta', SEED);
+    store.setItem(CAREER_KEY, JSON.stringify({ ...stored(), balanceVersion: BALANCE.version + 1 }));
+    const raw = store.getItem(CAREER_KEY);
+    openAirline();
+    const setItem = store.setItem.bind(store);
+    store.setItem = (k, v) => { if (k.includes('.bak.')) throw new Error('QuotaExceededError'); setItem(k, v); };
+    assert.equal(acceptBalanceMismatch(), false);
+    assert.equal(store.getItem(CAREER_KEY), raw);
+    assert.equal(currentCareer(), null);
+    assert.ok(pendingCareer() !== null);
+  });
+
   test('balanceMismatch i comencar de nou: copia, esborra i torna al nom', () => {
     createAirline('Marta', SEED);
     store.setItem(CAREER_KEY, JSON.stringify({ ...stored(), balanceVersion: BALANCE.version + 1 }));

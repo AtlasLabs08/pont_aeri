@@ -99,11 +99,16 @@ function balanceNotice() {
     title: t('save.balanceMismatch.title'),
     text: t('save.balanceMismatch.text', { saved: pendingCareer().balanceVersion, current: BALANCE.version }),
     buttons: [
-      { label: t('save.continue'), primary: true, onClick: () => { acceptBalanceMismatch(); showAirlineHome(); } },
+      { label: t('save.continue'), primary: true, onClick: () => { if (acceptBalanceMismatch()) showAirlineHome(); else continueFailed(); } },
       { label: t('save.startOver'), onClick: () => doStartOver() },
       { label: t('menu.back'), onClick: showMainMenu }
     ]
   }));
+}
+
+function continueFailed() {
+  mount(noticeScreen({ title: t('save.balanceMismatch.title'), tone: 'bad', text: t('save.continueFailed'),
+    buttons: [{ label: t('menu.back'), onClick: showMainMenu }] }));
 }
 
 function invalidNotice(backupKey) {

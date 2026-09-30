@@ -168,6 +168,7 @@ export default {
   'save.invalid.title': 'No s\'ha pogut llegir la partida',
   'save.invalid.text': 'La partida desada no es pot llegir. Se n\'ha fet una còpia en aquest navegador ({key}). Pots començar-ne una de nova.',
   'save.invalid.noBackup': 'La partida desada no es pot llegir i no se n\'ha pogut fer còpia, així que no s\'ha tocat.',
+  'save.continueFailed': 'No s\'ha pogut fer abans una còpia de la partida, així que no s\'ha canviat res.',
   'save.startOverFailed': 'No s\'ha pogut copiar la partida antiga, així que no s\'ha esborrat res.',
   'save.migrated.title': 'Partida actualitzada',
   'save.migrated.text': 'La partida desada s\'ha actualitzat a la versió actual.',

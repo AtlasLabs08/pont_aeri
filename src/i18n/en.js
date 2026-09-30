@@ -171,6 +171,7 @@ export default {
   'save.invalid.title': 'The save could not be read',
   'save.invalid.text': 'Your saved game could not be read. A copy has been kept in this browser ({key}). You can start a new game.',
   'save.invalid.noBackup': 'Your saved game could not be read and no copy could be made, so it has not been touched.',
+  'save.continueFailed': 'A copy of the save could not be made first, so nothing has been changed.',
   'save.startOverFailed': 'The old save could not be copied, so nothing has been deleted.',
   'save.migrated.title': 'Save updated',
   'save.migrated.text': 'Your saved game has been updated to the current version.',

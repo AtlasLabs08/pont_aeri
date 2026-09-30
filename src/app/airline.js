@@ -33,8 +33,10 @@
  *     reason 'name' si normalizeName torna null (no crea res). seed i
  *     createdAt per defecte de platform/ (randomSeed, nowIso).
  *   acceptBalanceMismatch() -> boolean   continua amb la partida pendent:
- *     balanceVersion passa a BALANCE.version (encara no hi ha cap migracio
- *     de valors, seccio 6) i es desa.
+ *     primer backupCareer(); despres balanceVersion passa a BALANCE.version
+ *     (encara no hi ha cap migracio de valors, seccio 6) i es desa. Com
+ *     discardCareer: si la copia falla i hi havia partida desada, no
+ *     sobreescriu res, la partida continua pendent i retorna false.
  *   startOver() -> boolean   discardCareer() (copia abans) i deixa la
  *     memoria buida. false si la copia ha fallat: no s esborra res.
  *   recordLesson(lessonId, facts) -> resultat de recordLessonAttempt
@@ -116,6 +118,8 @@ export function createAirline(name, opts = {}) {
 
 export function acceptBalanceMismatch() {
   if (!pending) return false;
+  const hadSaved = loadCareer().status !== 'none';
+  if (backupCareer() === null && hadSaved) return false;
   const state = { ...pending, balanceVersion: BALANCE.version };
   pending = null;
   set(state);
