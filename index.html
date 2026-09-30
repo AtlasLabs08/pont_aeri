@@ -132,7 +132,7 @@ import {
   AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FT, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
-  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder
+  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder, LandingWatch
 } from './src/core/index.js';
 
 import {
@@ -2055,7 +2055,7 @@ const Game = {
   state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
   opts: { aircraft: 'nb', airport: 'LEBL', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
   env: { windN: 0, windE: 0, gustN: 0, gustE: 0, gustD: 0, groundHeight: (n, e) => World.groundAt(e, n), surface: (n, e) => World.surfaceAt(e, n) },
-  lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, lastIas: 0, accelKt: 0, debug: false, help: false,
+  lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, landingWatch: new LandingWatch(), lastIas: 0, accelKt: 0, debug: false, help: false,
 
   setAircraft(id) {
     const cfg = AIRCRAFT[id]; if (this.mdl) R3.scene.remove(this.mdl.root);
@@ -2066,7 +2066,7 @@ const Game = {
     const O = this.opts, A = this.airport = AIRPORTS[O.airport], f = this.fdm, cfg = f.cfg, ctl = this.ctl = newCtl(), en = A.allEnds[O.runway % A.allEnds.length];
     this.env.windN = -Math.cos(O.windDir * DEG) * O.windKt * KT; this.env.windE = -Math.sin(O.windDir * DEG) * O.windKt * KT;
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
-    this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; Input.pitch = Input.roll = Input.yaw = 0;
+    this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
     const other = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.dest = O.mode === 'route' ? other : A;
     if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
       // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
@@ -2125,6 +2125,8 @@ const Game = {
     this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
   msg(t, secs) { UI.toast(t, secs); },
+  /** console.error una sola vegada per clau i per vol: un error persistent a Game.step sortiria a 120 Hz */
+  logOnce(key, text, err) { const L = this.errLogged || (this.errLogged = {}); if (L[key]) return; L[key] = true; console.error(text, err); },
   /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
   destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.activeEnd); },
   /** camera a l angle per defecte: tecla Home o doble clic amb el boto dret (Input) */
@@ -2205,7 +2207,13 @@ const Game = {
     // avisos que el joc ja mostra (PFD, HUD, memo del motor): un esdeveniment quan s'encenen
     this.warnEvent('stallWarning', o.stallWarn && !f.wow); this.warnEvent('overspeed', Instruments.warnings(this).some(w => /OVERSPEED/.test(w))); this.warnEvent('engineFailure', f.fuelOut);
     // events from the flight model
-    if (f.events.length) { for (const ev of f.events) { if (ev === 'touchdown') this.onTouchdown(); else if (ev === 'strike:tail') { if (!this.tailStrike) { this.tailStrike = true; Recorder.tailStrike(); this.msg('TAIL STRIKE', 4); } } else if (ev.startsWith('strike')) this.crashNow(ev === 'strike:wing' ? 'Wing strike' : ev === 'strike:engine' ? 'Engine pod strike' : 'Fuselage impact', 'The airframe touched the ground.'); } f.events.length = 0; }
+    // cada esdeveniment dins el seu try: una excepcio no pot deixar f.events sense buidar (es tornaria a llancar a cada pas
+    // i l informe no arribaria mai), pero tampoc s amaga: surt a la consola amb el tipus d esdeveniment
+    if (f.events.length) { for (const ev of f.events) { try { if (ev === 'touchdown') this.onTouchdown(); else if (ev === 'strike:tail') { if (!this.tailStrike) { this.tailStrike = true; Recorder.tailStrike(); this.msg('TAIL STRIKE', 4); } } else if (ev.startsWith('strike')) this.crashNow(ev === 'strike:wing' ? 'Wing strike' : ev === 'strike:engine' ? 'Engine pod strike' : 'Fuselage impact', 'The airframe touched the ground.'); } catch (err) { this.logOnce('event:' + ev, 'Game.step: error processant l esdeveniment ' + ev, err); } } f.events.length = 0; }
+    // aterratge que el model no ha anunciat (el morro ha tocat primer i airTime ja era 0) i xarxa de seguretat: nomes si
+    // no hi ha cap informe obert ni cap accident (core/landing-watch.js). Els aterratges normals no passen mai per aqui
+    if (this.state !== 'replay') { const td = this.landingWatch.step(f, { reportOpen: !!(this.report && !this.report.shown), crashed: !!this.crash });
+      if (td) { f.touchdown = td; try { this.onTouchdown(); } catch (err) { this.logOnce('landingWatch', 'Game.step: error registrant l aterratge', err); } } }
     if (f.surfaceType === SURF.WATER && o.agl < 0.5) this.crashNow('Water impact', 'The aircraft went into the sea.');
     else if (f.wow && f.surfaceType === SURF.TERRAIN && o.gs > 25) this.crashNow('Terrain impact', 'The aircraft hit terrain outside the airport.');
     else if (f.wow && f.surfaceType === SURF.GRASS && o.gs > 45) this.crashNow('Runway excursion', 'The aircraft left the paved surface at ' + Math.round(o.gs) + ' kt.');
@@ -2268,10 +2276,11 @@ const Game = {
   },
   /** landing evaluation */
   onTouchdown() {
-    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; Sound.touchdown(td); if (this.report && !this.report.shown) { this.report.bounces++; return; }
+    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; try { Sound.touchdown(td); } catch (err) { this.logOnce('sound:touchdown', 'Sound.touchdown', err); } if (this.report && !this.report.shown) { this.report.bounces++; return; }
     let best = null; for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id]; if (Math.hypot(f.e - A.e, f.n - A.n) > 8000) continue; const l = A.toLocal(f.e, f.n);
       for (const en of A.allEnds) { const dx = l[0] - en.thr[0], dy = l[1] - en.thr[1], s = dx * en.dir[0] + dy * en.dir[1], t = -dx * en.dir[1] + dy * en.dir[0], dh = Math.abs(wrapPi((td.track - en.hdg) * DEG)) * RAD; if (dh < 35 && s > -300 && s < en.rw.len + 100 && Math.abs(t) < en.rw.wid) { if (!best || Math.abs(t) < Math.abs(best.t)) best = { A, en, s, t, dh }; } } }
     const fpm = td.vs / FPM, R = this.report = { fpm, g: td.nzPeak, bounces: 0, shown: false, dist0: f.distGround, ias: td.ias, pitch: td.pitch, roll: td.roll, onRunway: !!best, get gNow() { return f.touchdown ? f.touchdown.nzPeak : this.g; } };
+    this.landingWatch.landed();
     if (best) { R.rwy = best.A.icao + ' ' + best.en.id; R.tdzDist = best.s - 400; R.fromThr = best.s; R.center = best.t; R.crab = wrapPi((td.hdg - best.en.hdg) * DEG) * RAD; R.remaining = best.en.rw.len - best.s; }
     this.tailStrike = false;
   },

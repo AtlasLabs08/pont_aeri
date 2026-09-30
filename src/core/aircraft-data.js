@@ -19,11 +19,16 @@ import { DEG } from './constants.js';
    flaps     per detent: slat extension (0..1), drag/pitching increments, 1-g stall speed (kt CAS at
              vsRefMass) and the flap limit speed VFE. CLmax for every detent is DERIVED
              from these stall speeds when the flight model is built.
-   engines   static thrust (jets, N) or shaft power (turboprop, W) per engine + positions
+   engines   static thrust (jets, N) or shaft power (turboprop, W) per engine + positions (pos: nacelles, also drawn in 3D;
+             thrustPos: physics-only point where the thrust acts, defaults to pos)
    gear      strut positions (x,y) and geometry, spring rates are derived from load share
    expect    realistic ranges for the category, checked by the headless test harness. brakePitch/brakeSettle: transient
-             after releasing the brakes at full power (deg, s); tdBounces/tdSettle: 400 fpm touchdown (bounces, s);
-             powerPitch: pitch excursion in 10 s after an idle to full power step from a trimmed idle glide (deg)   */
+             after releasing the brakes at full power (deg, s); tdBounces/tdSettle: 400 fpm touchdown (bounces, s), also at the
+             maximum landing and the minimum mass; tdBounces800/tdSettle800: the same touchdown at 800 fpm;
+             powerPitch: pitch excursion in 10 s after an idle to full power step from a trimmed idle glide (deg);
+             phugPitch/phugAlt: 60 s after the idle to full and full to idle steps, pitch excess (deg) and altitude
+             deviation (ft) relative to the new equilibrium (Harness.powerResponse). The Mi-9 must be the lowest of
+             the turboprops in both (docs/DECISIONS.md, 29/09/2026)   */
 
 export const AIRCRAFT = {
 
@@ -77,7 +82,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [100, 118], toRoll: [750, 1350], to35: [1000, 1650], climb: [1000, 2100],
       vsClean: [108, 118], vsFull: [87, 96], vapp: [108, 122], appPitch: [0, 1], ldgRoll: [400, 850], ldgDist: [800, 1400],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [6.5, 9.5], phugPitch: [12.5, 17], phugAlt: [650, 1300]
     }
   },
 
@@ -128,7 +134,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [135, 155], toRoll: [1200, 2000], to35: [1500, 2400], climb: [2000, 3800],
       vsClean: [148, 160], vsFull: [107, 116], vapp: [132, 146], appPitch: [2.5, 3.5], ldgRoll: [650, 1300], ldgDist: [1100, 1900],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
     }
   },
 
@@ -181,7 +188,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [150, 178], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
       vsClean: [160, 172], vsFull: [117, 126], vapp: [146, 160], appPitch: [2, 3], ldgRoll: [900, 1800], ldgDist: [1350, 2400],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [5, 8.5]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [5, 8.5], phugPitch: [18, 35], phugAlt: [2800, 7000]
     }
   },
 
@@ -235,7 +243,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [150, 175], toRoll: [1800, 3000], to35: [2200, 3500], climb: [1500, 3200],
       vsClean: [165, 178], vsFull: [119, 128], vapp: [148, 163], appPitch: [1, 2.5], ldgRoll: [1000, 2000], ldgDist: [1400, 2600],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [3.5, 6.5]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [3.5, 6.5], phugPitch: [13, 20], phugAlt: [2400, 4300]
     }
   },
 
@@ -269,7 +278,11 @@ export const AIRCRAFT = {
       psfc: 0.30 / 3.6e6, idleFF: 0.019,
       spool: { a0: 0.30, a1: 0.85 },
       reverseFrac: 0.50, propDragArea: 6.0,  // mateixa proporcio a S que el G-72 (12,1 m2 sobre 61 m2)
-      pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]]
+      pos: [[0.95, -2.9, -0.75], [0.95, 2.9, -0.75]],
+      // punt d aplicacio efectiu de l empenta (nomes fisica; les gondoles es dibuixen amb pos): la linia d empenta
+      // quasi pel CG, com l ajusta el fabricant d un avio d escola perque la potencia no mogui el morro. Amb -0,75 el
+      // Mi-9 era el turbohelix que mes es desviava en donar o treure potencia de cop (docs/DECISIONS.md, 29/09/2026)
+      thrustPos: [[0.95, -2.9, -0.1], [0.95, 2.9, -0.1]]
     },
     gear: {
       zStatic: 1.10, stroke: 0.46, tireDefl: 0.04, orifice: 0.15,
@@ -286,7 +299,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [95, 112], toRoll: [550, 1000], to35: [800, 1350], climb: [1500, 2800],
       vsClean: [96, 106], vsFull: [78, 88], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 700], ldgDist: [700, 1200],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [6.5, 9.5], phugPitch: [9, 12.5], phugAlt: [500, 850]
     }
   },
 
@@ -340,7 +354,8 @@ export const AIRCRAFT = {
     expect: {
       vr: [135, 155], toRoll: [1200, 2000], to35: [1600, 2500], climb: [2000, 3800],
       vsClean: [140, 152], vsFull: [105, 115], vapp: [132, 146], appPitch: [2.5, 4], ldgRoll: [600, 1200], ldgDist: [1000, 1800],
-      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [3, 6]
+      brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+      powerPitch: [3, 6], phugPitch: [11, 17], phugAlt: [1200, 2500]
     }
   }
 };
@@ -361,7 +376,8 @@ AIRCRAFT.tpShort = variant('tp', {
   expect: {
     vr: [95, 112], toRoll: [600, 1100], to35: [850, 1450], climb: [1200, 2300],
     vsClean: [97, 108], vsFull: [79, 89], vapp: [100, 114], appPitch: [0, 1], ldgRoll: [350, 750], ldgDist: [750, 1250],
-    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [6.5, 9.5]
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+    powerPitch: [6.5, 9.5], phugPitch: [12.5, 17], phugAlt: [650, 1300]
   }
 });
 
@@ -377,7 +393,8 @@ AIRCRAFT.nbShort = variant('nb', {
   expect: {
     vr: [130, 150], toRoll: [1100, 1900], to35: [1500, 2400], climb: [2200, 3800],
     vsClean: [141, 152], vsFull: [103, 112], vapp: [128, 142], appPitch: [2.5, 3.5], ldgRoll: [600, 1200], ldgDist: [1000, 1800],
-    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+    powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
   }
 });
 
@@ -393,7 +410,8 @@ AIRCRAFT.nbStretch = variant('nb', {
   expect: {
     vr: [145, 165], toRoll: [1300, 2200], to35: [1800, 2800], climb: [2000, 3800],
     vsClean: [148, 160], vsFull: [107, 116], vapp: [135, 150], appPitch: [2.5, 3.5], ldgRoll: [700, 1300], ldgDist: [1100, 1900],
-    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [7, 10]
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+    powerPitch: [7, 10], phugPitch: [14, 27], phugAlt: [1800, 5000]
   }
 });
 
@@ -409,10 +427,13 @@ AIRCRAFT.wbEr = variant('wb', {
   expect: {
     vr: [150, 175], toRoll: [1600, 2800], to35: [2000, 3300], climb: [1800, 3800],
     vsClean: [150, 162], vsFull: [110, 119], vapp: [138, 152], appPitch: [2, 3], ldgRoll: [800, 1600], ldgDist: [1250, 2200],
-    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], powerPitch: [5, 8.5]
+    brakePitch: [0, 0.8], brakeSettle: [0, 1], tdBounces: [0, 1], tdSettle: [0, 1], tdBounces800: [0, 0], tdSettle800: [0, 2],
+    powerPitch: [5, 8.5], phugPitch: [18, 35], phugAlt: [2800, 7000]
   }
 });
 
 export const AIRCRAFT_ORDER = ['tp', 'nb', 'wb', 'jumbo', 'commuter', 'rj', 'tpShort', 'nbShort', 'nbStretch', 'wbEr'];
 // static strut deflection = oleo at 80 % of its stroke + tyre deflection (used by the flight model and the 3D gear)
 for (const id in AIRCRAFT) { const g = AIRCRAFT[id].gear; g.staticDefl = 0.80 * g.stroke + g.tireDefl; }
+// punt d aplicacio de l empenta: per defecte, el de les gondoles
+for (const id in AIRCRAFT) { const e = AIRCRAFT[id].engines; if (!e.thrustPos) e.thrustPos = e.pos; }

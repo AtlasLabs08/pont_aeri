@@ -89,18 +89,21 @@ export class FlightModel {
       return { x, y, z: zFull, nose: isNose, stroke: S, soS, soMax: 0.90 * S, dg, F0: 0.08 * load, kt, ct: 2 * 0.10 * Math.sqrt(kt * mEq), Cc, Cr: 14 * Cc, c1: (kt + kAir) * PHYS_DT * 0.27, tireMax: g.tireDefl * 3.2, so: 0, soDot: 0, comp: 0, load: 0 };
     };
     this.legs.push(mk(g.nose.x, g.nose.y, W * noseShare, true));
-    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }
+    for (const l of g.mains) { const leg = mk(l.x, l.y, W * (1 - noseShare) / g.mains.length, false); leg.z += (l.x - xm) * Math.tan(3.5 * DEG); this.legs.push(leg); }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
     // Rebound damping. The orifice term above is quadratic (vanishes at small stroke speeds) and the only linear term, c1, is a
     // numerical one tied to PHYS_DT (~4 % of critical), so small pitch / heave motions on the gear rang for seconds. Each leg gets
     // a linear damper on its total extension rate, sized as a fraction of critical for the leg's static stiffness (tyre in series
     // with the air spring) and the mass the aircraft presents at that leg: pitching about the mains for the nose leg, about the
     // nose leg for the mains. The nose leg carries ~10 % of the weight but must stop the whole pitch inertia, hence mApp.
+    // cReb is sized here at the typical mass; mApp is proportional to the mass (Iyy scales with it), so reboundCoef() multiplies
+    // it by sqrt(mass / typical) and the fraction of critical stays GEAR_REBOUND_ZETA with any fuel and payload.
     const Iyy = this.cfg.inertia.Iyy * m / this.cfg.inertia.refMass, xn = g.nose.x, L2 = (xn - xm) * (xn - xm);
     for (const leg of this.legs) {
       const load = leg.F0 / 0.08, kAir = 1.3 * load / (leg.dg - leg.soS), k = leg.kt * kAir / (leg.kt + kAir);
       const mApp = leg.nose ? (Iyy + m * xm * xm) / L2 : (Iyy + m * xn * xn) / L2 / g.mains.length;
       leg.cReb = 2 * GEAR_REBOUND_ZETA * Math.sqrt(k * mApp);
-    }   // multi-bogie aircraft: aft trucks sit slightly higher so all trucks share the touchdown
+    }
+    this.gearMass = m;
     // structural contact points
     const ct = this.cfg.contact, P = [];
     P.push({ n: 'wing', p: ct.wingtip }, { n: 'wing', p: [ct.wingtip[0], -ct.wingtip[1], ct.wingtip[2]] });
@@ -111,6 +114,9 @@ export class FlightModel {
     P.push({ n: 'tail', p: [ct.tailX, 0, zt] }, { n: 'nose', p: ct.nose }, { n: 'belly', p: ct.belly });
     this.contactPts = P;
   }
+
+  /** rebound damping coefficient of a leg (N per m/s of extension) at the current mass (see _buildGear) */
+  reboundCoef(leg) { return leg.cReb * Math.sqrt(this.mass / this.gearMass); }
 
   /** (re)initialise the state. All fields optional. */
   reset(o) {
@@ -233,6 +239,7 @@ export class FlightModel {
     if (this.fuel <= 0) { this.fuelOut = true; xCmd = 0; }
     let thrustTot = 0, MyT = 0, MzT = 0, ffTot = 0;
     const dirF = lerp(1, -E.reverseFrac, this.revPos);
+    const TP = E.thrustPos || E.pos;                                          // punt d aplicacio de l empenta (nomes fisica)
     for (let i = 0; i < E.n; i++) {
       const en = this.eng[i];
       const rate = (E.spool.a0 + E.spool.a1 * en.x) * en.rate;
@@ -261,7 +268,7 @@ export class FlightModel {
       }
       if (this.fuelOut) { T = c.type === 'jet' ? 0 : -qbar * E.propDragArea * 0.05; ff = 0; }
       en.thrust = T; en.ff = ff; thrustTot += T; ffTot += ff;
-      MyT += E.pos[i][2] * T; MzT -= E.pos[i][1] * T;
+      MyT += TP[i][2] * T; MzT -= TP[i][1] * T;
     }
     this.fuel = Math.max(0, this.fuel - ffTot * dt);
     this.mass = this.zfm + this.fuel;
@@ -356,7 +363,7 @@ export class FlightModel {
         const vo = (so - leg.so) / dt; leg.so = so; leg.soDot = vo;
         const dTire = comp - leg.so;
         let N = leg.kt * dTire + leg.ct * (compRate - vo);
-        if (compRate < 0) N += leg.cReb * compRate;                                          // rebound damping (extension only)
+        if (compRate < 0) N += this.reboundCoef(leg) * compRate;                             // rebound damping (extension only)
         if (dTire > leg.tireMax) N += 6 * leg.kt * (dTire - leg.tireMax);                   // rim / bottoming
         if (N <= 0) { leg.comp = comp; continue; }
         leg.comp = comp; leg.load = N;

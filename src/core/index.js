@@ -11,3 +11,4 @@ export * from './trim.js';
 export * from './autopilot.js';
 export * from './harness.js';
 export * from './flight-recorder.js';
+export * from './landing-watch.js';
