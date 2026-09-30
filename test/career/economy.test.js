@@ -282,3 +282,30 @@ describe('computeFlightResult: errors', () => {
     }
   });
 });
+
+describe('computeFlightResult: revenueMult (D2+D5, G10)', () => {
+  test('sense revenueMult i amb revenueMult 1, resultat identic', () => {
+    assert.deepEqual(own({}, { revenueMult: 1 }), own());
+    assert.deepEqual(own(withScore(40), { revenueMult: 1 }), own(withScore(40)));
+  });
+
+  test('multiplica el bitllet (i la puntualitat, que n es un %); costos i eficiencia no canvien', () => {
+    const base = own(), r = own({}, { revenueMult: 1.08 });
+    // bitllets 45927 * 1.08 = 49601.16 -> 49601; puntualitat 0.04 * 49601.16 = 1984.05 -> 1984
+    assert.equal(r.revenue.tickets, 49601);
+    assert.equal(r.revenue.punctuality, 1984);
+    assert.equal(r.revenue.fuelSaving, base.revenue.fuelSaving);
+    assert.deepEqual(r.costs, base.costs);
+    assert.deepEqual(r.landing, base.landing);
+    assert.equal(r.rotation, base.rotation);
+    // net = 3.6 * (49601.16 + 1984.0464 + 63 - 6772) = 3.6 * 44876.2064 = 161554.34 -> 161554
+    assert.equal(r.net, 161554);
+  });
+
+  test('no s aplica al mode contract, i llanca si no es un numero finit >= 0', () => {
+    const c = input => computeFlightResult({ record: record(), mode: 'contract', rankPayMult: 1.25, ...input });
+    assert.deepEqual(c({ revenueMult: 1.15 }), c({}));
+    assert.throws(() => own({}, { revenueMult: -0.1 }), /revenueMult/);
+    assert.throws(() => own({}, { revenueMult: NaN }), /revenueMult/);
+  });
+});
