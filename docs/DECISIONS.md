@@ -546,3 +546,28 @@ Consequencia tecnica de l E4, nomes registrada: el tip antic de la llico 7
 (school.tip.flare, "des de 50 ft segueix la barra d arrodoniment") deia al
 jugador que seguis una barra que ja no surt. El tip nou de la V/S el
 substitueix i la clau antiga surt d en.js i ca.js.
+
+## 2026-09-30 - C5: punt de partida en graduar-se, base i copia en continuar
+
+Decisions d en Marc despres de revisar el PR #27.
+
+- Saldo en graduar-se. graduate deixa la partida exactament al punt de
+  partida de tools/balance.mjs. La logica es una sola funcio,
+  startingCompany (career/finance.js): company.cash = BALANCE.startingCash
+  (400.000 EUR, que ja inclouen el credit, DESIGN.md: 150 k propis + 250 k
+  de credit), un prestec 'L0' fet amb makeLoan(startingLoan.principal,
+  startingLoan.ratePerFlight, startingLoan.termFlights) i reputacio =
+  BALANCE.reputation.start. El harness ja no te codi propi de graduacio:
+  crida graduate de career/ amb totes les llicons aprovades (startState).
+  npm run balance --seeds 50 dona exactament la mateixa sortida que abans.
+  La pantalla de graduacio mostra el saldo i diu que inclou el credit.
+- Base. El harness escrivia la base a ma ('LEBL'). Ara es
+  BALANCE.startingBase = 'LEBL' (on es fa l escola): startingCompany la posa
+  a company.bases i el harness la fa servir tambe per a la ubicacio dels
+  avions. El harness no posa cap airportsUnlocked, aixi que graduate tampoc.
+  Com la resta de BALANCE abans del primer merge d Airline a main, no puja
+  version (seccio 6).
+- Continuar amb una altra versio d economia (balanceMismatch): com fins ara,
+  balanceVersion passa a BALANCE.version i es desa, pero primer
+  backupCareer(). Com discardCareer, si la copia falla i hi havia partida
+  desada, no se sobreescriu res i la UI ho diu.
