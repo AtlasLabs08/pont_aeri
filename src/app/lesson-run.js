@@ -159,6 +159,8 @@
  *   decidit el resultat (inclosa la gracia). No decideix passed/mercy:
  *   nomes tria el text. reason (opcional) es run.failReason(): si l intent
  *   ha suspes sense crash, es el missatge.
+ *   score (opcional) es la nota de l intent: l aprovat per gracia la diu
+ *   (E3, docs/DECISIONS.md 30/09/2026), { key, params: { score } }.
  */
 
 import { LESSONS, CONTROL_KEYS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
@@ -319,10 +321,10 @@ export function messageText({ key, params, tParams }) {
   return t(key, all);
 }
 
-export function attemptMessage({ passed, mercy, crashed, reason }) {
+export function attemptMessage({ passed, mercy, crashed, reason, score }) {
   if (crashed) return { key: 'school.instructor.crashed' };
   if (!passed && reason) return reason;
-  if (passed && mercy) return { key: 'school.instructor.mercyPassed' };
+  if (passed && mercy) return { key: 'school.instructor.mercyPassed', params: { score } };
   if (passed) return { key: 'school.instructor.passed' };
   return { key: 'school.instructor.failed' };
 }

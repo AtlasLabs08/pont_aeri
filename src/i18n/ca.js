@@ -55,7 +55,7 @@ export default {
   'school.instructor.askControl': 'Identifica aquest comandament: {controlName} (tecla {key}).',
   'school.instructor.crashed': 'Ha acabat malament. Respira i torna-ho a provar.',
   'school.instructor.passed': 'Molt bé, lliçó aprovada.',
-  'school.instructor.mercyPassed': 'Aprovat provisional. Pots tornar a l\'escola quan vulguis.',
+  'school.instructor.mercyPassed': 'Aprovat provisional amb {score}. Encara et falta ofici: torna a l\'escola quan vulguis.',
   'school.instructor.failed': 'Encara no. Vols tornar-ho a provar?',
   'school.instructor.altDeviation': 'T\'has desviat {ft} ft de l\'altitud de referència. Intent suspès.',
   'school.instructor.ilsDeviation': 'Has sortit de l\'ILS: {dots} punts de desviació entre {top} i {bottom} ft AGL.',

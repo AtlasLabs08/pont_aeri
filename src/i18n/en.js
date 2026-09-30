@@ -58,7 +58,7 @@ export default {
   'school.instructor.askControl': 'Identify this control: {controlName} (key {key}).',
   'school.instructor.crashed': 'That ended badly. Take a breath and try the lesson again.',
   'school.instructor.passed': 'Well done, lesson passed.',
-  'school.instructor.mercyPassed': 'Provisional pass. You can come back to the school whenever you like.',
+  'school.instructor.mercyPassed': 'Provisional pass with {score}. You still need practice: come back to the school whenever you like.',
   'school.instructor.failed': 'Not quite. Want to try again?',
   'school.instructor.altDeviation': 'You drifted {ft} ft from your reference altitude. Attempt failed.',
   'school.instructor.ilsDeviation': 'You left the ILS: {dots} dots off between {top} and {bottom} ft AGL.',

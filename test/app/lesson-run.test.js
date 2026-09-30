@@ -817,6 +817,13 @@ describe('attemptMessage', () => {
   test('crash, gracia, aprovat i suspes', () => {
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: true }).key, 'school.instructor.crashed');
     assert.equal(attemptMessage({ passed: true, mercy: true, crashed: false }).key, 'school.instructor.mercyPassed');
+    // E3: l aprovat per gracia diu la nota, a en i a ca
+    const mercy = attemptMessage({ passed: true, mercy: true, crashed: false, score: 34 });
+    assert.deepEqual(mercy, { key: 'school.instructor.mercyPassed', params: { score: 34 } });
+    assert.equal(messageText(mercy), 'Provisional pass with 34. You still need practice: come back to the school whenever you like.');
+    setLang('ca');
+    assert.equal(messageText(mercy), "Aprovat provisional amb 34. Encara et falta ofici: torna a l'escola quan vulguis.");
+    setLang('en');
     assert.equal(attemptMessage({ passed: true, mercy: false, crashed: false }).key, 'school.instructor.passed');
     assert.equal(attemptMessage({ passed: false, mercy: false, crashed: false }).key, 'school.instructor.failed');
     const reason = { key: 'school.instructor.altDeviation', params: { ft: 250 } };

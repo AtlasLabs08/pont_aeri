@@ -9,7 +9,7 @@
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { Storage, IS_DEV } from '../src/platform/index.js';
+import { Storage, IS_DEV, randomSeed, nowIso } from '../src/platform/index.js';
 
 const KEY = 'pontAeri.test';
 
@@ -28,7 +28,8 @@ class FullStorage extends FakeStorage {
 
 const ORIGINAL = {
   localStorage: Object.getOwnPropertyDescriptor(globalThis, 'localStorage'),
-  location: Object.getOwnPropertyDescriptor(globalThis, 'location')
+  location: Object.getOwnPropertyDescriptor(globalThis, 'location'),
+  crypto: Object.getOwnPropertyDescriptor(globalThis, 'crypto')
 };
 
 function inject(name, value) {
@@ -123,5 +124,24 @@ describe('IS_DEV', () => {
     assert.equal(await devWith('atlaslabs08.github.io', '?dev'), true);
     assert.equal(await devWith('atlaslabs08.github.io'), false);
     assert.equal(await devWith('pages.dev.example.com'), false);
+  });
+});
+
+describe('randomSeed i nowIso (C5, E1)', () => {
+  test('randomSeed treu la llavor de crypto.getRandomValues', () => {
+    inject('crypto', { getRandomValues: a => { a[0] = 0xDEADBEEF; return a; } });
+    assert.equal(randomSeed(), 0xDEADBEEF);
+  });
+
+  test('randomSeed sense crypto, o si llanca, no llanca i dona un enter de 32 bits', () => {
+    for (const fake of [undefined, { getRandomValues() { throw new Error('no'); } }]) {
+      inject('crypto', fake);
+      const s = randomSeed();
+      assert.ok(Number.isInteger(s) && s >>> 0 === s, String(s));
+    }
+  });
+
+  test('nowIso: data ISO', () => {
+    assert.match(nowIso(), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 });
