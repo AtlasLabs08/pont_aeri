@@ -472,3 +472,72 @@ Seguiment del PR #24. Mesures abans i despres amb tools/estabilitat.mjs
 - Sense canvi: els rebots que el model compta pero Game no (un contacte de
   mes de 0,5 s i un bot de menys de 2 s en l aire) es queden, perque
   canviarien les notes. Vegeu la descripcio del PR.
+
+## 2026-09-30 - C5+D1: E1-E10, graduacio, menu principal i centre d operacions
+
+Decisions d en Marc per a C5 (pantalla d escola i graduacio) i D1 (menu
+principal Free Flight / Airline, shell del centre d operacions i barra
+superior).
+
+- E1. Desat de l escola (substitueix la D2 del C3+C4). La partida
+  (CareerState) es crea el primer cop que el jugador entra a Airline: se li
+  demana el nom i es crida createCareer. L escola viu dins de la partida
+  (CareerState.school) i es desa amb app/save.js (clau pontAeri.career.v1)
+  despres de cada intent de llico i en tancar cada pantalla, mai per frame.
+  Canvia el "Fet quan" del C5: graduar-se ja no crea la partida, la
+  completa. El centre d operacions nomes s obre amb school.graduated = true.
+  Nom: de 1 a 24 caracters despres de treure espais (state.js no te cap regla
+  per al nom). La llavor i createdAt es generen a platform/
+  (crypto.getRandomValues, new Date().toISOString()) i s injecten: mai
+  Math.random() ni Date a career/.
+- E2. Graduacio. Quan canGraduate(school) es cert i graduated es fals, el joc
+  mostra la pantalla de graduacio i aplica graduate(state) un sol cop: afegeix
+  'commuter' a pilot.ratings (el pilot comenca amb ratings: []), suma
+  BALANCE.school.graduationXp a l XP pel mateix cami que la resta d XP
+  (applyXp: el rang surt de l XP) i posa school.graduated = true. La pantalla
+  mostra l habilitacio, l XP guanyada i el saldo (company.cash amb fmtMoney),
+  i te un boto per obrir el centre d operacions. Si la partida carregada ja
+  compleix canGraduate sense estar graduada (per exemple, despres del boto
+  DEV), tambe surt la pantalla de graduacio.
+- E3. Aprovat per gracia. Si recordLessonAttempt retorna mercy: true, el
+  jugador ho llegeix a l instructor i al debrief: "Provisional pass with
+  {score}. You still need practice: come back to the school whenever you
+  like." / "Aprovat provisional amb {score}. Encara et falta ofici: torna a
+  l escola quan vulguis." No es desa (decisio del C1 del 27/09, no canvia).
+- E4. Llico 7 sense barra d arrodoniment. A lessons.js, aids.flareBar de
+  'landing' passa a false (nomes dades; el codi de la barra es queda).
+  autoDebrief no canvia. Tip nou de l instructor a la llico 7 sobre la V/S:
+  "Just before touchdown, pull back gently to bring the vertical speed (V/S)
+  as close to 0 as you can, without letting the airspeed drop below Vref."
+- E5. Guia de consulta. Nomes consulta: no es practica i no te criteris.
+  Conte les tecles, els parametres del HUD i els simbols, amb una frase curta
+  per a cadascun. S obre des de la pantalla d escola i des de la pausa de
+  Free Flight. Les tecles surten sempre de CONTROL_KEYS (lessons.js): les que
+  Input o Game.onKey llegeixen i no hi eren s hi afegeixen (nomes dades, sense
+  tocar Input). L ajuda de la tecla H no es toca.
+- E6. Barra superior (nomes a Airline, nomes graduat): nom i distintiu de
+  rang; barra d XP fins al rang seguent (plena al rang maxim); saldo en
+  euros; reputacio 0-100; flota operatius/totals (status 'ready' /
+  fleet.length); base. Fora d aquest PR, sense caselles buides que els
+  esperin: data i hora (E1), xip d avis (E1/E2), variacio de l ultim vol i
+  tendencia de la reputacio (D4).
+- E7. Centre d operacions: les set pestanyes de DESIGN.md (Dispatch, Fleet,
+  Market, Crew, Pilot, Finance, Map), cadascuna amb "Available soon" /
+  "Aviat". Les omplen D2-D6. Un boto per tornar a l escola: les llicons es
+  poden repetir sempre, sense XP ni diners.
+- E8. Menu principal amb dues portes. Free Flight obre el menu que ja
+  existeix. Airline: sense partida -> pantalla del nom -> escola; amb partida
+  sense graduar -> escola; graduat -> centre d operacions. Cada un dels cinc
+  estats de loadCareer te resposta a la UI: si balanceVersion no coincideix,
+  avisar i oferir continuar o comencar de nou (seccio 8); si la partida no es
+  pot llegir, dir que se n ha fet copia i oferir comencar de nou. Estetica de
+  taulell de sortides (DESIGN.md): fons pissarra, tipografia condensada, files
+  fines, accents ambre i verd, amb la pila de fonts del sistema (cap font
+  externa ni dependencia nova). El fons es l escena que ja hi ha darrere del
+  menu actual (l escena 3D del menu es el D7).
+- E9. Exportar i importar la partida (seccio 8), a la pantalla d escola i al
+  centre d operacions. Exportar descarrega el JSON d exportJson. Importar fa
+  servir importJson: si falla, missatge d error i la partida actual no canvia.
+- E10. Panell DEV (nomes IS_DEV, fora d i18n): el boto "desbloqueja-les
+  totes" actua sobre l escola de la partida carregada i la desa. Boto nou
+  "esborra la partida", amb discardCareer (que fa copia abans).
