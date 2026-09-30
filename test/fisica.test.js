@@ -7,7 +7,10 @@
  *      dos sentits (Harness.powerResponse).
  *   2. L amortidor d extensio del tren es dimensiona amb la massa real: el
  *      coeficient canvia amb la massa i la fraccio del critic (zeta) es la
- *      mateixa buit, carregat o a la massa tipica.
+ *      mateixa buit, carregat o a la massa tipica. I el pas de fisica el fa
+ *      servir de debo: l alcada de l extensio despres d una sacsejada vertical
+ *      a terra, a la massa minima i a la maxima d aterratge, es la mesurada amb
+ *      aquest model (si el tren canvia legitimament, cal tornar-la a mesurar).
  *
  * Correr:  npm test
  */
@@ -15,7 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRCRAFT, AIRCRAFT_ORDER, FlightModel, Harness } from '../src/core/index.js';
+import { AIRCRAFT, AIRCRAFT_ORDER, FlightModel, Harness, newCtl, FLAT_ENV, PHYS_DT } from '../src/core/index.js';
 
 describe('Mi-9: el turbohelix mes docil en un canvi gran de potencia', () => {
   const R = {};
@@ -53,6 +56,31 @@ describe('amortidor d extensio del tren amb la massa real', () => {
           assert.ok(Math.abs(v - typ[i].z) < 1e-9, `pota ${i}: zeta ${name} ${v.toFixed(4)}, a la massa tipica ${typ[i].z.toFixed(4)}`);
         }
       });
+    });
+  }
+});
+
+/* sacsejada vertical a terra: avio aturat amb el fre posat 5 s, i de cop 0,5 m/s cap amunt (el tren s esten). Torna
+   l alcada maxima que puja el CG en 3 s (m). Es mesura el pas de fisica sencer, no reboundCoef */
+function kickRise(cfg, mass, fuel) {
+  const f = new FlightModel(cfg), ctl = newCtl(); ctl.parkBrake = true;
+  f.reset({ onGround: true, hdg: 0, mass, fuel });
+  for (let i = 0; i < 120 * 5; i++) f.step(PHYS_DT, ctl, FLAT_ENV);
+  const h0 = f.h; f.vd = -0.5; let rise = 0;
+  for (let i = 0; i < 120 * 3; i++) { f.step(PHYS_DT, ctl, FLAT_ENV); rise = Math.max(rise, f.h - h0); }
+  return rise;
+}
+
+describe('amortidor d extensio: efecte al pas de fisica a massa minima i maxima', () => {
+  // mm, mesurats amb aquest model. Amb l amortidor a la massa tipica (sense l escalat per la massa real), la massa
+  // minima puja 0,13 mm menys al G-72 i al Mi-9 i 0,38 mm menys al T-4: la tolerancia (0,02 mm) ho detecta
+  const REF = { tp: [10.9072, 11.0776], commuter: [10.8868, 11.0490], jumbo: [11.9003, 12.5116] };
+  for (const [id, [lo, hi]] of Object.entries(REF)) {
+    test(`${id}: alcada de l extensio despres d una sacsejada, buit i a la massa maxima d aterratge`, () => {
+      const M = AIRCRAFT[id].mass;
+      const rLo = kickRise(AIRCRAFT[id], M.empty + 0.1 * M.maxFuel, 0.1 * M.maxFuel) * 1000, rHi = kickRise(AIRCRAFT[id], M.mlw, M.typFuel) * 1000;
+      assert.ok(Math.abs(rLo - lo) < 0.02, `massa minima: ${rLo.toFixed(4)} mm, esperat ${lo}`);
+      assert.ok(Math.abs(rHi - hi) < 0.02, `massa maxima d aterratge: ${rHi.toFixed(4)} mm, esperat ${hi}`);
     });
   }
 });
