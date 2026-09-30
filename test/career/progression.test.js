@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 
 import {
   rankForXp, nextRank, rankPayMult, dispatchLimits, flightXp, applyXp,
-  canFlyType, purchaseRating, purchaseEndorsement, assessDamage
+  canFlyType, purchaseRating, purchaseEndorsement, assessDamage,
+  graduate, createCareer, validate, LESSONS, BALANCE
 } from '../../src/career/index.js';
 
 /** Pilot minim; over sobreescriu camps. */
@@ -372,5 +373,53 @@ describe('purchaseEndorsement', () => {
     assert.deepEqual(purchaseEndorsement(p, 0, 'longHaul'), { ok: false, reason: 'owned' });
     // student, 0 EUR, sense lowVis (commercial, 60.000): guanya rank
     assert.deepEqual(purchaseEndorsement(pilot(), 0, 'lowVis'), { ok: false, reason: 'rank' });
+  });
+});
+
+describe('graduate (C5, E2)', () => {
+  const allPassed = () => LESSONS.map(l => l.id);
+  const career = (school = {}) => {
+    const s = createCareer({ name: 'Marc', seed: 7, createdAt: '2026-09-30T00:00:00.000Z' });
+    return { ...s, school: { ...s.school, lessonsPassed: allPassed(), ...school } };
+  };
+
+  test('afegeix commuter una sola vegada i posa graduated', () => {
+    const g = graduate(career());
+    assert.deepEqual(g.pilot.ratings, ['commuter']);
+    assert.equal(g.school.graduated, true);
+    // si ja la tenia (no hauria de passar), no es duplica
+    const s = career();
+    const g2 = graduate({ ...s, pilot: { ...s.pilot, ratings: ['commuter'] } });
+    assert.deepEqual(g2.pilot.ratings, ['commuter']);
+  });
+
+  test('suma exactament BALANCE.school.graduationXp i el rang surt de l XP', () => {
+    const g = graduate(career());
+    assert.equal(g.pilot.xp, BALANCE.school.graduationXp);
+    assert.equal(g.pilot.rank, rankForXp(BALANCE.school.graduationXp));
+    // amb XP previa que creua un llindar: 400 + 250 = 650 >= 600 (private)
+    const s = career();
+    const g2 = graduate({ ...s, pilot: { ...s.pilot, xp: 400 } });
+    assert.equal(g2.pilot.xp, 400 + BALANCE.school.graduationXp);
+    assert.equal(g2.pilot.rank, 'private');
+  });
+
+  test('no modifica l entrada i la resta de la partida no canvia', () => {
+    const s = career(), before = clone(s);
+    const g = graduate(s);
+    assert.deepEqual(s, before);
+    assert.deepEqual(g.company, s.company);
+    assert.deepEqual(g.school.lessonsPassed, s.school.lessonsPassed);
+    assert.ok(validate(g).ok);
+  });
+
+  test('llanca si canGraduate es fals', () => {
+    const s = career({ lessonsPassed: allPassed().slice(0, -1) });
+    assert.throws(() => graduate(s), /graduate/);
+  });
+
+  test('llanca si ja es graduat: no es pot graduar dos cops', () => {
+    const g = graduate(career());
+    assert.throws(() => graduate(g), /graduate/);
   });
 });

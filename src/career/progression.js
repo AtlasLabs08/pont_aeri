@@ -4,7 +4,8 @@
  * Aplicar el resultat a la partida (i descomptar els diners) es feina d app/.
  *
  * EXPORTA: rankForXp nextRank rankPayMult dispatchLimits flightXp applyXp
- *          canFlyType purchaseRating purchaseEndorsement
+ *          canFlyType purchaseRating purchaseEndorsement graduate
+ *          GRADUATION_RATING
  *
  * INTERFICIE (no la canviis, app/, la interficie, el C1, l E5 i els tests en depenen):
  *   rankForXp(xp) -> clau del rang mes alt de BALANCE.ranks amb xp >= llindar.
@@ -41,9 +42,16 @@
  *     habilitacions es del C1: aqui es compra quan ja s ha passat.
  *     Llancen un Error si cash no es un numero finit o si pilot.rank no es a
  *     BALANCE.ranks.
+ *   graduate(state) -> CareerState nou (C5, docs/DECISIONS.md 30/09/2026, E2).
+ *     Rep i retorna la partida sencera, no modifica l entrada: afegeix
+ *     GRADUATION_RATING ('commuter') a pilot.ratings si no hi es, suma
+ *     BALANCE.school.graduationXp amb applyXp (el rang surt de l XP) i posa
+ *     school.graduated = true. Llanca un Error si canGraduate(state.school)
+ *     es fals o si ja es graduat.
  */
 
 import { BALANCE } from './balance.js';
+import { canGraduate } from './school.js';
 
 /** @typedef {import('./types.js').Pilot} Pilot */
 
@@ -144,4 +152,16 @@ export function purchaseRating(pilot, cash, key) {
 /** Compra un endorsement. */
 export function purchaseEndorsement(pilot, cash, key) {
   return purchase('purchaseEndorsement', BALANCE.endorsements, 'endorsements', pilot, cash, key);
+}
+
+/** Habilitacio que dona la graduacio de l escola (DESIGN.md, "La graduacio"). */
+export const GRADUATION_RATING = 'commuter';
+
+/** Completa la partida en graduar-se de l escola. Vegeu la capcalera. */
+export function graduate(state) {
+  if (!canGraduate(state.school)) throw new Error('graduate: encara hi ha llicons sense aprovar');
+  if (state.school.graduated) throw new Error('graduate: el pilot ja es graduat');
+  const { pilot } = applyXp(state.pilot, BALANCE.school.graduationXp);
+  const ratings = pilot.ratings.includes(GRADUATION_RATING) ? pilot.ratings : [...pilot.ratings, GRADUATION_RATING];
+  return { ...state, pilot: { ...pilot, ratings }, school: { ...state.school, graduated: true } };
 }
