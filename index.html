@@ -147,9 +147,9 @@ import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
-  currentCareer, recordLesson, unlockAllLessons, discardAirline, on
+  currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on
 } from './src/app/index.js';
-import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide } from './src/ui/index.js';
+import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -2037,7 +2037,8 @@ async function launchLesson(lessonId, unlockAll) {
  * nomes visible amb IS_DEV. Des de l E10 (30/09/2026) actua sobre la partida
  * carregada: "unlock all" marca totes les llicons com a aprovades a la seva
  * escola i la desa (sense recordLessonAttempt); "delete career" la llenca amb
- * discardCareer, que en fa copia abans. */
+ * discardCareer, que en fa copia abans. D2+D5: "new market" genera la llista
+ * de l epoch seguent al desat i la desa (devNewMarket). */
 const DevSchoolPanel = {
   init() {
     const el = document.createElement('div');
@@ -2055,12 +2056,14 @@ const DevSchoolPanel = {
     }).join('');
     this.el.innerHTML = '<b>DEV school</b>' + (career ? '' : '<div>no career loaded</div>') + rows +
       `<div style="margin-top:4px"><button data-unlock="1" ${career ? '' : 'disabled'}>unlock all (DEV)</button></div>` +
-      `<div style="margin-top:4px"><button data-discard="1" ${career ? '' : 'disabled'}>delete career (DEV)</button></div>`;
+      `<div style="margin-top:4px"><button data-discard="1" ${career ? '' : 'disabled'}>delete career (DEV)</button></div>` +
+      `<div style="margin-top:4px"><button data-market="1" ${career && career.school.graduated ? '' : 'disabled'}>new market (DEV)</button></div>`;
     this.el.querySelectorAll('button[data-lesson]').forEach(b => b.addEventListener('click', () => launchLesson(b.dataset.lesson, false)));
     this.el.querySelector('button[data-unlock]').addEventListener('click', () => {
       // E2: amb totes aprovades surt la graduacio; si s esta volant, en tornar al menu
       if (unlockAllLessons() && Game.state === 'menu') showAirlineHome();
     });
+    this.el.querySelector('button[data-market]').addEventListener('click', () => { if (devNewMarket()) refreshAirlineUi(); });
     this.el.querySelector('button[data-discard]').addEventListener('click', () => {
       if (!discardAirline()) { UI.toast('DEV: the backup failed, nothing deleted', 4); return; }
       if (Game.state === 'menu') { UI.el.menu.hidden = true; showMainMenu(); }

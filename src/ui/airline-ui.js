@@ -6,7 +6,7 @@
  * No importa Game ni render/: el que toca el simulador arriba com a hooks.
  *
  * EXPORTA: initAirlineUi showMainMenu enterAirline showAirlineHome
- *          hideAirlineUi isAirlineUiOpen showGuide
+ *          hideAirlineUi isAirlineUiOpen showGuide refreshAirlineUi
  *
  * INTERFICIE (no la canviis, index.html en depen):
  *   initAirlineUi({ launchLesson(lessonId), openFreeFlight(), onShow() })
@@ -19,23 +19,29 @@
  *     (tornar d una llico, boto DEV): nom, escola, graduacio o centre
  *   hideAirlineUi()    amaga la capa (desa si hi ha partida)
  *   isAirlineUiOpen() -> boolean
+ *   refreshAirlineUi()   si el centre d operacions es obert, el torna a
+ *     pintar amb la partida en memoria, a la mateixa pestanya (boto DEV
+ *     "new market").
  *   showGuide(onClose)   guia de consulta (E5). Des de la pausa de Free
  *     Flight: no crida onShow ni desa, i onClose (qui l ha obert) decideix
  *     que es torna a veure. Des de l escola hi ha un boto.
  */
 
-import { t } from '../i18n/index.js';
+import { t, fmtMoney } from '../i18n/index.js';
 import { BALANCE } from '../career/index.js';
 import {
   on, openAirline, currentCareer, pendingCareer, entryScreen, createAirline,
   acceptBalanceMismatch, startOver, graduateCareer, exportCareer, importCareer,
-  saveAirline, topBarModel, NAME_MAX_LENGTH
+  saveAirline, topBarModel, NAME_MAX_LENGTH, ensureMarket, marketModel, fleetModel,
+  buyListing, sellAirframe
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
 import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen } from './screens.js';
 import { guideScreen } from './guide.js';
+import { fleetPanel } from './fleet.js';
+import { marketPanel } from './market.js';
 
-let root = null, hooks = {}, bannerTimer = 0;
+let root = null, hooks = {}, bannerTimer = 0, screen = null, opsTab = null;
 
 export function initAirlineUi(h) {
   hooks = h || {};
@@ -49,8 +55,9 @@ export function isAirlineUiOpen() { return !!root && !root.hidden; }
 
 /** tanca la pantalla actual (desa, E1) i obre la nova. overlay: la guia
  *  oberta des de la pausa, que no toca ni la partida ni la resta de la UI */
-function mount(node, wide, overlay) {
+function mount(node, wide, overlay, name = null) {
   if (!overlay && isAirlineUiOpen() && currentCareer()) saveAirline();
+  screen = overlay ? screen : name;
   root.className = 'pa-ui ' + (wide ? 'pa-wide' : 'pa-side');
   root.replaceChildren(node);
   root.hidden = false;
@@ -67,6 +74,11 @@ export function hideAirlineUi() {
   if (currentCareer()) saveAirline();
   root.hidden = true;
   root.replaceChildren();
+  screen = null;
+}
+
+export function refreshAirlineUi() {
+  if (isAirlineUiOpen() && screen === 'ops' && currentCareer()) showOps(opsTab);
 }
 
 function banner(text, good) {
@@ -157,7 +169,7 @@ function showSchool() {
   mount(schoolScreen(state, {
     onFly: id => { hideAirlineUi(); hooks.launchLesson(id); },
     onGuide: () => mount(guideScreen({ onClose: showSchool })),
-    onOps: state.school.graduated ? showOps : null,
+    onOps: state.school.graduated ? () => showOps() : null,
     onBack: showMainMenu,
     ...saveActions()
   }));
@@ -166,12 +178,36 @@ function showSchool() {
 function showGraduation() {
   const result = graduateCareer();
   if (!result) return showAirlineHome();
-  mount(graduationScreen(currentCareer(), result, { onOpen: showOps }));
+  mount(graduationScreen(currentCareer(), result, { onOpen: () => showOps() }));
 }
 
-function showOps() {
+/** centre d operacions a la pestanya tab. En tornar a pintar-lo (comprar,
+ *  vendre), la barra superior s actualitza i la posicio de scroll es queda. */
+function showOps(tab = null) {
+  ensureMarket();
   const state = currentCareer();
-  mount(opsScreen(state, topBarModel(state), { onSchool: showSchool, onBack: showMainMenu, ...saveActions() }), true);
+  const again = screen === 'ops' && isAirlineUiOpen(), scroll = root.scrollTop;
+  mount(opsScreen(state, topBarModel(state), {
+    onSchool: showSchool, onBack: showMainMenu, ...saveActions(),
+    tab: tab ?? opsTab, onTab: id => { opsTab = id; },
+    panels: {
+      fleet: () => fleetPanel(fleetModel(currentCareer()), { onSell: sell, onMarket: () => showOps('market') }),
+      market: () => marketPanel(marketModel(currentCareer()), { onBuy: buy })
+    }
+  }), true, false, 'ops');
+  if (again) root.scrollTop = scroll;
+}
+
+function buy(reg, mode) {
+  const r = buyListing(reg, mode);
+  if (r.ok) banner(t('market.bought', { reg, icao: r.airframe.location }), true);
+  showOps('market');
+}
+
+function sell(reg) {
+  const r = sellAirframe(reg);
+  if (r.ok) banner(t('fleet.sold', { reg, net: fmtMoney(r.net) }), true);
+  showOps('fleet');
 }
 
 function exportSave() {

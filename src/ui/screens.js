@@ -12,7 +12,11 @@
  *   schoolScreen(state, { onFly(lessonId), onGuide, onExport, onImport,
  *     onOps, onBack })   onOps nomes si el pilot es graduat
  *   graduationScreen(state, result, { onOpen })   result de graduateCareer()
- *   opsScreen(state, topBarModel, { onSchool, onExport, onImport, onBack })
+ *   opsScreen(state, topBarModel, { onSchool, onExport, onImport, onBack,
+ *     tab?, onTab?, panels? })   tab: pestanya inicial (OPS_TABS[0] si no
+ *     n hi ha); onTab(id) en canviar de pestanya; panels: { id: () =>
+ *     Element } per a les pestanyes que ja existeixen (D2 Fleet, D5
+ *     Market). La resta diuen "Aviat".
  *   noticeScreen({ title, text, tone, buttons: [{ label, primary?, onClick }] })
  *   Totes retornen un Element.
  */
@@ -114,14 +118,18 @@ export function graduationScreen(state, result, { onOpen }) {
     el('div', { class: 'pa-btns' }, button(t('graduation.open'), onOpen, true)));
 }
 
-export function opsScreen(state, model, { onSchool, onExport, onImport, onBack }) {
+export function opsScreen(state, model, { onSchool, onExport, onImport, onBack, tab, onTab, panels = {} }) {
   const panel = el('div', { class: 'pa-tabpanel', role: 'tabpanel' });
   const tabs = OPS_TABS.map(id => el('button', { type: 'button', role: 'tab', 'data-tab': id, onclick: () => select(id) }, t('ops.tab.' + id)));
   function select(id) {
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === id));
-    panel.textContent = t('ops.soon');
+    const live = typeof panels[id] === 'function';
+    panel.className = 'pa-tabpanel' + (live ? ' pa-live' : '');
+    if (live) panel.replaceChildren(panels[id]());
+    else panel.textContent = t('ops.soon');
+    if (onTab) onTab(id);
   }
-  select(OPS_TABS[0]);
+  select(OPS_TABS.includes(tab) ? tab : OPS_TABS[0]);
   return el('div', {},
     topBar(model),
     el('section', { class: 'pa-ops' },

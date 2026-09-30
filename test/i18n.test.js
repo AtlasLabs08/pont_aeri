@@ -97,6 +97,18 @@ describe('t', () => {
     for (const k of keys) assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
   });
 
+  test('D2+D5: categories, cabina, estats, Fleet i Market, en tots dos idiomes', () => {
+    for (const k of BALANCE.market.tiers.flatMap(x => ['tier.' + x.key, 'tier.cabin.' + x.key])) {
+      assert.ok(Object.hasOwn(en, k), 'en: ' + k);
+      assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
+    }
+    for (const r of Object.keys(BALANCE.ratings)) assert.ok(Object.hasOwn(en, 'market.group.' + r), 'market.group.' + r);
+    const keys = Object.keys(en).filter(k => ['tier.', 'cond.', 'fleet.', 'market.'].some(p => k.startsWith(p)));
+    assert.ok(keys.length > 60);
+    for (const k of keys) assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
+    assert.equal(ca['tier.standard'], 'Estàndard');
+  });
+
   test('cada clau de BALANCE.landingBands existeix en tots dos idiomes', () => {
     for (const { key } of BALANCE.landingBands) {
       assert.ok(Object.hasOwn(en, key), 'en: ' + key);

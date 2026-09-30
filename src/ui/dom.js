@@ -87,7 +87,36 @@ const CSS = `
  padding:.55em 1.1em;font:600 .9rem system-ui,sans-serif;max-width:80vw}
 .pa-banner.pa-good{background:#10281a;color:#c9f5da;border-left-color:#3ddc84}
 .pa-backlink{display:inline-block;margin:0 0 .8rem;padding:0;background:none;border:0;color:#0f9aa0;text-decoration:underline;cursor:pointer;font-size:.9rem;letter-spacing:.02em}
-@media (max-width:640px){.pa-ui.pa-side{padding:20px 16px}.pa-ui .pa-lessons .pa-head,.pa-ui .pa-lessons .pa-row{grid-template-columns:1.6rem 1fr 5.4rem}.pa-ui .pa-lessons .pa-status{display:none}}
+.pa-ui .pa-tabpanel.pa-live{padding:1.2rem .2rem;font-family:var(--pa-cond);letter-spacing:0;text-transform:none;color:var(--pa-text)}
+.pa-ui .pa-panel h3{margin:.2rem 0 .4rem;font-size:.9rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pa-amber)}
+.pa-ui .pa-panel h4{margin:.9rem 0 .3rem;font-size:.75rem;letter-spacing:.18em;text-transform:uppercase;color:var(--pa-dim);font-weight:600}
+.pa-ui .pa-group{color:var(--pa-amber)!important;border-left:3px solid var(--pa-amber);padding-left:.5rem}
+.pa-ui .pa-fleet .pa-row{grid-template-columns:5.2rem 1fr auto 7.5rem;align-items:start}
+.pa-ui .pa-market .pa-head,.pa-ui .pa-market .pa-row{grid-template-columns:1fr auto 8.5rem}
+.pa-ui .pa-price{font-family:var(--pa-mono);text-align:right;color:var(--pa-green);font-size:1.05rem}
+.pa-ui .pa-head .pa-price{color:var(--pa-dim);font-size:.72rem}
+.pa-ui .pa-row.pa-listing.pa-locked{opacity:.6}
+.pa-tier{display:inline-block;vertical-align:middle;margin-left:.4rem;padding:.08em .5em;font-family:var(--pa-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:600;border-radius:2px}
+.pa-tier-basic{border:1px dashed #6f7d88;color:#8a9aa6}
+.pa-tier-standard{border:1px solid #cfd8de;color:#e6ebee}
+.pa-tier-premium{border:1px solid #f5b83d;color:#f5b83d;background:rgba(245,184,61,.1)}
+.pa-tier-deluxe{border:1px solid #3ddc84;background:#3ddc84;color:#0f1418}
+.pa-conds{display:inline-grid;grid-template-columns:repeat(4,3.4rem);gap:.25rem}
+.pa-cond{display:flex;flex-direction:column;align-items:center;border:1px solid var(--pa-line);padding:.15rem 0}
+.pa-cond i{font-style:normal;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--pa-dim)}
+.pa-cond b{font-family:var(--pa-mono);font-size:.95rem;color:var(--pa-green)}
+.pa-cond.pa-bad b{color:var(--pa-red)}
+.pa-ui .pa-dialog{border:1px solid var(--pa-amber);background:#0f1418;padding:.8rem 1rem;margin:.3rem 0 .8rem}
+.pa-ui .pa-dialog h3{color:var(--pa-text);letter-spacing:.08em}
+.pa-ui .pa-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:.8rem;margin-top:.4rem}
+.pa-ui .pa-option{border:1px solid var(--pa-line);padding:.2rem .7rem .7rem}
+.pa-ui .pa-option.pa-locked{opacity:.75}
+.pa-ui .pa-option .pa-kv b,.pa-ui .pa-effects .pa-kv b{font-size:1rem}
+.pa-ui .pa-filter{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin:.3rem 0 .6rem}
+.pa-ui .pa-filter span{color:var(--pa-dim);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;margin-right:.3rem}
+.pa-ui .pa-filter button{padding:.35em .8em}
+.pa-ui .pa-filter button[aria-pressed=true]{border-color:var(--pa-amber);color:var(--pa-amber)}
+@media (max-width:640px){.pa-ui .pa-fleet .pa-row,.pa-ui .pa-market .pa-row{grid-template-columns:1fr}.pa-ui .pa-price,.pa-ui .pa-status{text-align:left}.pa-ui.pa-side{padding:20px 16px}.pa-ui .pa-lessons .pa-head,.pa-ui .pa-lessons .pa-row{grid-template-columns:1.6rem 1fr 5.4rem}.pa-ui .pa-lessons .pa-status{display:none}}
 `;
 
 let injected = false;
