@@ -7,7 +7,8 @@
  *          opsScreen noticeScreen OPS_TABS
  *
  * INTERFICIE (no la canviis, airline-ui.js en depen):
- *   mainMenuScreen({ onFreeFlight, onAirline })
+ *   mainMenuScreen({ onFreeFlight, onAirline, onSettings? })   onSettings:
+ *     fila d ajustos (X1 del D2+D5), el mateix panell que Esc dins d un vol
  *   nameScreen({ onSubmit(name) -> missatge d error o null, onBack })
  *   schoolScreen(state, { onFly(lessonId), onGuide, onExport, onImport,
  *     onOps, onBack })   onOps nomes si el pilot es graduat
@@ -38,7 +39,7 @@ function clickRow(onClick, ...cells) {
   return el('div', { class: 'pa-row pa-click', role: 'button', tabindex: 0, onclick: act, onkeydown: act }, ...cells);
 }
 
-export function mainMenuScreen({ onFreeFlight, onAirline }) {
+export function mainMenuScreen({ onFreeFlight, onAirline, onSettings }) {
   return el('section', { 'aria-labelledby': 'paMenuTitle' },
     el('h1', { id: 'paMenuTitle' }, t('menu.title')),
     el('p', { class: 'pa-sub' }, t('menu.subtitle')),
@@ -49,7 +50,10 @@ export function mainMenuScreen({ onFreeFlight, onAirline }) {
         el('span', { class: 'pa-status pa-ok' }, t('menu.status.open'))),
       clickRow(onAirline, el('span', { class: 'pa-code' }, t('menu.airline.code')),
         el('span', { class: 'pa-name' }, t('menu.airline'), el('span', { class: 'pa-desc' }, t('menu.airline.desc'))),
-        el('span', { class: 'pa-status pa-warn' }, t('menu.status.boarding')))));
+        el('span', { class: 'pa-status pa-warn' }, t('menu.status.boarding'))),
+      onSettings ? clickRow(onSettings, el('span', { class: 'pa-code' }, t('menu.settings.code')),
+        el('span', { class: 'pa-name' }, t('menu.settings'), el('span', { class: 'pa-desc' }, t('menu.settings.desc'))),
+        el('span', { class: 'pa-status pa-off' }, t('menu.status.ground'))) : null));
 }
 
 export function nameScreen({ onSubmit, onBack }) {

@@ -9,7 +9,10 @@
  *          hideAirlineUi isAirlineUiOpen showGuide refreshAirlineUi
  *
  * INTERFICIE (no la canviis, index.html en depen):
- *   initAirlineUi({ launchLesson(lessonId), openFreeFlight(), onShow() })
+ *   initAirlineUi({ launchLesson(lessonId), openFreeFlight(), onShow(),
+ *                   openSettings()? })   openSettings: el panell d ajustos
+ *     d index.html (el de la pausa); en tancar-lo, index.html torna a
+ *     cridar showMainMenu().
  *     crea el contenidor, l estil i l avis de 'save:error'. onShow es crida
  *     cada cop que s obre una pantalla (index.html amaga el menu de Free
  *     Flight i el HUD).
@@ -91,7 +94,8 @@ function banner(text, good) {
 export function showMainMenu() {
   mount(mainMenuScreen({
     onFreeFlight: () => { hideAirlineUi(); if (hooks.openFreeFlight) hooks.openFreeFlight(); },
-    onAirline: enterAirline
+    onAirline: enterAirline,
+    onSettings: hooks.openSettings ? () => { hideAirlineUi(); hooks.openSettings(); } : null
   }));
 }
 

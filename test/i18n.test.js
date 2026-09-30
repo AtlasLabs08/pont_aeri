@@ -103,7 +103,7 @@ describe('t', () => {
       assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
     }
     for (const r of Object.keys(BALANCE.ratings)) assert.ok(Object.hasOwn(en, 'market.group.' + r), 'market.group.' + r);
-    const keys = Object.keys(en).filter(k => ['tier.', 'cond.', 'fleet.', 'market.'].some(p => k.startsWith(p)));
+    const keys = Object.keys(en).filter(k => ['tier.', 'cond.', 'fleet.', 'market.', 'settings.', 'menu.settings'].some(p => k.startsWith(p)));
     assert.ok(keys.length > 60);
     for (const k of keys) assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
     assert.equal(ca['tier.standard'], 'Estàndard');
