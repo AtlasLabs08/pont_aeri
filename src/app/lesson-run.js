@@ -6,10 +6,11 @@
  * d Input que Game.onKey ja gestiona).
  *
  * EXPORTA: LessonRun lessonGoalParams attemptMessage keyLabel messageText
- *          circuitGuidance ilsGuidance
+ *          circuitGuidance ilsGuidance aircraftSpeeds
  *
  * IMPORTA: LESSONS, CONTROL_KEYS, factsFromRecord i evaluate de career/; t de i18n/;
- *   taxiRoute i nearestOnPolyline de world/.
+ *   taxiRoute i nearestOnPolyline de world/; AIRCRAFT i FlightModel de core/
+ *   (aircraftSpeeds).
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   new LessonRun(lessonId)   llanca amb l id si es desconegut a LESSONS
@@ -92,8 +93,14 @@
  *     index.html mostra sota el missatge durant tot l intent, en l ordre de
  *     LESSONS[..].tips. params: els params de la dada (valors de lessons.js)
  *     mes cada tecla, keyLabel del primer codi del comandament a
- *     CONTROL_KEYS (lessons.js), mai escrita al text. [] si la llico no en
- *     te. Es pinten amb messageText().
+ *     CONTROL_KEYS (lessons.js), mai escrita al text, mes cada velocitat de
+ *     speeds (aircraftSpeeds de l avio de la llico; la Vref de la llico 7,
+ *     D2+D5 X2). [] si la llico no en te. Es pinten amb messageText().
+ * aircraftSpeeds(typeId) -> { vs, v1, vr, v2, vref, vapp } en nusos enters:
+ *   FlightModel.vspeeds() (core/flight-model.js), la mateixa font que el
+ *   PFD i el HUD de la cabina, amb l avio a la massa amb que el posa
+ *   Game.spawn (reset({}): massa i combustible tipics). Math.round, com el
+ *   PFD. Llanca si typeId no es a AIRCRAFT.
  *   run.objectives() -> [{ id, labelKey, params, ok }]   llista d objectius
  *     per al HUD, generada dels criteris de la llico (lessons.js), mai
  *     escrita a ma per llico: una fila per criteri, amb el valor actual
@@ -166,6 +173,17 @@
 import { LESSONS, CONTROL_KEYS, BALANCE, factsFromRecord, evaluate } from '../career/index.js';
 import { t, fmtNumber } from '../i18n/index.js';
 import { taxiRoute, nearestOnPolyline } from '../world/index.js';
+import { AIRCRAFT, FlightModel } from '../core/index.js';
+
+/** Velocitats de referencia d un avio, en nusos enters. Vegeu la capcalera. */
+export function aircraftSpeeds(typeId) {
+  if (!AIRCRAFT[typeId]) throw new Error('aircraftSpeeds: avio desconegut: ' + typeId);
+  const f = new FlightModel(AIRCRAFT[typeId]);
+  f.reset({});
+  const v = f.vspeeds();
+  return { vs: Math.round(v.vsLD), v1: Math.round(v.v1), vr: Math.round(v.vr), v2: Math.round(v.v2),
+    vref: Math.round(v.vref), vapp: Math.round(v.vapp) };
+}
 
 const SECONDS_PER_MINUTE = 60;
 /** l altimetre del HUD (index.html) arrodoneix l altitud MSL a 10 ft */
@@ -473,8 +491,10 @@ export class LessonRun {
   objectives() { return objectiveRows(this); }
 
   tips() {
-    return (this.lesson.tips || []).map(({ key, keys, params }) => ({ key,
-      params: { ...params, ...Object.fromEntries(Object.entries(keys || {}).map(([name, control]) => [name, keyLabel(CONTROL_KEYS[control][0])])) } }));
+    const speeds = () => aircraftSpeeds(this.lesson.aircraftTypeId);
+    return (this.lesson.tips || []).map(({ key, keys, params, speeds: sp }) => ({ key,
+      params: { ...params, ...Object.fromEntries(Object.entries(keys || {}).map(([name, control]) => [name, keyLabel(CONTROL_KEYS[control][0])])),
+        ...(sp ? Object.fromEntries(Object.entries(sp).map(([name, field]) => [name, speeds()[field]])) : {}) } }));
   }
 
   /** llindar d un criteri de la llico (value), o undefined */
