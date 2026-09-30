@@ -23,7 +23,9 @@
  *         - xarxa de seguretat: a terra per sota de 35 kt, amb les dades del
  *           primer contacte de les principals (o les del moment, si no n hi ha).
  *       Nomes actua si l avio ha volat (airTime > 2 en l aire) des del darrer
- *       aterratge registrat, no hi ha cap informe obert ni cap accident.
+ *       aterratge registrat, no hi ha cap informe obert ni cap accident. Els
+ *       rebots amb l informe obert, per llargs que siguin, son del mateix
+ *       aterratge i no el tornen a activar.
  *   w.landed()                 Game ha creat l informe d un aterratge
  */
 
@@ -43,7 +45,10 @@ export class LandingWatch {
   step(f, { reportOpen, crashed }) {
     const rising = f.mainWow && !this.mainWas; this.mainWas = f.mainWow;
     if (!f.wow && f.airTime > 2) this.pending = true;
-    if (!this.pending || reportOpen || crashed) return null;
+    // amb un informe obert, qualsevol rebot (encara que passi mes de 2 s a l aire) es part del mateix aterratge: ja esta
+    // registrat. Es neteja aqui i no a cada cami de Game.onTouchdown, perque cap cami nou no el pugui oblidar
+    if (reportOpen) { this.pending = false; this.contact = null; return null; }
+    if (!this.pending || crashed) return null;
     if (rising) { this.contact = touchdownFrom(f); return this.contact; }
     if (f.wow && f.out.gs < NET_GS_KT) return this.contact || touchdownFrom(f);
     return null;
