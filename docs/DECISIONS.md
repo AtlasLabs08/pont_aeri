@@ -571,3 +571,19 @@ Decisions d en Marc despres de revisar el PR #27.
   balanceVersion passa a BALANCE.version i es desa, pero primer
   backupCareer(). Com discardCareer, si la copia falla i hi havia partida
   desada, no se sobreescriu res i la UI ho diu.
+
+## 2026-10-01 - Informe d aterratge: els rebots curts es compten
+
+- Problema. flight-model.js nomes feia touchdown.bounces++ (sense esdeveniment)
+  en un retoc de menys de 2 s despres d un contacte de mes de 0,5 s, i l informe
+  (Game.report.bounces) nomes pujava dins onTouchdown(), que no llegia mai
+  f.touchdown.bounces: els dos comptes eren disjunts i aquests rebots no
+  arribaven a la nota.
+- Solucio. LandingWatch.step compta la vora de pujada de mainWow (nomes rodes
+  principals) amb l informe obert i la retorna a Game ({ touchdown, bounce });
+  Game fa report.bounces++. La vora del pas en que es crea l informe no es
+  compta (w.landed() la marca). onTouchdown ja no incrementa: no es compta dues
+  vegades. flight-model.js i test/snapshot.json no es toquen.
+- Efecte en la nota. Cada rebot curt que abans no es comptava resta 8 punts a
+  l aterratge (el mateix pes que ja tenia scoreReport per rebot). Les notes
+  d aterratge baixen, doncs, 8 punts per cada rebot curt que abans quedava fora.
