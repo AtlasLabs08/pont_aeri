@@ -27,7 +27,7 @@ const RATIOS = {
   rj: {         // jet regional: ala baixa, motors a cua amb pilo al fuselatge, T de cua
     taper: 0.30, dihedral: 4.5,
     wingPlaneR: 0.50,        // pla de l ala sota el CG = radi * aixo
-    hSpanB: 0.36, hChordL: 0.068, finHL: 0.135, finChordL: 0.135, finSweep: 36,
+    hSpanB: 0.28, hChordL: 0.050, finHL: 0.135, finChordL: 0.135, finSweep: 36,
     nacR: 0.47, nacL: 4.2,
     wheelR: 0.30, noseWheelR: 0.20, bogie: 1, winglet: 0.04,   // winglet = b * aixo
     noseFrac: 0.105, tailStart: 0.68, blades: 0, mount: 'rear', dorsal: false
