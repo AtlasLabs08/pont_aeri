@@ -1,7 +1,8 @@
 /* Proves de finalFix (world/ils.js): punt d aproximacio final del ND (H14,
  * docs/DECISIONS.md, 2026-10-01). A 10 nm del llindar, sobre l eix allargat,
  * amb el nom FF + designacio, i la senda de 3 graus hi passa per sobre del
- * terreny a tots els caps dels aeroports nous (300 ft, el marge d H6).
+ * terreny a tots els caps dels aeroports nous (300 ft, el marge d H6). I,
+ * amb la vall d H16, el tram IF -> FF es volable a tots els caps nous.
  *
  * Correr:  npm test
  */
@@ -9,7 +10,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, AIRPORT_ORDER, World, ILS, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
+import { AIRPORTS, AIRPORT_ORDER, World, approachFix, legFlyable, IF_NM, ILS, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
 const NEW = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
@@ -45,5 +46,12 @@ describe('finalFix (H14)', () => {
       }
     }
   });
-;
+
+  for (const id of NEW) test(`${id}: H16, el tram IF -> FF es volable (1.000 ft, 1 nm a cada costat) a tots dos caps`, () => {
+    const A = AIRPORTS[id];
+    for (const en of A.allEnds) {
+      const I = approachFix(A, en, IF_NM, 'IF'), F = approachFix(A, en, 10, 'FF'), r = legFlyable(I, I.h, F, F.h);
+      assert.ok(r.ok, `${id} ${en.id}: marge ${r.marginFt.toFixed(0)} ft`);
+    }
+  });
 });
