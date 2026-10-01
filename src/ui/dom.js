@@ -96,6 +96,46 @@ const CSS = `
 .pa-ui .pa-price{font-family:var(--pa-mono);text-align:right;color:var(--pa-green);font-size:1.05rem}
 .pa-ui .pa-head .pa-price{color:var(--pa-dim);font-size:.72rem}
 .pa-ui .pa-row.pa-listing.pa-locked{opacity:.6}
+.pa-ui .pa-cards{display:grid;grid-template-columns:1fr;gap:.8rem;grid-auto-flow:row dense;margin:0 0 1.2rem}
+@media (min-width:700px){.pa-ui .pa-cards{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:1000px){.pa-ui .pa-cards{grid-template-columns:repeat(3,1fr)}}
+@media (min-width:1400px){.pa-ui .pa-cards{grid-template-columns:repeat(4,1fr)}}
+.pa-ui .pa-cards .pa-offer{grid-column:1/-1;margin:0}
+.pa-ui .pa-card{position:relative;display:flex;flex-direction:column;background:var(--pa-slate2);border:1px solid var(--pa-line);border-radius:3px;cursor:pointer;overflow:hidden}
+.pa-ui .pa-card:hover,.pa-ui .pa-card:focus-visible,.pa-ui .pa-card.pa-selected{border-color:var(--pa-amber);outline:none}
+.pa-ui .pa-card.pa-deal{border-color:rgba(245,184,61,.55)}
+.pa-ui .pa-card.pa-locked{opacity:.6;filter:grayscale(.85)}
+.pa-ui .pa-card.pa-locked:hover{opacity:.85}
+.pa-ui .pa-card-img{position:relative;aspect-ratio:5/2;background:linear-gradient(#0f1418,#1a232a);border-bottom:1px solid var(--pa-line);display:flex;align-items:center;justify-content:center;padding:.9rem .6rem .4rem}
+.pa-ui .pa-card-img img{max-width:100%;max-height:100%;object-fit:contain}
+.pa-ui .pa-card-tags{position:absolute;top:.45rem;left:.45rem;right:.45rem;display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.pa-ui .pa-card-tags .pa-tier{margin:0}
+.pa-ui .pa-card-tags .pa-tier:not(.pa-tier-deluxe){background-color:rgba(15,20,24,.85)}
+.pa-ui .pa-deal-tag{padding:.1em .55em;font-family:var(--pa-mono);font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--pa-red);color:#fff;border-radius:2px}
+.pa-ui .pa-card-lock{position:absolute;right:.5rem;bottom:.4rem;width:1.5rem;height:1.5rem;color:var(--pa-text)}
+.pa-ui .pa-card-body{padding:.6rem .75rem .75rem;display:flex;flex-direction:column;gap:.25rem}
+.pa-ui .pa-card-body h5{margin:0;font-size:1.1rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.pa-ui .pa-card-body .pa-year{color:var(--pa-dim);font-weight:400;font-family:var(--pa-mono);font-size:.9rem}
+.pa-ui .pa-card-price{display:flex;align-items:baseline;gap:.6rem;margin:.15rem 0 .2rem}
+.pa-ui .pa-card-price b{font-family:var(--pa-mono);font-size:1.5rem;color:var(--pa-green);font-weight:700}
+.pa-ui .pa-card.pa-deal .pa-card-price b{color:var(--pa-amber)}
+.pa-ui .pa-card-price s{font-family:var(--pa-mono);color:var(--pa-dim);font-size:.95rem}
+.pa-ui .pa-stats{display:flex;gap:1.1rem;border-top:1px solid var(--pa-line);padding-top:.4rem}
+.pa-ui .pa-stat{display:flex;flex-direction:column}
+.pa-ui .pa-stat i{font-style:normal;color:var(--pa-dim);font-size:.65rem;letter-spacing:.16em;text-transform:uppercase}
+.pa-ui .pa-stat b{font-family:var(--pa-mono);font-size:.95rem;font-weight:600}
+.pa-ui .pa-card-need{display:flex;align-items:center;gap:.4rem;margin:.3rem 0 0;color:var(--pa-amber);font-size:.85rem}
+.pa-ui .pa-card-need .pa-lock{width:1rem;height:1rem;flex:none}
+.pa-lock-arc{fill:none;stroke:currentColor;stroke-width:1.6}.pa-lock-body{fill:currentColor}
+.pa-sil{width:100%;height:100%;max-height:7rem}
+.pa-sil .pa-sil-body{fill:var(--pa-line);stroke:var(--pa-dim);stroke-width:1.2}
+.pa-sil .pa-sil-wing,.pa-sil .pa-sil-far{fill:#3a4954;stroke:var(--pa-dim);stroke-width:1}
+.pa-sil .pa-sil-engine{fill:var(--pa-slate2);stroke:var(--pa-dim);stroke-width:1.1}
+.pa-sil .pa-sil-fin{fill:var(--pa-amber);stroke:#b98412;stroke-width:1}
+.pa-sil .pa-sil-cockpit{fill:#0f1418;stroke:none}
+.pa-sil .pa-sil-windows{stroke:#0f1418;stroke-width:2;stroke-dasharray:2.4 3.2}
+.pa-sil .pa-sil-wheel{fill:#0f1418;stroke:var(--pa-dim);stroke-width:1}
+.pa-sil .pa-sil-prop{fill:var(--pa-dim);opacity:.7}
 .pa-tier{display:inline-block;vertical-align:middle;margin-left:.4rem;padding:.08em .5em;font-family:var(--pa-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:600;border-radius:2px}
 .pa-tier-basic{border:1px dashed #6f7d88;color:#8a9aa6}
 .pa-tier-standard{border:1px solid #cfd8de;color:#e6ebee}

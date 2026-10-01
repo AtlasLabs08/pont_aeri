@@ -303,6 +303,7 @@ describe('sellQuote i sellAircraft (G9)', () => {
   test('cotitzacio: priceOf amb l estat actual menys sellFee; sense prestec, net = cotitzacio', () => {
     const s = owning('cash');
     s.fleet[0].condition = { engines: 70, gear: 60, airframe: 80, avionics: 75 };
+    s.fleet[0].finance.purchasePrice = 1000000;   // pagat per sobre del valor actual: el min de K2 no actua
     const q = sellQuote(s, 'EC-TST');
     assert.equal(q.ok, true);
     assert.equal(q.quote, quoteOf(s.fleet[0]));
@@ -312,6 +313,32 @@ describe('sellQuote i sellAircraft (G9)', () => {
     assert.equal(r.state.company.cash, s.company.cash + q.quote);
     assert.deepEqual(r.state.fleet, []);
     assert.deepEqual(validate(r.state), { ok: true, errors: [] });
+  });
+
+  test('K2: un avio comprat en oferta es ven per com a molt purchasePrice * (1 - sellFee)', () => {
+    // l estat i l edat de l anunci valen 250.000, pero es va pagar 200.000 (20 % d oferta)
+    const worth = priceOf('commuter', 'premium', BALANCE.market.referenceYear - 2015, listing().condition);
+    const s = owning('cash', { listPrice: worth, offerPct: 0.2, price: Math.round(worth * 0.8) });
+    const paid = s.fleet[0].finance.purchasePrice;
+    assert.equal(paid, Math.round(worth * 0.8));
+    const q = sellQuote(s, 'EC-TST');
+    assert.equal(q.quote, Math.round(paid * (1 - BALANCE.market.sellFee)));
+    assert.ok(q.quote < quoteOf(s.fleet[0]), 'sense K2 cotitzaria mes');
+    assert.equal(sellAircraft(s, 'EC-TST').state.company.cash, s.company.cash + q.quote);
+    // mai mes del que es va pagar menys la comissio, passi el que passi amb l estat
+    s.fleet[0].condition = { engines: 100, gear: 100, airframe: 100, avionics: 100 };
+    assert.ok(sellQuote(s, 'EC-TST').quote <= Math.round(paid * (1 - BALANCE.market.sellFee)));
+  });
+
+  test('K2: un avio comprat sense oferta cotitza com abans (priceOf menys sellFee)', () => {
+    const worth = priceOf('commuter', 'premium', BALANCE.market.referenceYear - 2015, listing().condition);
+    const s = owning('cash', { price: worth });
+    assert.equal(sellQuote(s, 'EC-TST').quote, quoteOf(s.fleet[0]));
+    // si despres s ha gastat, cotitza el que val ara (menys del que va costar)
+    s.fleet[0].condition = { engines: 60, gear: 60, airframe: 60, avionics: 60 };
+    const q = sellQuote(s, 'EC-TST').quote;
+    assert.equal(q, quoteOf(s.fleet[0]));
+    assert.ok(q < Math.round(worth * (1 - BALANCE.market.sellFee)));
   });
 
   test('un avio sense tier cotitza com a standard', () => {

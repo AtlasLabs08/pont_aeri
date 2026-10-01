@@ -14,3 +14,4 @@ export * from './debrief.js';
 export * from './airline.js';
 export * from './guide.js';
 export * from './market.js';
+export * from './aircraft-images.js';

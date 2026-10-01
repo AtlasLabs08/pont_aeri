@@ -67,9 +67,11 @@
  *     No modifica l entrada. Llanca un Error si el tipus no es a
  *     BALANCE.fleetTypes o en els casos de purchaseRule.
  *   sellQuote(state, reg) -> { ok, reason, quote, loanId, loanBalance, net }
- *     (G9) quote = round(priceOf(typeId, tier, referenceYear - yearBuilt,
- *     condition) * (1 - market.sellFee)), amb tier = airframeTier (sense,
- *     standard); loanBalance = balance del prestec de l avio (0 si no en te
+ *     (G9, K2) quote = round(min(priceOf(typeId, tier, referenceYear -
+ *     yearBuilt, condition), finance.purchasePrice) * (1 - market.sellFee)),
+ *     amb tier = airframeTier (sense, standard). El min impedeix vendre per
+ *     mes del que es va pagar menys la comissio: comprar una oferta per
+ *     revendre-la no dona guany (docs/DECISIONS.md 01/10/2026). loanBalance = balance del prestec de l avio (0 si no en te
  *     o ja no hi es); net = quote - loanBalance. reason: null, 'unknown'
  *     (cap avio amb aquesta matricula; la resta de camps null), 'status'
  *     (status != 'ready') o 'cash' (cash + net < 0), en aquest ordre.
@@ -208,7 +210,8 @@ export function sellQuote(state, reg) {
   const a = state.fleet.find(x => x.reg === reg);
   if (!a) return { ok: false, reason: 'unknown', quote: null, loanId: null, loanBalance: null, net: null };
   const M = BALANCE.market;
-  const quote = eur(priceOf(a.typeId, airframeTier(a), M.referenceYear - a.yearBuilt, a.condition) * (1 - M.sellFee));
+  const worth = priceOf(a.typeId, airframeTier(a), M.referenceYear - a.yearBuilt, a.condition);
+  const quote = eur(Math.min(worth, a.finance.purchasePrice) * (1 - M.sellFee));   // K2
   const loanId = a.finance.loanId;
   const loan = loanId === null ? null : state.company.loans.find(l => l.id === loanId) ?? null;
   const loanBalance = loan ? loan.balance : 0;

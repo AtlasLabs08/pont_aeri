@@ -74,7 +74,8 @@ export const BALANCE = deepFreeze({
     hoursPerYear:  { commuter: 1200, turboprop: 1800, narrowbody: 2600, widebody: 4200 },
     hoursPerCycle: { commuter: 0.8,  turboprop: 1.0,  narrowbody: 1.5,  widebody: 5.0 },
     hoursJitter: 0.3,
-    sellFee: 0.10
+    sellFee: 0.10,
+    offers: { count: [1, 2], discount: [0.10, 0.20] }   // K1: anuncis en oferta per llista i rebaixa uniforme
   },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
