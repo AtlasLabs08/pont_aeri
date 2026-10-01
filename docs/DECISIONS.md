@@ -1012,3 +1012,51 @@ Detalls d implementacio (sense canviar cap contracte):
   d una oferta ("K2: un avio comprat en oferta es ven per com a molt
   purchasePrice * (1 - sellFee)"); restaurat, torna a passar.
 
+
+## 2026-10-01 - F1: H17, MEA per tram, sostre de l avio i vent de cua
+
+Decisio d en Marc: no es toca el terreny del Pirineu. En lloc d aixo,
+altitud minima per tram, com les cartes reals.
+
+- H17a. Altitud minima de tram (MEA): el punt mes alt del terreny dins d 1 nm
+  a cada costat del tram, mes 1.000 ft, arrodonit cap amunt a 100 ft. El tram
+  origen -> IF (o origen -> FF) es vola a max(creuer de la taula, MEA), i la
+  comprovacio d H16 fa servir aquesta altitud. Un cap nomes es descarta si la
+  MEA d algun dels seus trams supera el sostre de servei de l avio.
+- H17b. Al ND, al mig de cada tram on la MEA es mes alta que el creuer de la
+  taula, "MEA 11100" amb l estil del nom dels punts. UI.modeText diu
+  l altitud de creuer que toca.
+- H17c. Vent de cua maxim per aterrar: 10 kt (MAX_TAILWIND_KT). A H11, un cap
+  amb mes vent de cua nomes es tria si no n hi ha cap altre d utilitzable, i
+  llavors UI.modeText ho avisa.
+
+Com s ha aplicat:
+
+- Sostre de servei: limits.ceiling d aircraft-data.js, que ja hi era per als
+  deu avions (25.000 ft els turbohelixs; 39.800 a 45.100 ft els jets). No cal
+  cap dada nova ni tocar la fisica.
+- Com es vola el primer tram: mai per sota de la MEA, i s arriba al punt
+  (IF o FF) a max(altitud minima del punt, MEA). Aixi el tram queda 1.000 ft
+  per sobre del terreny per construccio. La recta literal d H16 des de la MEA
+  a l origen fins a l altitud minima de l IF baixava per sota de la MEA abans
+  d arribar-hi (al Prat -> IF21, -443 ft): no es pot volar una MEA i alhora
+  baixar-ne abans del punt. La ruta es directa si s arriba al FF a la seva
+  altitud minima (MEA <= minima del FF, per poder fer l aproximacio des del
+  FF); si no, per l IF, amb el tram IF -> FF d H16 des de l altitud
+  d arribada a l IF. Un cap es descarta si la MEA passa del sostre, o si no
+  te cap ruta volable (amb la vall d H16, el tram IF -> FF ho es a tots).
+- Prat -> La Seu amb vent del sud-oest: la 21, per l IF21. MEA del tram
+  origen -> IF21: 11.100 ft (terreny mes alt 3.053 m, mostrejat cada 100 m al
+  llarg i 33 punts de costat a costat). En Marc esperava una MEA de mes de
+  11.333 ft: aquell nombre sortia del terreny d abans de la vall d H16, que ha
+  rebaixat la zona de l IF21. Amb el turbohelix (creuer de la taula 11.000
+  ft) es vola a 11.100 ft i el ND mostra MEA 11100; amb el jet (15.000 ft) no
+  cal etiqueta.
+- MEA nomes al primer tram (origen -> IF o origen -> FF), com diu H17a. El
+  tram IF -> FF es l aproximacio per la vall i es comprova amb la regla
+  d H16.
+- Vent de cua (H17c) dins d arrivalEnd: la regla d H11 s aplica primer als
+  caps amb 10 kt de vent de cua o menys; si no n hi ha cap, a tots. Canvia
+  dues proves d H11 de manera esperada: amb 30 kt de cua el cap amb ILS ja no
+  es tria, i LERS amb 20 kt de 070 aterra al 07. Avis: freeFlight.tailwind
+  ("Tailwind 12 kt on landing.").
