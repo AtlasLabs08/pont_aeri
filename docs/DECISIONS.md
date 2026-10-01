@@ -682,3 +682,28 @@ es al 20, com deia H3.
 - Comprovades la resta de designacions contra les reals: LERS 07/25, LEIB
   06/24, LEMH 01/19, LEDA 13/31, LELL 13/31, LESU 03/21. Totes coincideixen
   amb OurAirports: LEGE es l unica excepcio. Una prova fixa les set.
+
+## 2026-10-01 - F1: pista d arribada del vol cronometrat de Free Flight
+
+Decisio d en Marc dins del PR #31 (mode 'route' de Free Flight). No toca la
+fisica ni test/snapshot.json.
+
+- Pista d arribada: al desti, el cap de pista amb ILS; si n hi ha diversos o
+  cap, el que tingui mes vent de cara amb el vent del vol; si no hi ha vent,
+  el de la pista mes llarga. Funcio pura arrivalEnd(A, windDir, windKt) a
+  world/ils.js, amb proves (test/arrival-end.test.js). Empat: el primer cap
+  de l aeroport. Sense vent vol dir windKt <= 0.
+- Ruta del ND: final de la pista de sortida (amb el nom de l origen) -> punt
+  d aproximacio final a 10 nm del llindar d arribada, sobre l eix allargat,
+  amb el nom FF + pista (FF25) -> llindar (RW25). Els noms es dibuixen com
+  els de la resta de punts de ruta.
+- ILS: en mode 'route', l ILS sintonitzat es el de la pista d arribada des de
+  l enlairament, no el de l aeroport mes proper. El PFD en mostra el nom, el
+  curs i la distancia encara que no hi hagi senyal (mes enlla de 25 nm); les
+  agulles surten quan n hi ha. Si la pista d arribada no te ILS (LELL, LESU,
+  o un cap sense ILS), no se sintonitza cap ILS en tot el vol. Fora del mode
+  'route', com ara (auto-sintonia del cap amb que estas alineat).
+- Les distancies a l aeroport de desti (Game.destEnd) prefereixen l ILS
+  sintonitzat i despres la pista d arribada.
+- UI.modeText afegeix la pista d arribada ("LERS 25") i s actualitza si es
+  canvia el vent al menu.
