@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS thresholdDistNm destinationEnd
+ * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -26,6 +26,13 @@
  * en.ils (airports.js) tenen ILS. update() no sintonitza mai els altres i
  * nav() hi dona el localitzador i la senda sense senyal (locValid fals).
  * Un cap sense el camp (LEBL, LEPA, la pista sintetica del harness) en te.
+ *
+ *   arrivalEnd(A, windDir, windKt) -> cap de pista d arribada a A del vol
+ *     cronometrat de Free Flight (docs/DECISIONS.md, 2026-10-01, pista
+ *     d arribada). Funcio pura: si A te un sol cap amb ILS, aquest; si en te
+ *     diversos, d entre ells, i si no en te cap, d entre tots: el de mes vent
+ *     de cara (windDir = d on ve el vent, graus; windKt en nusos); sense vent
+ *     (windKt <= 0), el de la pista mes llarga. Empat: el primer d A.allEnds.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -38,6 +45,14 @@ export function thresholdDistNm(A, en, e, n) {
 
 export function destinationEnd(A, ...candidates) {
   return candidates.find(en => en && A.allEnds.includes(en)) || A.allEnds[0];
+}
+
+export function arrivalEnd(A, windDir, windKt) {
+  const ils = A.allEnds.filter(en => en.ils !== false);
+  if (ils.length === 1) return ils[0];
+  const pool = ils.length ? ils : A.allEnds, calm = !(windKt > 0);
+  const score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
+  return pool.reduce((best, en) => score(en) > score(best) + 1e-9 ? en : best);
 }
 
 export const ILS = {
