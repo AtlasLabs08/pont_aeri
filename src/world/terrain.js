@@ -117,6 +117,13 @@ export const World = {
   heightProc(e, n) {
     const sd = this.sd(e, n);
     if (sd <= 0) return Math.max(-400, sd * 0.3 - 0.5);
+    let h = this.heightRaw(e, n, sd);
+    const ab = this._airportBlend(e, n);
+    if (ab) h = lerp(h, ab[1], ab[0]);
+    return h;
+  },
+  /** relleu natural sobre el mar, sense cap aeroport (sd > 0: distancia signada a la costa) */
+  heightRaw(e, n, sd) {
     const island = n < -120000 || e > 130000;
     const mallorca = island && e > 5000 && e < 135000 && n > -240000;
     let base, hillAmp;
@@ -159,8 +166,6 @@ export const World = {
     const coast = smoothstep(0, 900, sd);
     let h = base * (1 - 0.85 * dflat) + (relief * (1 - dflat) + rg) * vf * (0.25 + 0.75 * coast) * (rg > 50 ? smoothstep(0, 350, sd) * 0.9 + 0.1 : 1);
     h = Math.max(h, 0.6 + Math.min(sd, 60) * 0.03);
-    const ab = this._airportBlend(e, n);
-    if (ab) h = lerp(h, ab[1], ab[0]);
     return h;
   },
 
