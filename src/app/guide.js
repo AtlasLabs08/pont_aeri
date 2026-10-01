@@ -16,11 +16,20 @@
  *     A les files de tecles, term = les etiquetes de keyLabel dels codis del
  *     comandament, sense repetir, separades per ' / ', i textKey =
  *     'guide.key.' + comandament. A les altres, term = t('guide.<seccio>.<id>.term').
+ *     Les files amb valors porten params per a t(textKey, params): la Vref
+ *     (hud.vref, D2+D5 X2) es la de l avio de la llico 7 (el Mi-9), de
+ *     aircraftSpeeds, la mateixa font que el PFD.
  */
 
 import { CONTROL_KEYS } from '../career/index.js';
 import { t } from '../i18n/index.js';
-import { keyLabel } from './lesson-run.js';
+import { keyLabel, aircraftSpeeds } from './lesson-run.js';
+import { LESSONS } from '../career/index.js';
+
+/** valors de les files de text que en tenen: mai escrits al text i18n */
+const TEXT_PARAMS = {
+  'hud.vref': () => ({ vref: aircraftSpeeds(LESSONS.find(l => l.id === 'landing').aircraftTypeId).vref })
+};
 
 export const GUIDE = [
   { id: 'flying', kind: 'keys', items: ['pitchDown', 'pitchUp', 'rollLeft', 'rollRight', 'steerLeft', 'steerRight',
@@ -33,7 +42,7 @@ export const GUIDE = [
   { id: 'mouse', kind: 'text', items: ['rightDrag', 'rightDouble', 'wheel', 'leftClick'] },
   { id: 'strip', kind: 'text', items: ['ias', 'alt', 'vs', 'hdg', 'thrust', 'flaps', 'gear', 'splr', 'brake', 'apAthr', 'warnings', 'clock'] },
   { id: 'hud', kind: 'text', items: ['speed', 'target', 'groundSpeed', 'altitude', 'verticalSpeed', 'radioAlt', 'heading',
-    'modes', 'ilsIdent', 'flareCue'] },
+    'modes', 'ilsIdent', 'flareCue', 'vref'] },
   { id: 'symbols', kind: 'text', items: ['horizon', 'pitchLadder', 'boresight', 'pathVector', 'glidepathRef', 'guidanceCue',
     'syntheticRunway', 'bankScale', 'speedTrend', 'ilsScales', 'approachBox', 'papi', 'taxiTarget'] }
 ];
@@ -48,6 +57,7 @@ export function guideSections() {
     titleKey: 'guide.section.' + id,
     rows: items.map(item => kind === 'keys'
       ? { term: keysTerm(item), textKey: 'guide.key.' + item }
-      : { term: t('guide.' + id + '.' + item + '.term'), textKey: 'guide.' + id + '.' + item + '.text' })
+      : { term: t('guide.' + id + '.' + item + '.term'), textKey: 'guide.' + id + '.' + item + '.text',
+          ...(TEXT_PARAMS[id + '.' + item] ? { params: TEXT_PARAMS[id + '.' + item]() } : {}) })
   }));
 }

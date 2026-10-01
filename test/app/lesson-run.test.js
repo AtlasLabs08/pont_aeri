@@ -8,7 +8,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance, ilsGuidance } from '../../src/app/lesson-run.js';
+import { LessonRun, lessonGoalParams, attemptMessage, keyLabel, messageText, circuitGuidance, ilsGuidance, aircraftSpeeds } from '../../src/app/lesson-run.js';
+import { AIRCRAFT, FlightModel } from '../../src/core/index.js';
 import { LESSONS, CONTROL_KEYS, BALANCE, evaluate } from '../../src/career/index.js';
 import { setLang, fmtNumber } from '../../src/i18n/index.js';
 import { AIRPORTS } from '../../src/world/index.js';
@@ -679,13 +680,24 @@ describe('llico 8 (ils): l instructor guia la intercepcio', () => {
 });
 
 describe('llico 7 (landing): sense barra d arrodoniment, amb el tip de la V/S (E4)', () => {
-  test('tip de la V/S, a en i a ca', () => {
+  test('tip de la V/S amb el valor de la Vref (X2 del D2+D5), a en i a ca', () => {
     const tips = new LessonRun('landing').tips();
-    assert.deepEqual(tips, [{ key: 'school.tip.verticalSpeed', params: {} }]);
-    assert.match(messageText(tips[0]), /vertical speed \(V\/S\) as close to 0 as you can, without letting the airspeed drop below Vref/);
+    const vref = aircraftSpeeds('commuter').vref;
+    assert.deepEqual(tips, [{ key: 'school.tip.verticalSpeed', params: { vref } }]);
+    assert.match(messageText(tips[0]), new RegExp('vertical speed \\(V/S\\) as close to 0 as you can, without letting the airspeed drop below Vref \\(' + vref + ' kt\\)\\.'));
     setLang('ca');
-    assert.match(messageText(tips[0]), /velocitat vertical \(V\/S\) tan a prop de 0 com puguis/);
+    assert.match(messageText(tips[0]), new RegExp('sense deixar que la velocitat baixi de la Vref \\(' + vref + ' kt\\)\\.'));
     setLang('en');
+  });
+
+  test('aircraftSpeeds: la Vref es la de FlightModel.vspeeds() a la massa de Game.spawn, arrodonida com al PFD', () => {
+    for (const id of ['commuter', 'nb', 'jumbo']) {
+      const f = new FlightModel(AIRCRAFT[id]);
+      f.reset({});
+      assert.equal(aircraftSpeeds(id).vref, Math.round(f.vspeeds().vref), id);
+    }
+    assert.ok(aircraftSpeeds('commuter').vref > 50 && aircraftSpeeds('commuter').vref < 150);
+    assert.throws(() => aircraftSpeeds('zeppelin'), /zeppelin/);
   });
 
   test('aids: la barra d arrodoniment desactivada i el debrief automatic es queda', () => {

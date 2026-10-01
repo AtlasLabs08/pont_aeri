@@ -8,15 +8,22 @@
  *
  * INTERFICIE (no la canviis, app/, el B5 i els tests en depenen):
  *   computeFlightResult({ record, mode, ticketPrice, paxOnBoard, crewCount,
- *                         rankPayMult, weatherBonus, exclusive, financePerFlight })
+ *                         rankPayMult, weatherBonus, exclusive, financePerFlight,
+ *                         revenueMult })
  *   -> { mode, landing: { key, mult, xp },
  *        revenue: { tickets, contract, punctuality, fuelSaving },
  *        costs: { fuel, fees, crew, maintenance, finance },
  *        rotation, K, net }
  *
  *   mode 'own':      net = K * r * (ingressos - costos)
+ *   revenueMult (opcional, per defecte 1; D2+D5, G10): multiplica els
+ *                    ingressos del bitllet (la cabina de la categoria de
+ *                    l avio, BALANCE.market.tiers[..].revenueMult). La
+ *                    puntualitat, que es un % del bitllet, el segueix; la
+ *                    resta no canvia. Amb 1 el resultat es identic.
  *   mode 'contract': net = contractFeePerLeg[cls] * rankPayMult * m_aterratge,
- *                    sense costos; rotation i K valen 1 (no s apliquen)
+ *                    sense costos; rotation i K valen 1 (no s apliquen);
+ *                    revenueMult no s hi aplica
  *   Sense aterratge (touchdown null) o amb accident: ingressos 0. En mode
  *   'own' els costos es paguen igualment. landing es el tram de la nota, o el
  *   de nota 0 si no hi ha touchdown o si hi ha accident (sigui quina sigui la
@@ -26,7 +33,8 @@
  *   suma de partides arrodonides pot diferir de net en uns quants euros.
  *   Llanca un Error si l avio no es a BALANCE.fleetTypes o a AIRCRAFT, si el
  *   mode es desconegut; en mode 'own', si ticketPrice no es finit o es
- *   negatiu, o si paxOnBoard (de l entrada o, si no hi es, del record) no es
+ *   negatiu, si revenueMult no es un numero finit >= 0, o si paxOnBoard (de
+ *   l entrada o, si no hi es, del record) no es
  *   un enter entre 0 i fleetTypes[..].seats; en mode 'contract', si
  *   rankPayMult falta o no es un numero finit positiu.
  */
@@ -77,9 +85,12 @@ export function computeFlightResult(input) {
   }
   if (mode !== 'own') throw new Error('computeFlightResult: mode desconegut: ' + mode);
 
-  const { ticketPrice, crewCount = 0, weatherBonus = 0, exclusive = false, financePerFlight = 0 } = input;
+  const { ticketPrice, crewCount = 0, weatherBonus = 0, exclusive = false, financePerFlight = 0, revenueMult = 1 } = input;
   if (!Number.isFinite(ticketPrice) || ticketPrice < 0) {
     throw new Error('computeFlightResult: en mode own cal ticketPrice, finit i no negatiu');
+  }
+  if (!Number.isFinite(revenueMult) || revenueMult < 0) {
+    throw new Error('computeFlightResult: revenueMult ha de ser un numero finit no negatiu');
   }
   const pax = input.paxOnBoard ?? record.paxOnBoard ?? 0;
   if (!Number.isInteger(pax) || pax < 0 || pax > seats) {
@@ -93,7 +104,7 @@ export function computeFlightResult(input) {
   const fuelKg = record.fuelBurntKg + (record.skippedCruiseFuelKg ?? 0) * (1 + B.cruiseSkipFuelPenalty);
   const hours = record.blockSeconds / SECONDS_PER_HOUR;
 
-  const tickets = failed ? 0 : ticketPrice * pax * mRoute * band.mult;
+  const tickets = failed ? 0 : ticketPrice * pax * mRoute * band.mult * revenueMult;
   let punctuality = 0, fuelSaving = 0;
   if (!failed && td.score >= bon.minScore) {
     if (Math.abs(record.arrivalDeltaMin) <= bon.punctualityWindowMin) punctuality = bon.punctualityPct * tickets;

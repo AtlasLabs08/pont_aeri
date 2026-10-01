@@ -27,7 +27,7 @@ function fly(id, { fpm = 400, pullAfter = 0, dropEvent = false, zeroAirTime = fa
   let tFirst = -1, tAir = -1;
   let registerFails = failFirstRegister;
   const onTouchdown = () => {
-    if (G.report && !G.report.shown) { G.report.bounces++; return; }
+    if (G.report && !G.report.shown) return;
     if (registerFails) { registerFails = false; throw new Error('onTouchdown simulat que falla'); }
     G.report = { fpm: f.touchdown.vs / FPM, g: f.touchdown.nzPeak, bounces: 0, shown: false, onRunway: false, ias: f.touchdown.ias, pitch: f.touchdown.pitch, roll: f.touchdown.roll }; G.reports++; w.landed();
   };
@@ -47,7 +47,8 @@ function fly(id, { fpm = 400, pullAfter = 0, dropEvent = false, zeroAirTime = fa
       try { onTouchdown(); } catch { /* Game ho escriu a la consola */ }
     }
     f.events.length = 0;
-    const td = w.step(f, { reportOpen: !!(G.report && !G.report.shown), crashed: !!G.crash });
+    const { touchdown: td, bounce } = w.step(f, { reportOpen: !!(G.report && !G.report.shown), crashed: !!G.crash });
+    if (bounce) G.report.bounces++;
     if (td) { G.watchCalls.push({ gs: f.out.gs, fpm: td.vs / FPM }); f.touchdown = td; try { onTouchdown(); } catch { /* idem */ } }
     if (G.report && !G.report.shown && f.wow && f.out.gs < 35) {
       G.report.shown = true; G.shown = f.out.gs; G.landings++; G.bestSubmits++;
@@ -105,6 +106,41 @@ describe('LandingWatch', () => {
   test('a terra sense haver volat (rodatge a menys de 35 kt), el vigilant no fa res', () => {
     const cfg = AIRCRAFT.commuter, f = new FlightModel(cfg), ctl = newCtl(), w = new LandingWatch();
     f.reset({ onGround: true, hdg: 0 }); ctl.throttle = 0.2;
-    for (let i = 0; i < 120 * 30; i++) { f.step(PHYS_DT, ctl, FLAT_ENV); assert.equal(w.step(f, { reportOpen: false, crashed: false }), null); }
+    for (let i = 0; i < 120 * 30; i++) { f.step(PHYS_DT, ctl, FLAT_ENV); assert.equal(w.step(f, { reportOpen: false, crashed: false }).touchdown, null); }
+  });
+});
+
+/* Rebots curts amb un f fals: nomes mainWow, wow, airTime i out.gs. Cada pas dura 0,1 s; un pas = una crida a step.
+   Es la replica de Game: l esdeveniment del model crea l informe (w.landed()) ABANS de w.step, en el mateix pas */
+describe('LandingWatch: rebots', () => {
+  const mk = () => ({ mainWow: false, wow: false, airTime: 0, time: 0, nz: 1.2, vd: 1, n: 0, e: 0, out: { gs: 70, hdg: 0, track: 0, ias: 100, pitch: 3, roll: 0 } });
+  /** pas: 'air' (>2 s a l aire), 'air1' (a l aire, airTime curt), 'main' (rodes principals a terra), 'nose' (nomes morro).
+      ev: el model emet l esdeveniment en aquest pas (Game crea l informe abans de step) */
+  function run(steps) {
+    const f = mk(), w = new LandingWatch(); let reports = 0, bounces = 0, open = false;
+    for (const [kind, ev] of steps) {
+      f.mainWow = kind === 'main'; f.wow = kind === 'main' || kind === 'nose'; f.airTime = kind === 'air' ? 3 : kind === 'air1' ? 0.2 : 0; f.time += 0.1;
+      if (ev && !open) { open = true; reports++; w.landed(); }
+      const { touchdown, bounce } = w.step(f, { reportOpen: open, crashed: false });
+      if (bounce) bounces++;
+      if (touchdown && !open) { open = true; reports++; w.landed(); }
+    }
+    return { reports, bounces };
+  }
+  const A = ['air', 0], M = ['main', 1], M0 = ['main', 0], h = ['air1', 0], a = ['air', 0];
+  test('contacte de mes de 0,5 s i retoc de menys de 2 s: 1 rebot', () => {
+    assert.deepEqual(run([A, M, ...Array(6).fill(M0), h, h, M0, M0]), { reports: 1, bounces: 1 });
+  });
+  test('contacte unic: 0 rebots', () => {
+    assert.deepEqual(run([A, M, ...Array(8).fill(M0)]), { reports: 1, bounces: 0 });
+  });
+  test('esdeveniment i vora al mateix pas: 0 rebots (es el primer contacte)', () => {
+    assert.deepEqual(run([A, M]), { reports: 1, bounces: 0 });
+  });
+  test('dos retocs: 2 rebots', () => {
+    assert.deepEqual(run([A, M, ...Array(6).fill(M0), h, M0, M0, h, M0, M0]), { reports: 1, bounces: 2 });
+  });
+  test('retoc de mes de 2 s a l aire: 1 rebot', () => {
+    assert.deepEqual(run([A, M, ...Array(6).fill(M0), ...Array(25).fill(a), M0, M0]), { reports: 1, bounces: 1 });
   });
 });

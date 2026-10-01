@@ -23,6 +23,28 @@
  * @property {{queue:DispatchOrder[]}} dispatch
  * @property {{minute:number}} clock
  * @property {{lessonsPassed:string[], attempts:Object<string,number>, graduated:boolean}} school
+ * @property {Market} [market]       opcional: si falta, refreshMarket (market.js) el genera
+ */
+
+/**
+ * Mercat d ocasio (D2+D5). epoch = floor(clock.minute / market.regenMinutes)
+ * de quan es va generar la llista.
+ * @typedef {{epoch:number, listings:Listing[]}} Market
+ */
+
+/**
+ * Un anunci del mercat: un avio concret amb historial. En comprar-lo es
+ * converteix en un Airframe amb els mateixos camps.
+ * @typedef {Object} Listing
+ * @property {string} reg            'EC-XXX', unica entre la flota i la llista
+ * @property {string} typeId
+ * @property {'basic'|'standard'|'premium'|'deluxe'} tier
+ * @property {number} yearBuilt
+ * @property {number} hours
+ * @property {number} cycles
+ * @property {{engines:number, gear:number, airframe:number, avionics:number}} condition
+ * @property {{nextAHours:number, nextCHours:number}} maintenance   hores absolutes, com l Airframe
+ * @property {number} price          euros enters (priceOf de market.js)
  */
 
 /** @typedef {{name:string, xp:number, rank:string, ratings:string[],
@@ -46,6 +68,7 @@
  * @property {{nextAHours:number, nextCHours:number, deferred:string[]}} maintenance
  * @property {{purchasePrice:number, loanId:string|null, leaseId:string|null}} finance
  * @property {number} value
+ * @property {'basic'|'standard'|'premium'|'deluxe'} [tier]   opcional: sense, 'standard'
  */
 
 /** @typedef {{id:string, reg:string, from:string, to:string, crewId:string,

@@ -147,9 +147,9 @@ import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
-  currentCareer, recordLesson, unlockAllLessons, discardAirline, on
+  currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on
 } from './src/app/index.js';
-import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide } from './src/ui/index.js';
+import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
    SECTION 8c - PHOTO SCENERY (optional). When the page is served next to a
    ./scenery folder built by pont_aeri_escenari.py, a real zone replaces the
@@ -2037,7 +2037,8 @@ async function launchLesson(lessonId, unlockAll) {
  * nomes visible amb IS_DEV. Des de l E10 (30/09/2026) actua sobre la partida
  * carregada: "unlock all" marca totes les llicons com a aprovades a la seva
  * escola i la desa (sense recordLessonAttempt); "delete career" la llenca amb
- * discardCareer, que en fa copia abans. */
+ * discardCareer, que en fa copia abans. D2+D5: "new market" genera la llista
+ * de l epoch seguent al desat i la desa (devNewMarket). */
 const DevSchoolPanel = {
   init() {
     const el = document.createElement('div');
@@ -2055,12 +2056,14 @@ const DevSchoolPanel = {
     }).join('');
     this.el.innerHTML = '<b>DEV school</b>' + (career ? '' : '<div>no career loaded</div>') + rows +
       `<div style="margin-top:4px"><button data-unlock="1" ${career ? '' : 'disabled'}>unlock all (DEV)</button></div>` +
-      `<div style="margin-top:4px"><button data-discard="1" ${career ? '' : 'disabled'}>delete career (DEV)</button></div>`;
+      `<div style="margin-top:4px"><button data-discard="1" ${career ? '' : 'disabled'}>delete career (DEV)</button></div>` +
+      `<div style="margin-top:4px"><button data-market="1" ${career && career.school.graduated ? '' : 'disabled'}>new market (DEV)</button></div>`;
     this.el.querySelectorAll('button[data-lesson]').forEach(b => b.addEventListener('click', () => launchLesson(b.dataset.lesson, false)));
     this.el.querySelector('button[data-unlock]').addEventListener('click', () => {
       // E2: amb totes aprovades surt la graduacio; si s esta volant, en tornar al menu
       if (unlockAllLessons() && Game.state === 'menu') showAirlineHome();
     });
+    this.el.querySelector('button[data-market]').addEventListener('click', () => { if (devNewMarket()) refreshAirlineUi(); });
     this.el.querySelector('button[data-discard]').addEventListener('click', () => {
       if (!discardAirline()) { UI.toast('DEV: the backup failed, nothing deleted', 4); return; }
       if (Game.state === 'menu') { UI.el.menu.hidden = true; showMainMenu(); }
@@ -2231,7 +2234,8 @@ const Game = {
     if (f.events.length) { for (const ev of f.events) { try { if (ev === 'touchdown') this.onTouchdown(); else if (ev === 'strike:tail') { if (!this.tailStrike) { this.tailStrike = true; Recorder.tailStrike(); this.msg('TAIL STRIKE', 4); } } else if (ev.startsWith('strike')) this.crashNow(ev === 'strike:wing' ? 'Wing strike' : ev === 'strike:engine' ? 'Engine pod strike' : 'Fuselage impact', 'The airframe touched the ground.'); } catch (err) { this.logOnce('event:' + ev, 'Game.step: error processant l esdeveniment ' + ev, err); } } f.events.length = 0; }
     // aterratge que el model no ha anunciat (el morro ha tocat primer i airTime ja era 0) i xarxa de seguretat: nomes si
     // no hi ha cap informe obert ni cap accident (core/landing-watch.js). Els aterratges normals no passen mai per aqui
-    if (this.state !== 'replay') { const td = this.landingWatch.step(f, { reportOpen: !!(this.report && !this.report.shown), crashed: !!this.crash });
+    if (this.state !== 'replay') { const { touchdown: td, bounce } = this.landingWatch.step(f, { reportOpen: !!(this.report && !this.report.shown), crashed: !!this.crash });
+      if (bounce) this.report.bounces++;   // rebots de les rodes principals amb l informe obert (core/landing-watch.js)
       if (td) { f.touchdown = td; try { this.onTouchdown(); } catch (err) { this.logOnce('landingWatch', 'Game.step: error registrant l aterratge', err); } } }
     if (f.surfaceType === SURF.WATER && o.agl < 0.5) this.crashNow('Water impact', 'The aircraft went into the sea.');
     else if (f.wow && f.surfaceType === SURF.TERRAIN && o.gs > 25) this.crashNow('Terrain impact', 'The aircraft hit terrain outside the airport.');
@@ -2295,7 +2299,7 @@ const Game = {
   },
   /** landing evaluation */
   onTouchdown() {
-    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; try { Sound.touchdown(td); } catch (err) { this.logOnce('sound:touchdown', 'Sound.touchdown', err); } if (this.report && !this.report.shown) { this.report.bounces++; return; }
+    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; try { Sound.touchdown(td); } catch (err) { this.logOnce('sound:touchdown', 'Sound.touchdown', err); } if (this.report && !this.report.shown) return;   // rebot: el compta LandingWatch.step
     let best = null; for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id]; if (Math.hypot(f.e - A.e, f.n - A.n) > 8000) continue; const l = A.toLocal(f.e, f.n);
       for (const en of A.allEnds) { const dx = l[0] - en.thr[0], dy = l[1] - en.thr[1], s = dx * en.dir[0] + dy * en.dir[1], t = -dx * en.dir[1] + dy * en.dir[0], dh = Math.abs(wrapPi((td.track - en.hdg) * DEG)) * RAD; if (dh < 35 && s > -300 && s < en.rw.len + 100 && Math.abs(t) < en.rw.wid) { if (!best || Math.abs(t) < Math.abs(best.t)) best = { A, en, s, t, dh }; } } }
     const fpm = td.vs / FPM, R = this.report = { fpm, g: td.nzPeak, bounces: 0, shown: false, dist0: f.distGround, ias: td.ias, pitch: td.pitch, roll: td.roll, onRunway: !!best, get gNow() { return f.touchdown ? f.touchdown.nzPeak : this.g; } };
@@ -2724,7 +2728,8 @@ const Main = {
     initAirlineUi({
       launchLesson: id => launchLesson(id, false),
       openFreeFlight: () => { UI.showMenu(true); },
-      onShow: () => { UI.el.menu.hidden = true; UI.el.hud.hidden = true; }
+      onShow: () => { UI.el.menu.hidden = true; UI.el.hud.hidden = true; },
+      openSettings: () => UI.settings(true)
     });
     if (IS_DEV) { DevSchoolPanel.init(); on('career:changed', () => DevSchoolPanel.render()); }
     Env.update(Game.opts.hours, 100, [0, 0, -1]);
@@ -2803,7 +2808,10 @@ const UI = {
     this.$('btnHelp').addEventListener('click', () => this.toggleHelp());
     // guia de consulta (E5): des de la pausa; el panell de pausa s amaga mentre es llegeix
     this.$('btnGuide').textContent = t('guide.open');
-    this.$('btnGuide').addEventListener('click', () => { this.el.pause.hidden = true; showGuide(() => { if (Game.state === 'paused') this.el.pause.hidden = false; }); });
+    this.$('btnGuide').addEventListener('click', () => { this.el.pause.hidden = true; showGuide(() => { if (Game.state === 'paused' || this.settingsOpen) this.el.pause.hidden = false; }); });
+    // Settings del menu principal (X1 del D2+D5): el mateix panell de pausa, sense els botons del vol
+    const settingsBack = document.createElement('button'); settingsBack.id = 'btnSettingsBack'; settingsBack.textContent = t('settings.back'); settingsBack.hidden = true;
+    settingsBack.addEventListener('click', () => this.settings(false)); this.$('btnMenu').after(settingsBack);
     // tornar del menu de Free Flight al menu principal (E8)
     const back = document.createElement('button'); back.type = 'button'; back.className = 'pa-backlink'; back.textContent = t('menu.back');
     back.addEventListener('click', () => { this.el.menu.hidden = true; showMainMenu(); });
@@ -2841,6 +2849,16 @@ const UI = {
     if (lesson) showAirlineHome(); else this.showMenu(true); },
   pause(on) { if (!on && isAirlineUiOpen()) hideAirlineUi(); if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
+  /** Settings des del menu principal (X1): obre el panell de pausa (grafics, so, mesclador, controls, guia) sense Resume,
+   *  Restart ni Main menu; en tancar-lo es torna al menu principal. Els ajustos es desen igual que des de la pausa. */
+  settings(on) {
+    const p = this.el.pause, title = p.querySelector('h2');
+    this.settingsOpen = on;
+    for (const id of ['btnResume', 'btnRestart', 'btnMenu']) this.$(id).hidden = on;
+    this.$('btnSettingsBack').hidden = !on;
+    if (on) { this.pausedTitle ??= title.textContent; title.textContent = t('settings.title'); this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); p.hidden = false; this.$('btnSettingsBack').focus(); }
+    else { title.textContent = this.pausedTitle ?? title.textContent; p.hidden = true; this.el.mixer.hidden = true; this.el.help.hidden = true; showMainMenu(); }
+  },
   /** photo scenery: a line in the menu and the data credits in a corner */
   photoNote() {
     if (!Photo.on) return;
@@ -2850,6 +2868,7 @@ const UI = {
   /** sound mixer panel. Opened from the pause screen it lets the frozen engine / wind sound play as a live preview */
   mixer(on) { Sound.unlock(); this.mixSync(); this.el.mixer.hidden = !on;
     if (Game.state === 'paused') { this.el.pause.hidden = on; if (Sound.ctx) Sound.set(Sound.bed.gain, on ? 1 : 0, 0.08); }
+    else if (this.settingsOpen) this.el.pause.hidden = on;
     if (on) this.$('mixClose').focus(); },
   toast(t, secs) { this.el.toast.textContent = t; this.el.toast.style.opacity = 1; this.toastT = secs || 2.5; },
   yoke(on) { this.el.yoke.hidden = !on; },
