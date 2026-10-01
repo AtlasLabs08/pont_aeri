@@ -1,4 +1,4 @@
-/* Proves del terreny dels aeroports (F1, docs/DECISIONS.md, 2026-10-01, H6).
+/* Proves del terreny dels aeroports (F1, docs/DECISIONS.md, 2026-10-01, H6 i H16).
  *
  * - Senda: per a cada cap de pista dels aeroports nous, des del llindar fins a
  *   10 km i a 0 i +-150 m de l eix, el terreny es com a molt 300 ft per sota de
@@ -7,12 +7,13 @@
  *   l elevacio de l aeroport.
  * - Inici en final de Free Flight (10 nm): fins a 10 nm + 500 m, el mateix
  *   marge de 300 ft sota la senda.
- * - Pendent: graella de 50 m fins a 12 km i de 200 m fins a 32 km de cada
- *   aeroport nou, sobre terra ferma (el fons del mar no compta). Una parella de punts veins on el terreny
- *   es el modificat per l aeroport (difereix del relleu natural, heightRaw) als
- *   dos punts es la transicio: com a molt un 25 %. A la vora (un punt
- *   modificat i l altre natural), la transicio no pot ser mes abrupta que el
- *   relleu natural de la mateixa parella.
+ * - Pendent: graella de 50 m fins a 12 km i de 250 m fins a 55 km de cada
+ *   aeroport nou, sobre terra ferma (el fons del mar no compta). Transicio
+ *   (H16): una parella de punts veins tots dos dins de la vall (el terreny hi
+ *   queda mes de VALLEY.softM per sota del relleu natural, heightRaw): com a
+ *   molt un 12 %. Qualsevol parella que l aeroport toqui: com a molt un 25 %
+ *   (H6), o mai mes abrupta que el relleu natural de la mateixa parella (on la
+ *   vall s uneix amb un relleu natural escarpat).
  * - LEBL i LEPA: alcades identiques a test/fixtures/terrain-lebl-lepa.json,
  *   preses del codi de dev (90f61db) abans de F1+F2. No es regenera.
  *
@@ -23,11 +24,11 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { World, AIRPORTS, ILS, setRunwayDifficulty } from '../src/world/index.js';
+import { World, AIRPORTS, ILS, VALLEY, setRunwayDifficulty } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
 const NEW = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
-const FT300 = 300 * 0.3048, MAX_SLOPE = 0.25;
+const FT300 = 300 * 0.3048, MAX_SLOPE = 0.25, VALLEY_MAX_SLOPE = 0.12;
 
 before(() => { setRunwayDifficulty('normal'); World.build(); });
 
@@ -49,27 +50,28 @@ describe('inici en final de Free Flight: el mateix marge fins a 10 nm', () => {
   for (const id of NEW) test(id, () => checkPath(id, 10 * NM + 500));
 });
 
-describe('H6: pendent de la transicio de l aeroport al relleu', () => {
-  for (const id of NEW) test(`${id}: com a molt un 25 %`, () => {
+describe('H6 i H16: pendent de la vall de l aeroport', () => {
+  for (const id of NEW) test(`${id}: la transicio, com a molt un 12 %; res mes abrupte que el natural per sobre del 25 %`, () => {
     const A = AIRPORTS[id];
     const H = (e, n) => { const sd = World.sd(e, n); return sd <= 0 ? null : [World.heightProc(e, n), World.heightRaw(e, n, sd)]; };
-    let inside = 0;
-    for (const [st, R] of [[50, 12000], [200, 32000]]) for (let j = -R; j <= R; j += st) {
+    let touched = 0, valley = 0;
+    for (const [st, R] of [[50, 12000], [250, 55000]]) for (let j = -R; j <= R; j += st) {
       let prev = null;
       for (let i = -R; i <= R; i += st) {
         const p = H(A.e + i, A.n + j), up = H(A.e + i, A.n + j + st);
         for (const q of [prev, up]) {
           if (!p || !q) continue;
-          const mp = Math.abs(p[0] - p[1]) > 0.01, mq = Math.abs(q[0] - q[1]) > 0.01;
-          if (!mp && !mq) continue;
-          const dh = Math.abs(p[0] - q[0]);
-          if (mp && mq) { inside++; assert.ok(dh / st <= MAX_SLOPE, `${id} a ${i},${j}: ${(dh / st * 100).toFixed(1)} %`); }
-          else assert.ok(dh / st <= MAX_SLOPE || dh <= Math.abs(p[1] - q[1]) + 1e-6, `${id} a ${i},${j}: vora mes abrupta que el relleu natural`);
+          const dp = p[1] - p[0], dq = q[1] - q[0];
+          if (Math.abs(dp) <= 0.01 && Math.abs(dq) <= 0.01) continue;
+          const dh = Math.abs(p[0] - q[0]); touched++;
+          assert.ok(dh / st <= MAX_SLOPE || dh <= Math.abs(p[1] - q[1]) + 1e-6, `${id} a ${i},${j}: ${(dh / st * 100).toFixed(1)} %, mes abrupte que el natural`);
+          if (dp > VALLEY.softM && dq > VALLEY.softM) { valley++; assert.ok(dh / st <= VALLEY_MAX_SLOPE, `${id} a ${i},${j}: vall al ${(dh / st * 100).toFixed(1)} %`); }
         }
         prev = p;
       }
     }
-    assert.ok(inside > 100, `${id}: l aeroport hauria de modificar el relleu`);
+    assert.ok(touched > 100, `${id}: l aeroport hauria de modificar el relleu`);
+    if (id === 'LESU' || id === 'LEDA') assert.ok(valley > 1000, `${id}: hi hauria d haver vall`);
   });
 });
 

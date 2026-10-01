@@ -1,40 +1,46 @@
 /* Graella de distancia signada a la costa i funcio d alcada del terreny.
  * ORIGEN: linies 1466-1638 de l'original.
  *
- * EXPORTA: World AIRPORT_CONE_SLOPE AIRPORT_PATH_MARGIN_M
+ * EXPORTA: World VALLEY valleyMarginM
  *
  * IMPORTA: ../core/constants.js, ../core/noise.js, ../core/flight-model.js
  *          (nomes SURF), ./geo.js, ./airports.js, ./ils.js (la senda)
  *
- * AEROPORTS (F1, docs/DECISIONS.md, 2026-10-01, H6):
+ * AEROPORTS (F1, docs/DECISIONS.md, 2026-10-01, H6 i H16):
  *   - LEBL i LEPA (sense def.terrain): aplanament de 700 m al voltant del
  *     rectangle (bounds), exactament com sempre (_airportBlend).
  *   - Els aeroports nous (def.terrain, dades d airport-data.js) passen per
- *     _airportShape, que nomes retalla el relleu natural amb superficies de
- *     pendent acotat: un anell pla de terrain.flatR m al voltant del
- *     rectangle i despres un con que limita la diferencia amb l elevacio de
- *     l aeroport a AIRPORT_CONE_SLOPE per metre; i, si terrain.corridor, un
- *     passadis en V sobre l eix allargat de cada cap (fins a corridor.len m)
- *     amb el fons AIRPORT_PATH_MARGIN_M per sota de la senda de 3 graus i les
- *     parets al pendent del con, i una conca de corridor.basin m de radi al
- *     voltant del punt d aproximacio final (finalFix, 10 nm) al mateix marge
- *     sota la senda al FF. On cap limit no actua, el relleu es el natural.
- *   El passadis es calcula amb la pista real (dificultat normal): el terreny
- *   no canvia amb la dificultat.
+ *     _airportShape: una vall natural al llarg de l eix de pista, mai
+ *     circular. El fons es a l elevacio de l aeroport al costat de la pista i,
+ *     cap enfora, segueix la senda de 3 graus per sota (valleyMarginM: 130 m a
+ *     prop, 340 m a partir de 9 km, mes de 1.000 ft entre el FF i l IF) fins a
+ *     terrain.valley.len m del llindar, on fa un capcal. L amplada del fons
+ *     creix amb la distancia i ondula amb soroll; les vores pugen al
+ *     VALLEY.wall (8 %) amb una arrencada suau, el fons rep relleu de
+ *     soroll (nomes rebaixa), i la vall s uneix amb el relleu natural
+ *     amb un minim suau: sense vores rectes ni fons plans. Al voltant del
+ *     rectangle (terrain.flatR) les depressions es reomplen amb el mateix
+ *     pendent. On la vall no talla res, el relleu es el natural.
+ *   La vall es calcula amb la pista real (dificultat normal): el terreny no
+ *   canvia amb la dificultat.
  */
 
-import { DEG, NM, clamp, lerp, smoothstep } from '../core/constants.js';
+import { DEG, clamp, lerp, smoothstep } from '../core/constants.js';
 import { vnoise, fbm, ridged } from '../core/noise.js';
 import { SURF } from '../core/flight-model.js';
 import { ll, COAST, RIDGES, VALLEYS, URBAN, ROADS } from './geo.js';
 import { AIRPORTS, AIRPORT_ORDER, airportPavedAt } from './airports.js';
-import { ILS, FINAL_FIX_NM } from './ils.js';
+import { ILS } from './ils.js';
 
-export const AIRPORT_CONE_SLOPE = 0.2;          // pendent maxim del con al voltant d un aeroport nou
-export const AIRPORT_PATH_MARGIN_M = 120;       // el passadis deixa el terreny aquests m per sota de la senda (300 ft = 91,4 m)
-const SHAPE_RANGE_M = 40000;                     // abast des de l origen: mes enlla, ni el con ni el passadis (20 km) retallen res
-const CONE_KNEE_M = 400;                         // el con arrenca de l anell pla amb pendent creixent en aquests m                     // abast de _airportShape des de l origen de l aeroport
-const CORRIDOR = { core: 150, widen: 0.1 };      // passadis: mitja amplada a l eix (m) i eixamplament per m de distancia
+/* vall dels aeroports nous (H16): pendent de les vores, arrencada suau de la vora (m), eixamplament del fons per m,
+^ * ondulacio de l amplada (m) i la seva escala (m), relleu del fons (m, nomes rebaixa) i la seva escala (m), suavitat de la unio (m) */
+export const VALLEY = { wall: 0.08, knee: 1200, widen: 0.08, wobbleM: 600, wobbleScaleM: 9000, reliefM: 30, reliefScaleM: 2500, softM: 40 };
+/** marge del fons de la vall per sota de la senda de 3 graus a s m abans del llindar */
+export function valleyMarginM(s) { return s <= 4000 ? 130 : s >= 9000 ? 340 : lerp(130, 340, (s - 4000) / 5000); }
+const SHAPE_RANGE_M = 70000;                     // abast des de l origen: mes enlla, la vall (22 nm i el capcal) ja no talla res
+const smin = (x, y, k) => { const h = Math.max(k - Math.abs(x - y), 0) / k; return Math.min(x, y) - h * h * k / 4; };
+const smax = (x, y, k) => -smin(-x, -y, k);
+const ramp = (x, k) => x <= 0 ? 0 : x < k ? x * x / (2 * k) : x - k / 2;      // 0 i despres pendent 1, amb arrencada suau
 
 /* ---------------------------------------------------------------------------
  * Photo (escenari fotografic) es queda a index.html perque depen de THREE,
@@ -115,9 +121,10 @@ export const World = {
       const D = A.def, ends = [];
       for (const r of D.runways) {
         const rel = (r.hdg - D.axis) * DEG, d = [Math.cos(rel), -Math.sin(rel)], h = r.len / 2;
-        ends.push({ thr: [r.a - d[0] * h, r.c - d[1] * h], dir: d }, { thr: [r.a + d[0] * h, r.c + d[1] * h], dir: [-d[0], -d[1]] });
+        ends.push({ thr: [r.a - d[0] * h, r.c - d[1] * h], dir: d, len: r.len }, { thr: [r.a + d[0] * h, r.c + d[1] * h], dir: [-d[0], -d[1]], len: r.len });
       }
-      return { icao: A.icao, e: A.e, n: A.n, ua: A.ua, uc: A.uc, bounds: A.bounds, elev: A.elev, T: A.terrain, ends };
+      const b = A.bounds, w0 = Math.max(Math.abs(b[2]), Math.abs(b[3])) + A.terrain.flatR;
+      return { icao: A.icao, e: A.e, n: A.n, ua: A.ua, uc: A.uc, bounds: A.bounds, elev: A.elev, T: A.terrain, ends, w0 };
     });
     this.ready = true;
   },
@@ -171,37 +178,37 @@ export const World = {
   },
   /** relleu h retallat per tots els aeroports nous a l abast, un rere l altre (cadascun nomes retalla) */
   _airportShape(e, n, h) {
-    for (const S of this.shapes || []) { const P = this._shapeLocal(S, e, n); if (P) h = this._shapeOne(P, h); }
+    for (const S of this.shapes || []) { const P = this._shapeLocal(S, e, n); if (P) h = this._shapeOne(P, h, e, n); }
     return h;
   },
-  /** un aeroport nou: anell pla, passadis d aproximacio i con (vegeu la capcalera) */
-  _shapeOne(P, h) {
-    const { S, a, c, d } = P, E = S.elev, T = S.T;
+  /** un aeroport nou: la vall al llarg de l eix i el reompliment de les depressions properes (vegeu la capcalera) */
+  _shapeOne(P, h, e, n) {
+    const { S, a, c, d } = P, E = S.elev, T = S.T, V = VALLEY;
     if (d <= 0) return E;
     let g = h;
-    if (T.corridor) {
-      // vall en V: al fons, AIRPORT_PATH_MARGIN_M per sota de la senda; parets, el capcal i la cua
-      // pugen amb el mateix pendent que el con. Nomes rebaixa, mai omple.
-      const tg = Math.tan(ILS.GS), L = T.corridor.len;
-      for (const en of S.ends) {
-        const ra = a - en.thr[0], rc = c - en.thr[1], s = -(ra * en.dir[0] + rc * en.dir[1]);       // s > 0: abans del llindar
-        const t = Math.abs(-ra * en.dir[1] + rc * en.dir[0]), sc = clamp(s, 0, L), wc = CORRIDOR.core + CORRIDOR.widen * sc;
-        const out = Math.hypot(Math.max(0, t - wc), s - sc);
-        const cap = E + Math.max(0, (sc + ILS.GS_S) * tg - AIRPORT_PATH_MARGIN_M) + AIRPORT_CONE_SLOPE * out;
-        if (g > cap) g = cap;
-        // conca al voltant del punt d aproximacio final (H14): a menys de corridor.basin m del FF, el terreny es
-        // com a molt AIRPORT_PATH_MARGIN_M sota la senda al FF, i les parets pugen al pendent del con. Hi cap el gir
-        // per enfilar la pista vingui d on vingui la ruta.
-        if (T.corridor.basin) {
-          const sF = FINAL_FIX_NM * NM, r = Math.hypot(ra + en.dir[0] * sF, rc + en.dir[1] * sF);
-          const capF = E + (sF + ILS.GS_S) * tg - AIRPORT_PATH_MARGIN_M + AIRPORT_CONE_SLOPE * Math.max(0, r - T.corridor.basin);
-          if (g > capF) g = capF;
+    if (T.valley) {
+      const tg = Math.tan(ILS.GS), L = T.valley.len;
+      // sostre de la vall sense l ondulacio de l amplada: si el relleu ja hi queda per sota amb marge, no cal res mes
+      const capAt = wob => { let cap = Infinity;
+        for (const en of S.ends) {
+          const ra = a - en.thr[0], rc = c - en.thr[1], s = -(ra * en.dir[0] + rc * en.dir[1]);     // s > 0: abans del llindar
+          if (s < -en.len) continue;                                                             // mes enlla de l altre llindar
+          const sp = Math.max(s, 0), sl = Math.min(sp, L), t = Math.abs(-ra * en.dir[1] + rc * en.dir[0]);
+          const F = E + Math.max(0, (sl + ILS.GS_S) * tg - valleyMarginM(sl)), W = S.w0 + V.widen * sl + wob;
+          // vora lateral i capcal amb el mateix pendent, combinats (el pendent no se suma a la cantonada)
+          cap = Math.min(cap, F + V.wall * Math.hypot(ramp(t - Math.max(W, S.w0), V.knee), sp - sl));
         }
+        return cap; };
+      if (h > capAt(V.wobbleM) - V.softM) {
+        const k = V.reliefScaleM, w = V.wobbleScaleM, cap = capAt(V.wobbleM * fbm(e / w + 31, n / w - 17, 2))
+          - V.reliefM * (0.5 + 0.5 * fbm(e / k + 7, n / k + 3, 3)) * smoothstep(2000, 5000, d);
+        g = smin(h, cap, V.softM);
       }
     }
-    // anell pla de flatR m al voltant del rectangle, i despres el con (amb un genoll suau de CONE_KNEE_M)
-    const x = Math.max(0, d - T.flatR), K = CONE_KNEE_M, lim = AIRPORT_CONE_SLOPE * (x < K ? x * x / (2 * K) : x - K / 2);
-    return clamp(g, E - lim, E + lim);
+    // a prop del rectangle, les depressions es reomplen fins a l elevacio de l aeroport amb el pendent de les vores
+    // (smax pot passar k/4 per sobre del mes alt dels dos: el limit es baixa aquest tros perque no passi mai d E)
+    const lo = E - V.wall * ramp(d - T.flatR, V.knee);
+    return g < lo + V.softM ? Math.min(smax(g, lo - V.softM / 4, V.softM), Math.max(g, lo)) : g;
   },
   /** relleu natural sobre el mar, sense cap aeroport (sd > 0: distancia signada a la costa) */
   heightRaw(e, n, sd) {

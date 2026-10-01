@@ -18,7 +18,7 @@
  *             als aeroports nous; sense def.ils, tots els caps en tenen (H3).
  *   en.kind   aproximacio del cap (H12): 'ILS' si en.ils, 'RNP' si no. Tots
  *             els caps en tenen una, amb la mateixa interficie (ILS.nav).
- *   def.terrain  { flatR, corridor } nomes als aeroports nous (H6).
+ *   def.terrain  { flatR, valley } nomes als aeroports nous (H6, H16).
  *   twy.conn  true als trams de taxiway que entren a la pista (connectors).
  *   twy.backtrack  true al tram de rodatge sobre l eix de la pista (aeroports
  *             petits: es rodola per la pista). Es a la xarxa, no es pinta.
