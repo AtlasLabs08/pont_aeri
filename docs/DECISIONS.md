@@ -909,3 +909,61 @@ Com s ha aplicat:
   intermedi sobre l eix allargat mes enlla del FF (per exemple a 20 nm), o
   que H11 descarti un cap si el tram fins al seu FF no es pot volar des de
   l origen.
+
+## 2026-10-01 - F1: H16, punt intermedi, caps no volables i terreny natural
+
+Decisio d en Marc per resoldre el Prat -> La Seu 21, i condicio sobre el
+terreny: res de crateres ni formes artificials.
+
+- H16. Altitud minima de cada punt: FF a l alcada de la senda de 3 graus a
+  10 nm; IF a l alcada de la senda allargada a 20 nm. Un tram es volable si la
+  recta entre l altitud del punt anterior i la del seguent (a l origen,
+  l altitud de creuer de la ruta) queda com a minim 1.000 ft per sobre del
+  terreny, amb 1 nm de marge a cada costat. Ruta en mode 'route': origen -> FF
+  -> llindar si origen -> FF es volable; si no, origen -> IF -> FF -> llindar
+  si origen -> IF i IF -> FF ho son. Si cap de les dues no ho es, H11 descarta
+  aquell cap i tria el seguent amb la mateixa regla; si cap cap no ho es, el de
+  mes vent de cara, amb un avis a la consola en mode DEV. Al ND, al costat de
+  l IF i del FF, l altitud minima de pas en ft. Funcions pures a
+  world/route.js.
+- Terreny: si cal modificar-lo, ha de semblar natural: forma allargada
+  seguint l eix d aproximacio (com una vall), mai circular; vores amples i
+  suaus (pendent maxim del 12 % a la transicio), barrejades amb el soroll del
+  relleu, sense vores rectes ni fons plans visibles. El mateix criteri per al
+  passadis d H6. LEBL i LEPA identics.
+
+Com s ha aplicat:
+
+- Altitud minima al ND: l alcada de la senda arrodonida cap amunt a 100 ft
+  (IF03 9100, FF03 5900): es un minim, no s arrodoneix avall.
+- Origen: el final de la pista de sortida, a l altitud de creuer de la taula
+  del vol cronometrat (Game.ROUTE_ALT, la que ja feia servir selAlt; jet o
+  turbohelix).
+- "La mateixa regla" d H11 vol dir tornar a aplicar arrivalEnd als caps que
+  queden (si en queda un sol amb ILS, aquest; si no, vent de cara; sense vent,
+  la pista mes llarga). Sense cap cap volable: el de mes vent de cara sense
+  mirar l ILS (sense vent, la pista mes llarga).
+- Terreny dels aeroports nous: en lloc del con del 20 % (que a LESU i LEDA
+  feia un crater al voltant de l aeroport), del passadis en V (franja recta
+  amb el fons pla) i de la conca circular del FF, una sola vall al llarg de
+  l eix de pista (world/terrain.js, VALLEY): fons a l elevacio de l aeroport
+  al costat de la pista i, cap enfora, per sota de la senda (130 m a prop,
+  340 m a partir de 9 km, perque el tram IF -> FF tingui els 1.000 ft) fins a
+  22 nm, on fa un capcal; amplada que creix amb la distancia i ondula amb
+  soroll; vores al 8 % amb arrencada suau i unio suau amb el relleu natural;
+  relleu de soroll al fons. Les depressions al voltant de l aeroport es
+  reomplen amb el mateix pendent. Pendent de la transicio (dins la vall):
+  maxim 11,7 % (LESU); la prova en mira el 12 % a 55 km de cada aeroport.
+  On la vall s uneix amb relleu natural mes escarpat, mai no hi es mes
+  abrupta que el natural.
+- La conca del FF ja no cal: amb la vall i l IF, totes les rutes que es fan
+  servir son volables sense ella. S ha tret.
+- Prat -> La Seu amb vent del sud-oest: la 21 no es volable per cap de les
+  dues rutes. El tram IF -> FF de la 21 si que ho es (1.135 ft), pero el tram
+  origen -> IF21 creua relleu natural del Pirineu fora de l eix d aproximacio
+  (l IF21 es a 37 km al nord-est de LESU): marge de -333 ft amb el creuer del
+  turbohelix (11.000 ft) i de 646 ft amb el del jet (15.000 ft). Fer-lo
+  volable voldria dir rebaixar el massis fora de l eix, que es justament una
+  forma artificial. Per H16, la 21 es descarta i es fa servir la 03 per l IF
+  (IF03 -> FF03), que es volable. Amb 12 kt de vent del sud-oest, la 03 te
+  uns 12 kt de vent de cua (pista de 1.270 m).
