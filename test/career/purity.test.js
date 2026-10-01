@@ -101,6 +101,13 @@ describe('career/ es pur', () => {
   }
 });
 
+describe('world/weather.js es pur', () => {
+  test('world/weather.js', () => {
+    const path = join(SRC, 'world', 'weather.js');
+    assert.deepEqual(checkFile(path, readFileSync(path, 'utf8')), []);
+  });
+});
+
 describe('el detector funciona', () => {
   const at = join(CAREER, 'x.js');
   const bad = src => checkFile(at, src).length > 0;
