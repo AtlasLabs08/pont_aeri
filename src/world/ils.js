@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd flightApproach finalFix FINAL_FIX_NM
+ * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd tailwindKt MAX_TAILWIND_KT flightApproach finalFix FINAL_FIX_NM
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -36,6 +36,11 @@
  *     diversos, d entre ells, i si no en te cap, d entre tots: el de mes vent
  *     de cara (windDir = d on ve el vent, graus; windKt en nusos); sense vent
  *     (windKt <= 0), el de la pista mes llarga. Empat: el primer d A.allEnds.
+ *     H17c: un cap amb mes de MAX_TAILWIND_KT de vent de cua (tailwindKt)
+ *     nomes es tria si no n hi ha cap altre: la regla s aplica primer als caps
+ *     que en tenen com a molt MAX_TAILWIND_KT.
+ *   tailwindKt(en, windDir, windKt) -> nusos de vent de cua al cap en (negatiu:
+ *     vent de cara).
  *   flightApproach({ mode, start, airport, dest, runway, windDir, windKt })
  *     -> { A, en, tuned }   pista d arribada d un vol de Free Flight (H11) i si
  *     se n sintonitza l aproximacio des del principi (H13). Els camps son els
@@ -60,10 +65,15 @@ export function destinationEnd(A, ...candidates) {
   return candidates.find(en => en && A.allEnds.includes(en)) || A.allEnds[0];
 }
 
+export const MAX_TAILWIND_KT = 10;
+export function tailwindKt(en, windDir, windKt) { return windKt > 0 ? -windKt * Math.cos((windDir - en.hdg) * DEG) : 0; }
+
 export function arrivalEnd(A, windDir, windKt) {
-  const ils = A.allEnds.filter(en => en.ils !== false);
+  const ok = A.allEnds.filter(en => tailwindKt(en, windDir, windKt) <= MAX_TAILWIND_KT + 1e-9), ends = ok.length ? ok : A.allEnds;
+  const ils = ends.filter(en => en.ils !== false);
   if (ils.length === 1) return ils[0];
-  const pool = ils.length ? ils : A.allEnds, calm = !(windKt > 0);
+  if (ils.length === 1) return ils[0];
+  const pool = ils.length ? ils : ends, calm = !(windKt > 0);
   const score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
   return pool.reduce((best, en) => score(en) > score(best) + 1e-9 ? en : best);
 }

@@ -1,6 +1,8 @@
-/* Proves de world/route.js: punt intermedi, altituds minimes i caps no
- * volables del vol cronometrat de Free Flight (H16, docs/DECISIONS.md,
- * 2026-10-01).
+/* Proves de world/route.js: punt intermedi, altituds minimes, MEA, sostre de
+ * l avio, vent de cua i caps no volables del vol cronometrat de Free Flight
+ * (H16, H17, docs/DECISIONS.md, 2026-10-01). Creuers i sostres de la taula
+ * d index.html i d aircraft-data.js: LEBL-LESU (128 km) 11.000 ft turbohelix
+ * (sostre 25.000) i 15.000 ft jet (39.800); LEBL-LERS 6.000 / 8.000 ft.
  *
  * Correr:  npm test
  */
@@ -8,7 +10,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, World, ILS, setRunwayDifficulty, makeAirport, approachFix, legFlyable, planRoute, planArrival,
+import { AIRPORTS, World, ILS, setRunwayDifficulty, makeAirport, approachFix, legFlyable, legMeaFt, planRoute, planArrival,
   IF_NM, LEG_CLEAR_FT, LEG_SIDE_NM, thresholdDistNm } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
@@ -17,7 +19,6 @@ before(() => { setRunwayDifficulty('normal'); World.build(); });
 
 /** final de la pista de sortida 0 (com la ruta del ND a index.html) */
 const originOf = A => { const en = A.allEnds[0], p = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len); return { e: p[0], n: p[1] }; };
-const JET = 15000 * FT, TP = 11000 * FT;     // creuer de LEBL-LESU (128 km) a la taula d index.html: jet i turbohelix
 
 describe('approachFix', () => {
   test('FF a 10 nm i IF a 20 nm sobre l eix, a l alcada de la senda allargada; altitud minima arrodonida cap amunt a 100 ft', () => {
@@ -53,52 +54,85 @@ describe('legFlyable', () => {
   });
 });
 
-describe('planArrival i planRoute (H16)', () => {
-  test('Prat -> La Seu amb vent del sud-oest: la 21 no es volable; es descarta i la 03 fa servir l IF, amb trams volables', () => {
-    for (const cruiseM of [JET, TP]) {
-      const r = planArrival({ origin: originOf(AIRPORTS.LEBL), cruiseM, A: AIRPORTS.LESU, windDir: 210, windKt: 12 });
-      assert.deepEqual(r.rejected, ['21']);
-      assert.equal(r.en.id, '03'); assert.equal(r.usesIF, true); assert.equal(r.flyable, true); assert.equal(r.fallback, false);
-      assert.deepEqual(r.fixes.map(f => f.name), ['IF03', 'FF03']);
+describe('legMeaFt (H17a)', () => {
+  const p0 = { e: 0, n: 0 }, p1 = { e: 30000, n: 0 };
+  test('punt mes alt a 1 nm de cada costat, mes 1.000 ft, arrodonit cap amunt a 100 ft', () => {
+    assert.equal(legMeaFt(p0, p1, () => 0), 1000);
+    const hill = (d, h) => (e, n) => Math.abs(n - d) < 150 && Math.abs(e - 15000) < 150 ? h : 0;
+    assert.equal(legMeaFt(p0, p1, hill(0, 500)), Math.ceil((500 / FT + 1000) / 100) * 100);      // 2.640 ft -> 2.700
+    assert.equal(legMeaFt(p0, p1, hill(0, 500)), 2700);
+    assert.equal(legMeaFt(p0, p1, hill(NM, 500)), 2700, 'a 1 nm del costat compta');
+    assert.equal(legMeaFt(p0, p1, hill(1.3 * NM, 500)), 1000, 'a 1,3 nm, no');
+  });
+});
+
+/** aeroport de prova amb una pista 09/27 a (0, 0) local; origen a 60 km a l oest */
+const toyApt = () => makeAirport({ icao: 'TEST', lat: 41, lon: 2, elev: 0, axis: 90, bounds: [-5000, 5000, -3000, 3000],
+  runways: [{ hdg: 90, len: 3000, wid: 45, a: 0, c: 0 }], taxiways: [], aprons: [] });
+
+describe('planArrival i planRoute (H16, H17)', () => {
+  const LEBL0 = () => originOf(AIRPORTS.LEBL);
+
+  test('Prat -> La Seu amb vent del sud-oest: la 21 per l IF, amb la MEA per sobre del creuer de la taula', () => {
+    for (const [cruiseFt, ceilingFt] of [[11000, 25000], [15000, 39800]]) {
+      const r = planArrival({ origin: LEBL0(), cruiseFt, ceilingFt, A: AIRPORTS.LESU, windDir: 210, windKt: 12 });
+      assert.equal(r.en.id, '21'); assert.equal(r.usesIF, true); assert.equal(r.flyable, true); assert.equal(r.fallback, false);
+      assert.deepEqual(r.rejected, []); assert.deepEqual(r.fixes.map(f => f.name), ['IF21', 'FF21']);
+      assert.ok(r.tailwindKt < 0, 'vent de cara');
+      // MEA del tram origen -> IF21 (el terreny del Pirineu), per sobre del creuer del turbohelix
+      assert.equal(r.meaFt, legMeaFt(LEBL0(), r.fixes[0]));
+      assert.ok(r.meaFt > 11000 && r.meaFt <= 25000, `MEA ${r.meaFt}`);
+      assert.equal(r.cruiseFt, Math.max(cruiseFt, r.meaFt));
+      // el tram IF -> FF, des de l altitud d arribada a l IF (MEA), es volable
       const [IF, FF] = r.fixes;
-      assert.ok(legFlyable(originOf(AIRPORTS.LEBL), cruiseM, IF, IF.h).ok && legFlyable(IF, IF.h, FF, FF.h).ok);
-      // la 21: ni directa ni per l IF
-      const r21 = planRoute(originOf(AIRPORTS.LEBL), cruiseM, AIRPORTS.LESU, AIRPORTS.LESU.allEnds[1]);
-      assert.equal(r21.flyable, false);
+      assert.ok(legFlyable(IF, Math.max(IF.h, r.meaFt * FT), FF, FF.h).ok);
     }
   });
 
   test('Prat -> La Seu sense vent: la 03 (pista mes llarga, empat: la primera), per l IF', () => {
-    const r = planArrival({ origin: originOf(AIRPORTS.LEBL), cruiseM: TP, A: AIRPORTS.LESU, windDir: 250, windKt: 0 });
+    const r = planArrival({ origin: LEBL0(), cruiseFt: 11000, ceilingFt: 25000, A: AIRPORTS.LESU, windDir: 250, windKt: 0 });
     assert.equal(r.en.id, '03'); assert.equal(r.usesIF, true); assert.deepEqual(r.rejected, []);
+    assert.ok(r.meaFt <= 11000, 'sense MEA per sobre del creuer'); assert.equal(r.cruiseFt, 11000);
   });
 
-  test('Prat -> Reus continua sense IF: LERS 25, directa', () => {
-    for (const cruiseM of [8000 * FT, 6000 * FT]) {
-      const r = planArrival({ origin: originOf(AIRPORTS.LEBL), cruiseM, A: AIRPORTS.LERS, windDir: 250, windKt: 0 });
+  test('Prat -> Reus sense canvis: LERS 25, directa, al creuer de la taula', () => {
+    for (const [cruiseFt, ceilingFt] of [[8000, 39800], [6000, 25000]]) {
+      const r = planArrival({ origin: LEBL0(), cruiseFt, ceilingFt, A: AIRPORTS.LERS, windDir: 250, windKt: 0 });
       assert.equal(r.en.id, '25'); assert.equal(r.usesIF, false); assert.equal(r.flyable, true);
-      assert.deepEqual(r.fixes.map(f => f.name), ['FF25']);
+      assert.deepEqual(r.fixes.map(f => f.name), ['FF25']); assert.equal(r.cruiseFt, cruiseFt);
+      assert.ok(r.meaFt <= r.fixes[0].minFt);
     }
+  });
+
+  test('H17a: un cap nomes es descarta si la MEA supera el sostre de l avio', () => {
+    // muntanya de 8.000 m entre 5 i 15 km a l est de la pista: sota els trams cap al 27 (s hi arriba des de l est)
+    const A = toyApt(), origin = { e: A.e - 60000, n: A.n }, g = (e, n) => e > A.e + 5000 && e < A.e + 15000 && Math.abs(n - A.n) < 20000 ? 8000 : 0;
+    const tp = planArrival({ origin, cruiseFt: 11000, ceilingFt: 25000, A, windDir: 270, windKt: 8, groundAt: g });
+    assert.deepEqual(tp.rejected, ['27']); assert.equal(tp.en.id, '09'); assert.equal(tp.fallback, false);
+    assert.equal(planRoute(origin, 11000, A, A.allEnds[1], g, 25000).tooHigh, true);
+    // amb un sostre mes alt el 27 es pot fer, a la seva MEA
+    const jet = planArrival({ origin, cruiseFt: 15000, ceilingFt: 39800, A, windDir: 270, windKt: 8, groundAt: g });
+    assert.equal(jet.en.id, '27'); assert.ok(jet.meaFt > 25000 && jet.cruiseFt === jet.meaFt);
+  });
+
+  test('H17c: mes de 10 kt de vent de cua fa triar l altre cap; si no n hi ha cap altre d utilitzable, es tria i es diu', () => {
+    const lers = planArrival({ origin: LEBL0(), cruiseFt: 8000, ceilingFt: 39800, A: AIRPORTS.LERS, windDir: 70, windKt: 20 });
+    assert.equal(lers.en.id, '07', '20 kt de cua al 25'); assert.ok(lers.tailwindKt <= 10);
+    const A = toyApt(), origin = { e: A.e - 60000, n: A.n }, g = (e, n) => e > A.e + 5000 && e < A.e + 15000 && Math.abs(n - A.n) < 20000 ? 8000 : 0;
+    // el 27 no es pot fer (sostre) i el 09 te 12 kt de cua: es tria el 09 igualment
+    const r = planArrival({ origin, cruiseFt: 11000, ceilingFt: 25000, A, windDir: 270, windKt: 12, groundAt: g });
+    assert.equal(r.en.id, '09'); assert.ok(r.tailwindKt > 10 && Math.abs(r.tailwindKt - 12) < 1e-9); assert.equal(r.fallback, false);
   });
 
   test('cas sintetic sense cap cap volable: el de mes vent de cara, marcat fallback', () => {
     const A = makeAirport({ icao: 'TEST', lat: 41, lon: 2, elev: 0, axis: 90, bounds: [-5000, 5000, -3000, 3000], ils: ['09'],
       runways: [{ hdg: 90, len: 3000, wid: 45, a: 0, c: 0 }, { hdg: 0, len: 2500, wid: 45, a: 0, c: 1500 }], taxiways: [], aprons: [] });
     const wall = () => 1e5, origin = { e: A.e - 100000, n: A.n };
-    const r = planArrival({ origin, cruiseM: 3000, A, windDir: 350, windKt: 15, groundAt: wall });
+    const r = planArrival({ origin, cruiseFt: 11000, ceilingFt: 25000, A, windDir: 350, windKt: 15, groundAt: wall });
     assert.equal(r.fallback, true); assert.equal(r.flyable, false);
     assert.equal(r.en.id, '36', 'mes vent de cara, encara que el 09 tingui ILS');
     assert.deepEqual([...r.rejected].sort(), A.allEnds.map(e => e.id).sort());
-    const calm = planArrival({ origin, cruiseM: 3000, A, windDir: 0, windKt: 0, groundAt: wall });
+    const calm = planArrival({ origin, cruiseFt: 11000, ceilingFt: 25000, A, windDir: 0, windKt: 0, groundAt: wall });
     assert.equal(calm.fallback, true); assert.equal(calm.en.id, '09', 'sense vent: la pista mes llarga');
-  });
-
-  test('si el primer cap no es volable es tria el seguent amb la mateixa regla (H11)', () => {
-    const A = makeAirport({ icao: 'TEST', lat: 41, lon: 2, elev: 0, axis: 90, bounds: [-5000, 5000, -3000, 3000],
-      runways: [{ hdg: 90, len: 3000, wid: 45, a: 0, c: 0 }], taxiways: [], aprons: [] });
-    // muntanya a l est: el 27 (s hi arriba des de l est) no es volable; el 09 si
-    const g = (e, n) => e > A.e + 15000 ? 1e5 : 0, origin = { e: A.e - 60000, n: A.n };
-    const r = planArrival({ origin, cruiseM: 3000, A, windDir: 270, windKt: 20, groundAt: g });
-    assert.deepEqual(r.rejected, ['27']); assert.equal(r.en.id, '09'); assert.equal(r.fallback, false);
   });
 });

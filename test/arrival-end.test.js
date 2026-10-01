@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, setRunwayDifficulty, makeAirport, arrivalEnd, flightApproach } from '../src/world/index.js';
+import { AIRPORTS, setRunwayDifficulty, makeAirport, arrivalEnd, flightApproach, tailwindKt, MAX_TAILWIND_KT } from '../src/world/index.js';
 
 setRunwayDifficulty('normal');
 
@@ -18,10 +18,20 @@ const toy = (runways, ils) => makeAirport({ icao: 'TEST', lat: 41, lon: 2, elev:
   runways: runways.map(r => ({ hdg: r.hdg, len: r.len, wid: 45, a: 0, c: r.c || 0 })), taxiways: [], aprons: [] });
 
 describe('arrivalEnd', () => {
-  test('un sol cap amb ILS: aquest, encara que el vent bufi de l altra banda', () => {
+  test('un sol cap amb ILS: aquest, encara que el vent bufi de l altra banda, fins a 10 kt de vent de cua (H17c)', () => {
     const A = toy([{ hdg: 90, len: 3000 }], ['27']);
-    assert.equal(arrivalEnd(A, 90, 30).id, '27');
+    assert.equal(arrivalEnd(A, 90, 10).id, '27');
     assert.equal(arrivalEnd(A, 0, 0).id, '27');
+  });
+
+  test('H17c: amb mes de 10 kt de vent de cua, l altre cap; i si tots en tenen mes, la regla de sempre', () => {
+    assert.equal(MAX_TAILWIND_KT, 10);
+    const A = toy([{ hdg: 90, len: 3000 }], ['27']);
+    assert.equal(arrivalEnd(A, 90, 30).id, '09', '30 kt de cua al 27 (ILS): el 09');
+    assert.equal(arrivalEnd(A, 90, 10.5).id, '09');
+    assert.ok(Math.abs(tailwindKt(A.allEnds[1], 90, 12) - 12) < 1e-9 && Math.abs(tailwindKt(A.allEnds[0], 90, 12) + 12) < 1e-9);
+    const B = toy([{ hdg: 90, len: 3000 }], []);
+    assert.equal(arrivalEnd(B, 0, 30).id, '09', 'creuat: cap dels dos te vent de cua, mana el vent de cara (empat: el primer)');
   });
 
   test('diversos caps amb ILS: el de mes vent de cara d entre ells', () => {
@@ -50,8 +60,9 @@ describe('arrivalEnd', () => {
     assert.equal(A.allEnds.map(e => e.id).join(), before);
   });
 
-  test('aeroports reals: LERS 25, LEGE 20, LEDA 31 (un sol ILS); LELL i LESU segons el vent; LEBL sense vent, 07L (la mes llarga)', () => {
-    assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 20).id, '25');
+  test('aeroports reals: LERS 25, LEGE 20, LEDA 31 (un sol ILS, sense massa vent de cua); LELL i LESU segons el vent; LEBL sense vent, 07L (la mes llarga)', () => {
+    assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 8).id, '25');
+    assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 20).id, '07', 'H17c: 20 kt de cua al 25');
     assert.equal(arrivalEnd(AIRPORTS.LEGE, 0, 0).id, '20');
     assert.equal(arrivalEnd(AIRPORTS.LEDA, 130, 10).id, '31');
     assert.equal(arrivalEnd(AIRPORTS.LELL, 300, 10).id, '31');
