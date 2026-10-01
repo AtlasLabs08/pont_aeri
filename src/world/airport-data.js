@@ -8,7 +8,7 @@
 export const GATES_BY_LAYOUT = {"small":3,"medium":6,"large":10};
 
 export const AIRPORT_DATA = {
-  LEGE: {"icao":"LEGE","name":"Girona-Costa Brava","city":"Girona","ref":[41.904639,2.761774],"elev":142.6,"size":"regional","layout":"medium","gates":6,"ils":["19"],"terrain":{"flatR":600,"corridor":{"len":20000}},"runways":[{"ids":["01","19"],"hdg":14,"len":2400,"wid":45,"le":[41.894901,2.75826],"he":[41.915699,2.76612]}]},
+  LEGE: {"icao":"LEGE","name":"Girona-Costa Brava","city":"Girona","ref":[41.904639,2.761774],"elev":142.6,"size":"regional","layout":"medium","gates":6,"ils":["20"],"terrain":{"flatR":600,"corridor":{"len":20000}},"runways":[{"ids":["02","20"],"hdg":14,"len":2400,"wid":45,"le":[41.894901,2.75826],"he":[41.915699,2.76612]}]},
   LERS: {"icao":"LERS","name":"Reus","city":"Reus","ref":[41.147509,1.168354],"elev":71,"size":"regional","layout":"medium","gates":6,"ils":["25"],"terrain":{"flatR":600,"corridor":{"len":20000}},"runways":[{"ids":["07","25"],"hdg":68.9,"len":2455,"wid":45,"le":[41.1441,1.15586],"he":[41.152,1.18315]}]},
   LEIB: {"icao":"LEIB","name":"Eivissa","city":"Eivissa","ref":[38.872898,1.37312],"elev":7.3,"size":"major","layout":"large","gates":10,"ils":["24"],"terrain":{"flatR":800,"corridor":{"len":20000}},"runways":[{"ids":["06","24"],"hdg":62.1,"len":2800,"wid":45,"le":[38.866901,1.35887],"he":[38.8787,1.38738]}]},
   LEMH: {"icao":"LEMH","name":"Menorca","city":"Maó","ref":[39.862598,4.21865],"elev":92,"size":"regional","layout":"medium","gates":6,"ils":["01"],"terrain":{"flatR":600,"corridor":{"len":20000}},"runways":[{"ids":["01","19"],"hdg":8,"len":2550,"wid":45,"le":[39.851257,4.216322],"he":[39.872166,4.220619]}]},

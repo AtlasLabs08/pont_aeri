@@ -39,15 +39,20 @@ const GATES_BY_LAYOUT = { small: 3, medium: 6, large: 10 };
  * compleix la senda (300 ft fins a 10 km): tots en porten. 20 km cobreix l inici
  * en final de Free Flight (10 nm = 18,5 km); a LESU el relleu hi torna a pujar. */
 const EXTRA = {
-  // LEGE: H3 diu "20". OurAirports numera la pista 01/19 (rumb veritable 14): el
-  // cap 19 es el mateix cap fisic (aterratge cap a 194). Es manten l id de la font.
-  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['19'], terrain: { flatR: 600, corridor: { len: 20000 } } },
+  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['20'], terrain: { flatR: 600, corridor: { len: 20000 } } },
   LERS: { name: 'Reus', city: 'Reus', ils: ['25'], terrain: { flatR: 600, corridor: { len: 20000 } } },
   LEIB: { name: 'Eivissa', city: 'Eivissa', ils: ['24'], terrain: { flatR: 800, corridor: { len: 20000 } } },
   LEMH: { name: 'Menorca', city: 'Maó', ils: ['01'], terrain: { flatR: 600, corridor: { len: 20000 } } },
   LELL: { name: 'Sabadell', city: 'Sabadell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } },
   LEDA: { name: 'Lleida-Alguaire', city: 'Lleida', ils: ['31'], terrain: { flatR: 400, corridor: { len: 20000 } } },
   LESU: { name: 'La Seu d\'Urgell', city: 'La Seu d\'Urgell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } }
+};
+/* excepcions de designacio: nomes els ids dels caps, la geometria continua sortint
+ * d OurAirports. Clau: ids d OurAirports 'le/he'; valor: ids reals [le, he].
+ * LEGE: OurAirports te la numeracio antiga 01/19; la pista real es 02/20 (AIP),
+ * amb l ILS al 20 (docs/DECISIONS.md, 2026-10-01, LEGE 02/20). */
+const IDS_OVERRIDE = {
+  LEGE: { '01/19': ['02', '20'] }
 };
 const ORDER = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
 
@@ -95,10 +100,12 @@ export function buildData(airportsCsv, runwaysCsv) {
       const le = [num(r.le_latitude_deg), num(r.le_longitude_deg)], he = [num(r.he_latitude_deg), num(r.he_longitude_deg)];
       if (le.includes(null) || he.includes(null)) throw new Error(`${icao} ${r.le_ident}/${r.he_ident}: falten coordenades`);
       const hdg = num(r.le_heading_degT) ?? bearing(le[0], le[1], he[0], he[1]);
-      return { ids: [r.le_ident, r.he_ident], hdg: r1(hdg), len: Math.round(num(r.length_ft) * FT_M), wid: Math.round(num(r.width_ft) * FT_M),
+      const ov = (IDS_OVERRIDE[icao] || {})[r.le_ident + '/' + r.he_ident];
+      return { ids: ov || [r.le_ident, r.he_ident], hdg: r1(hdg), len: Math.round(num(r.length_ft) * FT_M), wid: Math.round(num(r.width_ft) * FT_M),
         le: [r6(le[0]), r6(le[1])], he: [r6(he[0]), r6(he[1])] };
     }).sort((x, y) => y.len - x.len);
     if (!runways.length) throw new Error(`${icao}: cap pista oberta`);
+    for (const k of Object.keys(IDS_OVERRIDE[icao] || {})) if (!rwys.some(r => r.airport_ident === icao && r.closed !== '1' && r.le_ident + '/' + r.he_ident === k)) throw new Error(`${icao}: l excepcio ${k} ja no es a OurAirports`);
     for (const e of X.ils) if (!runways.some(r => r.ids.includes(e))) throw new Error(`${icao}: ILS ${e} no es cap cap de pista`);
     out[icao] = { icao, name: X.name, city: X.city, ref: [r6(num(a.latitude_deg)), r6(num(a.longitude_deg))],
       elev: r1(num(a.elevation_ft) * FT_M), size, layout, gates: GATES_BY_LAYOUT[layout], ils: X.ils, terrain: X.terrain, runways };

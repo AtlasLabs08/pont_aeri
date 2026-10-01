@@ -51,10 +51,15 @@ describe('airport-data.js: aeroports de les fases 1 i 2', () => {
     assert.deepEqual(GATES_BY_LAYOUT, { small: 3, medium: 6, large: 10 });
   });
 
-  test('ILS (H3): LEGE 19 (el 20 d en Marc: OurAirports la numera 01/19), LERS 25, LEIB 24, LEMH 01, LEDA 31; LELL i LESU cap', () => {
+  test('ILS (H3): LEGE 20, LERS 25, LEIB 24, LEMH 01, LEDA 31; LELL i LESU cap', () => {
     const ils = Object.fromEntries(NEW.map(id => [id, AIRPORT_DATA[id].ils]));
-    assert.deepEqual(ils, { LEGE: ['19'], LERS: ['25'], LEIB: ['24'], LEMH: ['01'], LELL: [], LEDA: ['31'], LESU: [] });
+    assert.deepEqual(ils, { LEGE: ['20'], LERS: ['25'], LEIB: ['24'], LEMH: ['01'], LELL: [], LEDA: ['31'], LESU: [] });
     for (const id of NEW) for (const e of AIRPORT_DATA[id].ils) assert.ok(AIRPORT_DATA[id].runways.some(r => r.ids.includes(e)), `${id} ${e}`);
+  });
+
+  test('designacions reals (LEGE 02/20 per la taula d excepcions de l script; la resta, OurAirports)', () => {
+    const ids = Object.fromEntries(NEW.map(id => [id, AIRPORT_DATA[id].runways.map(r => r.ids.join('/'))]));
+    assert.deepEqual(ids, { LEGE: ['02/20'], LERS: ['07/25'], LEIB: ['06/24'], LEMH: ['01/19'], LELL: ['13/31'], LEDA: ['13/31'], LESU: ['03/21'] });
   });
 
   test('LESU i LELL: pistes curtes (1.267 m i 1.049 m)', () => {
