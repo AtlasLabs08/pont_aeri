@@ -627,10 +627,7 @@ taxiways i portes procedimentals, i desti lliure a Free Flight).
 
 Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
 
-- LEGE: OurAirports numera la pista 01/19 (rumb veritable 14), no 02/20.
-  Es mante l id de la font (H2) i l ILS va al 19, el mateix cap fisic que el
-  "20" d H3 (aterratge cap a 194). Si es vol 02/20, es un canvi a la taula
-  de l script.
+- LEGE: vegeu l entrada seguent (02/20, ILS al 20).
 - world/ no pot importar career/ (seccio 3): la mida surt de
   BALANCE.airportSize a l script (tools/ si que pot) i queda escrita al
   fitxer generat (size, layout, gates). Una prova comprova que coincideix.
@@ -670,3 +667,18 @@ Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
   llicons no la fan servir. Altitud del vol cronometrat: fins a 80 km, 8.000 /
   6.000 ft (jet / turbohelix); fins a 150 km, 15.000 / 11.000; fins a 260 km,
   24.000 / 17.000 (LEBL-LEPA, com abans); mes, 30.000 / 20.000.
+
+## 2026-10-01 - F1: LEGE 02/20, taula d excepcions de designacio
+
+Decisio d en Marc despres de revisar el PR #31. OurAirports te la numeracio
+antiga de LEGE (01/19); la pista real es 02/20 (AIP i diverses fonts) i l ILS
+es al 20, com deia H3.
+
+- tools/airports-ourairports.mjs te una taula IDS_OVERRIDE d excepcions de
+  designacio: nomes canvia els ids dels caps; la geometria (llindars, rumb,
+  llargada, amplada) continua sortint d OurAirports. Si una excepcio ja no
+  coincideix amb cap pista oberta d OurAirports, l script falla.
+- LEGE: 01/19 -> 02/20, ILS al 20. airport-data.js regenerat.
+- Comprovades la resta de designacions contra les reals: LERS 07/25, LEIB
+  06/24, LEMH 01/19, LEDA 13/31, LELL 13/31, LESU 03/21. Totes coincideixen
+  amb OurAirports: LEGE es l unica excepcio. Una prova fixa les set.
