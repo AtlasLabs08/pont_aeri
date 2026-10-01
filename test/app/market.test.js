@@ -19,8 +19,11 @@ import {
   ensureMarket, _resetAirline
 } from '../../src/app/airline.js';
 import {
-  MINUTES_PER_DAY, listingOffer, marketModel, fleetModel, buyListing, sellAirframe, devNewMarket
+  MINUTES_PER_DAY, listingOffer, cardModel, marketModel, fleetModel, buyListing, sellAirframe, devNewMarket
 } from '../../src/app/market.js';
+import {
+  AIRCRAFT_IMAGES, IMAGE_DIR, SILHOUETTES, silhouetteOf, imageOf
+} from '../../src/app/aircraft-images.js';
 
 class FakeStorage {
   constructor() { this.data = new Map(); }
@@ -83,6 +86,86 @@ describe('mercat en graduar-se i en carregar (G11)', () => {
     createAirline('Escola', { seed: 1, createdAt: '' });
     assert.equal(ensureMarket(), false);
     assert.equal(currentCareer().market, undefined);
+  });
+});
+
+describe('cardModel i imatges (K4, K5)', () => {
+  const cardOf = (s, l) => cardModel(listingOffer(s, l));
+  const sample = (s, over) => ({ ...basicMi9(s), ...over });
+
+  test('targeta d una oferta: etiqueta, preu actual i preu ratllat, dades curtes', () => {
+    const s = graduatedCareer(), base = basicMi9(s);
+    const l = sample(s, { listPrice: 400000, offerPct: 0.15, price: 340000, hours: 12345.4,
+      condition: { engines: 60, gear: 70, airframe: 80, avionics: 91 } });
+    const c = cardOf(s, l);
+    assert.equal(c.reg, base.reg);
+    assert.equal(c.name, 'Migjorn Mi-9');
+    assert.equal(c.tier, 'basic');
+    assert.equal(c.year, base.yearBuilt);
+    assert.equal(c.isOffer, true);
+    assert.equal(c.offerPct, 15);
+    assert.equal(c.price, 340000);
+    assert.equal(c.listPrice, 400000);
+    assert.equal(c.hours, 12345);
+    assert.equal(c.condition, 75);
+    assert.equal(c.revenueMult, tierOf('basic').revenueMult);
+  });
+
+  test('sense oferta no hi ha etiqueta ni preu ratllat; un anunci d abans de K1 es llegeix igual', () => {
+    const s = graduatedCareer(), base = basicMi9(s);
+    const plain = cardOf(s, sample(s, { listPrice: base.price, offerPct: 0 }));
+    assert.deepEqual([plain.isOffer, plain.offerPct, plain.listPrice, plain.price], [false, 0, null, base.price]);
+    const { listPrice, offerPct, ...old } = base;
+    assert.deepEqual(cardOf(s, old), cardOf(s, { ...old, listPrice: old.price, offerPct: 0 }));
+    assert.equal(cardOf(s, old).isOffer, false);
+  });
+
+  test('el percentatge de l etiqueta arrodoneix l offerPct', () => {
+    const s = graduatedCareer();
+    assert.equal(cardOf(s, sample(s, { offerPct: 0.104, listPrice: 1000, price: 896 })).offerPct, 10);
+    assert.equal(cardOf(s, sample(s, { offerPct: 0.196, listPrice: 1000, price: 804 })).offerPct, 20);
+  });
+
+  test('sense habilitacio: targeta bloquejada amb l habilitacio que falta; amb ella, no', () => {
+    const s = graduatedCareer();
+    const nb = { ...basicMi9(s), typeId: 'nb', tier: 'standard' };
+    const c = cardOf(s, nb);
+    assert.equal(c.locked, true);
+    assert.equal(c.missingRating, 'narrowbody');
+    const mi9 = cardOf(s, basicMi9(s));
+    assert.deepEqual([mi9.locked, mi9.missingRating], [false, null]);
+    const withRating = { ...s, pilot: { ...s.pilot, ratings: [...s.pilot.ratings, 'narrowbody'] } };
+    assert.deepEqual([cardOf(withRating, nb).locked, cardOf(withRating, nb).missingRating], [false, null]);
+  });
+
+  test('sense imatge al mapa, silueta de la classe; amb imatge, la URL i cap silueta', () => {
+    const s = graduatedCareer(), l = basicMi9(s);
+    assert.equal(imageOf('commuter'), null);
+    const c = cardOf(s, l);
+    assert.deepEqual([c.image, c.silhouette], [null, 'commuter']);
+    // un render nou es nomes un fitxer a public/aircraft/ i una linia al mapa
+    assert.equal(imageOf('commuter', { commuter: 'mi-9.webp' }), 'aircraft/mi-9.webp');
+    assert.equal(imageOf('nb', { commuter: 'mi-9.webp' }), null);
+    assert.equal(Object.isFrozen(AIRCRAFT_IMAGES), true);
+  });
+
+  test('imageOf prefixa IMAGE_DIR; cada tipus del joc te silueta, i la silueta es una de les sis', () => {
+    assert.equal(IMAGE_DIR, 'aircraft/');
+    assert.deepEqual([...SILHOUETTES], ['commuter', 'turboprop', 'regionalJet', 'narrowbody', 'widebody', 'jumbo']);
+    for (const typeId of Object.keys(BALANCE.fleetTypes)) {
+      assert.ok(SILHOUETTES.includes(silhouetteOf(typeId)), typeId);
+    }
+    assert.deepEqual(Object.keys(BALANCE.usedPrice).sort(), Object.keys(BALANCE.usedPrice).filter(t => SILHOUETTES.includes(silhouetteOf(t))).sort());
+    for (const typeId of Object.keys(AIRCRAFT_IMAGES)) {
+      assert.ok(Object.hasOwn(BALANCE.usedPrice, typeId), 'imatge d un tipus que no existeix: ' + typeId);
+      assert.equal(imageOf(typeId), IMAGE_DIR + AIRCRAFT_IMAGES[typeId]);
+    }
+  });
+
+  test('la silueta segueix la classe: jumbo, widebody, narrowbody, jet regional, turbohelix i commuter', () => {
+    const by = { commuter: 'commuter', tp: 'turboprop', tpShort: 'turboprop', rj: 'regionalJet',
+      nb: 'narrowbody', nbShort: 'narrowbody', nbStretch: 'narrowbody', wb: 'widebody', wbEr: 'widebody', jumbo: 'jumbo' };
+    for (const [typeId, sil] of Object.entries(by)) assert.equal(silhouetteOf(typeId), sil, typeId);
   });
 });
 
