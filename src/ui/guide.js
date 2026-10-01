@@ -21,6 +21,6 @@ export function guideScreen({ onClose }) {
     guideSections().map(sec => el('div', {},
       el('h3', {}, t(sec.titleKey)),
       el('div', { class: 'pa-board' }, sec.rows.map(r =>
-        el('div', { class: 'pa-row' }, el('span', { class: 'pa-code' }, r.term), el('span', {}, t(r.textKey))))))),
+        el('div', { class: 'pa-row' }, el('span', { class: 'pa-code' }, r.term), el('span', {}, t(r.textKey, r.params))))))),
     el('div', { class: 'pa-btns' }, close));
 }

@@ -89,7 +89,7 @@ describe('career/ es pur', () => {
   const files = listJs(CAREER);
 
   test('hi ha fitxers per comprovar', () => {
-    for (const f of ['index.js', 'state.js', 'types.js', 'balance.js']) {
+    for (const f of ['index.js', 'state.js', 'types.js', 'balance.js', 'market.js']) {
       assert.ok(files.includes(join(CAREER, f)), f);
     }
   });

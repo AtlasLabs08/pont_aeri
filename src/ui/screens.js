@@ -7,12 +7,17 @@
  *          opsScreen noticeScreen OPS_TABS
  *
  * INTERFICIE (no la canviis, airline-ui.js en depen):
- *   mainMenuScreen({ onFreeFlight, onAirline })
+ *   mainMenuScreen({ onFreeFlight, onAirline, onSettings? })   onSettings:
+ *     fila d ajustos (X1 del D2+D5), el mateix panell que Esc dins d un vol
  *   nameScreen({ onSubmit(name) -> missatge d error o null, onBack })
  *   schoolScreen(state, { onFly(lessonId), onGuide, onExport, onImport,
  *     onOps, onBack })   onOps nomes si el pilot es graduat
  *   graduationScreen(state, result, { onOpen })   result de graduateCareer()
- *   opsScreen(state, topBarModel, { onSchool, onExport, onImport, onBack })
+ *   opsScreen(state, topBarModel, { onSchool, onExport, onImport, onBack,
+ *     tab?, onTab?, panels? })   tab: pestanya inicial (OPS_TABS[0] si no
+ *     n hi ha); onTab(id) en canviar de pestanya; panels: { id: () =>
+ *     Element } per a les pestanyes que ja existeixen (D2 Fleet, D5
+ *     Market). La resta diuen "Aviat".
  *   noticeScreen({ title, text, tone, buttons: [{ label, primary?, onClick }] })
  *   Totes retornen un Element.
  */
@@ -34,7 +39,7 @@ function clickRow(onClick, ...cells) {
   return el('div', { class: 'pa-row pa-click', role: 'button', tabindex: 0, onclick: act, onkeydown: act }, ...cells);
 }
 
-export function mainMenuScreen({ onFreeFlight, onAirline }) {
+export function mainMenuScreen({ onFreeFlight, onAirline, onSettings }) {
   return el('section', { 'aria-labelledby': 'paMenuTitle' },
     el('h1', { id: 'paMenuTitle' }, t('menu.title')),
     el('p', { class: 'pa-sub' }, t('menu.subtitle')),
@@ -45,7 +50,10 @@ export function mainMenuScreen({ onFreeFlight, onAirline }) {
         el('span', { class: 'pa-status pa-ok' }, t('menu.status.open'))),
       clickRow(onAirline, el('span', { class: 'pa-code' }, t('menu.airline.code')),
         el('span', { class: 'pa-name' }, t('menu.airline'), el('span', { class: 'pa-desc' }, t('menu.airline.desc'))),
-        el('span', { class: 'pa-status pa-warn' }, t('menu.status.boarding')))));
+        el('span', { class: 'pa-status pa-warn' }, t('menu.status.boarding'))),
+      onSettings ? clickRow(onSettings, el('span', { class: 'pa-code' }, t('menu.settings.code')),
+        el('span', { class: 'pa-name' }, t('menu.settings'), el('span', { class: 'pa-desc' }, t('menu.settings.desc'))),
+        el('span', { class: 'pa-status pa-off' }, t('menu.status.ground'))) : null));
 }
 
 export function nameScreen({ onSubmit, onBack }) {
@@ -114,14 +122,18 @@ export function graduationScreen(state, result, { onOpen }) {
     el('div', { class: 'pa-btns' }, button(t('graduation.open'), onOpen, true)));
 }
 
-export function opsScreen(state, model, { onSchool, onExport, onImport, onBack }) {
+export function opsScreen(state, model, { onSchool, onExport, onImport, onBack, tab, onTab, panels = {} }) {
   const panel = el('div', { class: 'pa-tabpanel', role: 'tabpanel' });
   const tabs = OPS_TABS.map(id => el('button', { type: 'button', role: 'tab', 'data-tab': id, onclick: () => select(id) }, t('ops.tab.' + id)));
   function select(id) {
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === id));
-    panel.textContent = t('ops.soon');
+    const live = typeof panels[id] === 'function';
+    panel.className = 'pa-tabpanel' + (live ? ' pa-live' : '');
+    if (live) panel.replaceChildren(panels[id]());
+    else panel.textContent = t('ops.soon');
+    if (onTab) onTab(id);
   }
-  select(OPS_TABS[0]);
+  select(OPS_TABS.includes(tab) ? tab : OPS_TABS[0]);
   return el('div', {},
     topBar(model),
     el('section', { class: 'pa-ops' },

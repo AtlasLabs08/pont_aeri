@@ -9,10 +9,11 @@
  *          pendingCareer entryScreen createAirline acceptBalanceMismatch
  *          startOver recordLesson needsGraduation graduateCareer
  *          exportCareer importCareer saveAirline unlockAllLessons
- *          discardAirline topBarModel _resetAirline
+ *          discardAirline topBarModel updateCareer ensureMarket _resetAirline
  *
  * IMPORTA: career/ (createCareer, recordLessonAttempt, canGraduate, graduate,
- *   exportJson, importJson, nextRank, rankForXp, BALANCE, LESSONS), save.js,
+ *   exportJson, importJson, nextRank, rankForXp, refreshMarket, BALANCE,
+ *   LESSONS), save.js,
  *   bus.js, randomSeed i nowIso de platform/.
  *
  * INTERFICIE (no la canviis, index.html, ui/ i els tests en depenen):
@@ -22,7 +23,9 @@
  *   openAirline() -> { status, backupKey? }   carrega amb loadCareer():
  *     'ok' i 'migrated' deixen la partida a currentCareer(). 'balanceMismatch'
  *     la deixa a pendingCareer() fins que la UI tria acceptBalanceMismatch()
- *     o startOver(). 'invalid' fa backupCareer() de seguida i en retorna la
+ *     o startOver(). Si la partida carregada es graduada i no te mercat (o
+ *     el rellotge ja es d un epoch mes nou), refreshMarket el genera i es
+ *     desa (D2+D5, G11). 'invalid' fa backupCareer() de seguida i en retorna la
  *     clau (null si no s ha pogut): loadCareer no esborra mai res. 'none':
  *     no hi ha partida. Sempre emet 'career:changed' amb la partida en
  *     memoria (o null), perque qui en mostra l estat (panell DEV) s actualitzi.
@@ -46,7 +49,9 @@
  *   needsGraduation(state = currentCareer()) -> canGraduate i no graduat
  *   graduateCareer() -> { rating, xpGained, xp, rank, cash, loan, saved } o null
  *     si no toca (s aplica un sol cop encara que es demani dues vegades).
- *     cash ja inclou el credit inicial; loan = el seu principal.
+ *     cash ja inclou el credit inicial; loan = el seu principal. La partida
+ *     graduada ja porta el primer mercat (refreshMarket, amb l habilitacio
+ *     commuter).
  *   exportCareer() -> text JSON o null
  *   importCareer(text) -> { ok, saved? }   si importJson falla, ok false i
  *     la partida en memoria no canvia.
@@ -58,12 +63,17 @@
  *     { name, rankKey, xp, xpFloor, xpNext, xpProgress, atMaxRank, cash,
  *       reputation, fleetReady, fleetTotal, base }
  *     xpNext null i xpProgress 1 al rang maxim; base = bases[0] o null.
+ *   updateCareer(state) -> boolean   substitueix la partida en memoria,
+ *     emet 'career:changed' i la desa (saveCareer). Per a les operacions
+ *     d altres moduls d app/ (market.js: comprar, vendre, boto DEV).
+ *   ensureMarket() -> boolean   si la partida es graduada, refreshMarket;
+ *     si canvia, updateCareer. true si ha generat una llista nova.
  *   _resetAirline()   nomes per a proves: buida la memoria.
  */
 
 import {
   createCareer, recordLessonAttempt, canGraduate, graduate, exportJson, importJson,
-  nextRank, rankForXp, BALANCE, LESSONS, GRADUATION_RATING
+  nextRank, rankForXp, refreshMarket, BALANCE, LESSONS, GRADUATION_RATING
 } from '../career/index.js';
 import { randomSeed, nowIso } from '../platform/index.js';
 import { loadCareer, saveCareer, backupCareer, discardCareer } from './save.js';
@@ -93,8 +103,13 @@ export function normalizeName(text) {
 export function openAirline() {
   const { status, state } = loadCareer();
   career = null; pending = null;
-  if (status === 'ok' || status === 'migrated') career = state;
-  else if (status === 'balanceMismatch') pending = state;
+  if (status === 'ok' || status === 'migrated') {
+    career = state;
+    if (career.school.graduated) {
+      const fresh = refreshMarket(career);
+      if (fresh !== career) { career = fresh; saveCareer(career); }
+    }
+  } else if (status === 'balanceMismatch') pending = state;
   emit('career:changed', { state: career });
   if (status === 'invalid') return { status, backupKey: backupCareer() };
   return { status };
@@ -149,7 +164,7 @@ export function needsGraduation(state = career) {
 export function graduateCareer() {
   if (!needsGraduation()) return null;
   const before = career.pilot.xp;
-  const saved = set(graduate(career));
+  const saved = set(refreshMarket(graduate(career)));
   return {
     rating: GRADUATION_RATING, xpGained: career.pilot.xp - before, xp: career.pilot.xp,
     rank: career.pilot.rank, cash: career.company.cash,
@@ -180,6 +195,18 @@ export function unlockAllLessons() {
 
 export function discardAirline() {
   return startOver();
+}
+
+export function updateCareer(state) {
+  return set(state);
+}
+
+export function ensureMarket() {
+  if (!career || !career.school.graduated) return false;
+  const fresh = refreshMarket(career);
+  if (fresh === career) return false;
+  set(fresh);
+  return true;
 }
 
 export function topBarModel(state) {
