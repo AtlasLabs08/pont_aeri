@@ -1,7 +1,7 @@
-/* Proves d arrivalEnd (world/ils.js): pista d arribada del vol cronometrat de
- * Free Flight (docs/DECISIONS.md, 2026-10-01, pista d arribada). Cap amb ILS;
- * si n hi ha diversos o cap, el de mes vent de cara; sense vent, el de la
- * pista mes llarga.
+/* Proves d arrivalEnd i flightApproach (world/ils.js): pista d arribada dels
+ * vols de Free Flight (docs/DECISIONS.md, 2026-10-01, H11 i H13). Cap amb
+ * ILS; si n hi ha diversos o cap, el de mes vent de cara; sense vent, el de la
+ * pista mes llarga. Ruta: al desti; inici en final: la de l arrencada.
  *
  * Correr:  npm test
  */
@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, setRunwayDifficulty, makeAirport, arrivalEnd } from '../src/world/index.js';
+import { AIRPORTS, setRunwayDifficulty, makeAirport, arrivalEnd, flightApproach } from '../src/world/index.js';
 
 setRunwayDifficulty('normal');
 
@@ -59,5 +59,35 @@ describe('arrivalEnd', () => {
     assert.equal(arrivalEnd(AIRPORTS.LESU, 200, 10).id, '21');
     assert.equal(arrivalEnd(AIRPORTS.LEBL, 0, 0).id, '07L');
     assert.equal(arrivalEnd(AIRPORTS.LEBL, 250, 12).id, '25R');
+  });
+});
+
+describe('flightApproach (H11, H13)', () => {
+  const base = { mode: 'free', start: 'runway', airport: 'LEBL', dest: 'LERS', runway: 0, windDir: 250, windKt: 0 };
+
+  test('mode route: la pista d arribada del desti, sintonitzada des del principi', () => {
+    const r = flightApproach({ ...base, mode: 'route' });
+    assert.equal(r.A, AIRPORTS.LERS); assert.equal(r.en.id, '25'); assert.equal(r.tuned, true);
+    const s = flightApproach({ ...base, mode: 'route', dest: 'LESU', windDir: 200, windKt: 12 });
+    assert.equal(s.A, AIRPORTS.LESU); assert.equal(s.en.id, '21'); assert.equal(s.tuned, true);
+  });
+
+  test('mode route amb inici en final: mana la ruta (el desti)', () => {
+    const r = flightApproach({ ...base, mode: 'route', start: 'final', runway: 1 });
+    assert.equal(r.A, AIRPORTS.LERS); assert.equal(r.tuned, true);
+  });
+
+  test('inici en final sense ruta: el cap de l arrencada, encara que el vent o l ILS en triessin un altre', () => {
+    for (const [apt, k] of [['LESU', 0], ['LESU', 1], ['LEBL', 3], ['LERS', 0]]) {
+      const r = flightApproach({ ...base, airport: apt, start: 'final', runway: k, windDir: 0, windKt: 30 });
+      assert.equal(r.A, AIRPORTS[apt]); assert.equal(r.en, AIRPORTS[apt].allEnds[k]); assert.equal(r.tuned, true);
+    }
+  });
+
+  test('altres arrencades sense ruta: l aeroport triat, arrivalEnd, sense sintonitzar (auto-sintonia de sempre)', () => {
+    for (const start of ['runway', 'gate']) {
+      const r = flightApproach({ ...base, airport: 'LELL', start, windDir: 120, windKt: 10 });
+      assert.equal(r.A, AIRPORTS.LELL); assert.equal(r.en.id, '13'); assert.equal(r.tuned, false);
+    }
   });
 });

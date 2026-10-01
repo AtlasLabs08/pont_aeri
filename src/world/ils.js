@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd
+ * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd flightApproach
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -33,6 +33,13 @@
  *     diversos, d entre ells, i si no en te cap, d entre tots: el de mes vent
  *     de cara (windDir = d on ve el vent, graus; windKt en nusos); sense vent
  *     (windKt <= 0), el de la pista mes llarga. Empat: el primer d A.allEnds.
+ *   flightApproach({ mode, start, airport, dest, runway, windDir, windKt })
+ *     -> { A, en, tuned }   pista d arribada d un vol de Free Flight (H11) i si
+ *     se n sintonitza l aproximacio des del principi (H13). Els camps son els
+ *     de Game.opts (dest ja resolt: un altre aeroport). mode 'route': el desti,
+ *     arrivalEnd, sintonitzada. Inici 'final' (sense ruta): l aeroport triat,
+ *     el cap de l arrencada (runway), sintonitzada. Altrament: l aeroport
+ *     triat, arrivalEnd, sense sintonitzar (l auto-sintonia de sempre).
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -53,6 +60,13 @@ export function arrivalEnd(A, windDir, windKt) {
   const pool = ils.length ? ils : A.allEnds, calm = !(windKt > 0);
   const score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
   return pool.reduce((best, en) => score(en) > score(best) + 1e-9 ? en : best);
+}
+
+export function flightApproach({ mode, start, airport, dest, runway, windDir, windKt }) {
+  if (mode === 'route') { const A = AIRPORTS[dest]; return { A, en: arrivalEnd(A, windDir, windKt), tuned: true }; }
+  const A = AIRPORTS[airport];
+  if (start === 'final') return { A, en: A.allEnds[(runway || 0) % A.allEnds.length], tuned: true };
+  return { A, en: arrivalEnd(A, windDir, windKt), tuned: false };
 }
 
 export const ILS = {
