@@ -89,7 +89,7 @@ describe('career/ es pur', () => {
   const files = listJs(CAREER);
 
   test('hi ha fitxers per comprovar', () => {
-    for (const f of ['index.js', 'state.js', 'types.js', 'balance.js']) {
+    for (const f of ['index.js', 'state.js', 'types.js', 'balance.js', 'market.js']) {
       assert.ok(files.includes(join(CAREER, f)), f);
     }
   });
@@ -99,6 +99,13 @@ describe('career/ es pur', () => {
       assert.deepEqual(checkFile(path, readFileSync(path, 'utf8')), []);
     });
   }
+});
+
+describe('world/weather.js es pur', () => {
+  test('world/weather.js', () => {
+    const path = join(SRC, 'world', 'weather.js');
+    assert.deepEqual(checkFile(path, readFileSync(path, 'utf8')), []);
+  });
 });
 
 describe('el detector funciona', () => {

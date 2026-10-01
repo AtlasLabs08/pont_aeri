@@ -287,6 +287,23 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
  * @property {{queue:DispatchOrder[]}} dispatch
  * @property {{minute:number}} clock
  * @property {{lessonsPassed:string[], attempts:Object<string,number>, graduated:boolean}} school
+ * @property {Market} [market]       D2+D5. Opcional: si falta, refreshMarket el genera
+ */
+
+/** @typedef {{epoch:number, listings:Listing[]}} Market
+ *   epoch = floor(clock.minute / BALANCE.market.regenMinutes) de quan es va generar */
+
+/**
+ * @typedef {Object} Listing         un anunci del mercat d ocasio (D5)
+ * @property {string} reg            'EC-XXX', unica entre la flota i la llista
+ * @property {string} typeId
+ * @property {'basic'|'standard'|'premium'|'deluxe'} tier
+ * @property {number} yearBuilt
+ * @property {number} hours
+ * @property {number} cycles
+ * @property {{engines:number, gear:number, airframe:number, avionics:number}} condition
+ * @property {{nextAHours:number, nextCHours:number}} maintenance   hores absolutes, com l Airframe
+ * @property {number} price          euros enters (priceOf)
  */
 
 /** @typedef {{name:string, xp:number, rank:string, ratings:string[],
@@ -309,7 +326,8 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
  * @property {number} groundedUntilMinute
  * @property {{nextAHours:number, nextCHours:number, deferred:string[]}} maintenance
  * @property {{purchasePrice:number, loanId:string|null, leaseId:string|null}} finance
- * @property {number} value
+ * @property {number} value          el preu pagat (sense depreciacio de moment)
+ * @property {'basic'|'standard'|'premium'|'deluxe'} [tier]   D2+D5. Opcional: sense, 'standard'
  */
 
 /** @typedef {{id:string, reg:string, from:string, to:string, crewId:string,
@@ -324,6 +342,12 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
 - `reg` és la clau d'un avió, mai l'índex dins de `fleet`.
 - `clock.minute` només el modifica `career/clock.js`.
 - `routesFlown` guarda `'AAAA-BBBB'` amb els dos ICAO en ordre alfabètic.
+- `market` i `Airframe.tier` no pugen `schemaVersion` ni porten migració
+  (D2+D5, `docs/DECISIONS.md` 30/09/2026, G11): `validate` accepta una partida
+  sense mercat i un avió sense categoria. En carregar una partida graduada,
+  `app/` crida `refreshMarket`. L'atzar del mercat surt de
+  `derivedRng(rngSeed, 'market', epoch)` i no toca `rngCounter`. La categoria
+  d'un avió no canvia mai, ni amb el desgast.
 
 ---
 
@@ -366,7 +390,23 @@ export const BALANCE = {
     commuter: 350000, tpShort: 1100000, tp: 1800000, rj: 4500000, nbShort: 6500000,
     nb: 8000000, nbStretch: 10000000, wb: 22000000, wbEr: 25000000, jumbo: 30000000
   },
-  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340 },   // B5: quotes per vol
+  financing: { downPct: 0.30, ratePerFlight: 0.004, termFlights: 340,     // B5: quotes per vol
+               reserveFlights: 10 },        // D2+D5: regla de compra (G6)
+  market: {                                 // D2+D5: mercat d ocasio i categories
+    listings: [8, 12], regenMinutes: 1440,  // un dia de partida
+    mix: { rated: 0.50, next: 0.35, other: 0.15 },
+    tierWeights: { basic: 0.25, standard: 0.35, premium: 0.25, deluxe: 0.15 },
+    tiers: [                                // de pitjor a millor
+      { key: 'basic',    priceFactor: [0.6, 0.8], ageYears: [20, 30], condition: [55, 75],  revenueMult: 0.90, wearMult: 1.25 },
+      { key: 'standard', priceFactor: [0.8, 1.0], ageYears: [12, 22], condition: [70, 88],  revenueMult: 1.00, wearMult: 1.00 },
+      { key: 'premium',  priceFactor: [1.0, 1.2], ageYears: [5, 14],  condition: [85, 96],  revenueMult: 1.08, wearMult: 0.90 },
+      { key: 'deluxe',   priceFactor: [1.2, 1.4], ageYears: [1, 6],   condition: [94, 100], revenueMult: 1.15, wearMult: 0.80 }
+    ],
+    referenceYear: 2026, ageWeight: 0.5,
+    hoursPerYear:  { commuter: 1200, turboprop: 1800, narrowbody: 2600, widebody: 4200 },
+    hoursPerCycle: { commuter: 0.8,  turboprop: 1.0,  narrowbody: 1.5,  widebody: 5.0 },
+    hoursJitter: 0.3, sellFee: 0.10
+  },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
   landingBands: [                           // de dalt a baix; guanya el primer amb score >= min
@@ -496,6 +536,33 @@ export function draw(state) {
   sortir igual encara que el jugador tanqui i obri el joc.
 - Cada `DispatchOrder` desa el seu `rngCounter` en crear-se.
 
+### Contracte de la meteo (`src/world/weather.js`, F3)
+
+```js
+weatherFor({ icao, month, hour, day, seed }) -> {
+  windDirDeg,   // 0-359, d on ve el vent
+  windKt, gustKt,   // enters; gustKt >= windKt
+  visibilityM,  // 50-10000
+  ceilingFt,    // 100-10000, o null = cel net
+  turbulence,   // 0-1
+  pattern,      // clau de WEATHER_PATTERNS, o 'general'
+  severity,     // 0-1: el pitjor entre vent, visibilitat, sostre i turbulencia
+  hard          // severity >= HARD_SEVERITY (0,7)
+}
+toGameWeather(w) -> { windDir, windKt, turb, gustKt, visibilityM, ceilingFt }
+```
+
+- `month` 1-12, `hour` 0-23, `day` enter: els passa qui la crida (el rellotge
+  arriba a l'E1). `weatherFor` no llegeix cap rellotge.
+- Mateixa entrada, mateixa sortida: tot l'atzar surt de `hash2`.
+- Distribucio sobre tots els aeroports, mesos i hores: vent apreciable (>= 12 kt
+  o ratxes >= 18 kt) en un 20 % +-4 punts, `hard` en un 6,7 % +-2.
+- Els patrons locals son una taula de dades (`WEATHER_PATTERNS`): afegir-ne un
+  no toca codi. Els aeroports sense patro fan servir el general.
+- `toGameWeather` passa a les unitats de `Game.opts`: `windDir` 0-350 de 10 en
+  10, `windKt` enter 0-40, `turb` boolea (`turbulence >= 0,35`). `Game` encara no
+  accepta rafegues, visibilitat ni sostre: es retornen com a dades.
+
 ---
 
 ## 8. Persistència
@@ -601,7 +668,14 @@ No forma part de `npm test` (és lent i dona informació, no un sí o un no).
 2. Simula 200 vols. Notes d'aterratge: normal de mitjana 72 i desviació 14,
    truncada a [0, 100] (es torna a tirar fins que cau dins, no es retalla),
    amb un 3 % de cua sota 25.
-3. Aplica les compres òbvies quan hi ha diners.
+3. Aplica les compres òbvies quan hi ha diners, amb la regla de compra del joc
+   (`purchaseRule` i `buyAircraft` de `career/finance.js`, G6 del D2+D5):
+   `cash - entrada >= financing.reserveFlights * Q` (financat) o
+   `cash - preu >= reserveFlights * Q` (al comptat), amb Q la suma de les
+   quotes per vol de tots els préstecs després de la compra, sobre el cash que
+   queda després de pagar l'habilitació. Mode per defecte: el primer avió al
+   comptat i la resta financats, a `usedPrice`, estat 100, `revenueMult` i
+   `wearMult` 1.
 4. Imprimeix: corba de `cash`, vol de cada compra, vols fins a cada rang, % de
    vols en negatiu, ingressos per hora de joc a cada acte.
 
@@ -611,7 +685,16 @@ per a cada mètrica (vol de la primera tripulació, cada salt, % de vols en
 negatiu, durada de cada acte tancat), la mediana i el percentil 90 (rang més
 proper). Un salt o un acte que no arriba dins dels 200 vols compta com a
 infinit. També imprimeix la Corba objectiu amb tots els vols de totes les
-llavors i avalua els criteris.
+llavors, el nombre de llavors on el cash baixa de 0 en algun moment després
+d'una compra i el cash mínim de totes, i avalua els criteris.
+
+`npm run balance -- --tier <basic|standard|premium|deluxe>` (es combina amb
+`--seeds N`): cada compra és d'aquella categoria, **totes financades (també la
+primera)**, amb preu = `usedPrice` × punt mig del `priceFactor` de la
+categoria, estat inicial al punt mig del seu `condition`, i els seus
+`revenueMult` i `wearMult` passats a `computeFlightResult` i
+`applyFlightWear`. `npm run balance -- --tiers` corre el mode per defecte i les
+quatre categories (50 llavors) i imprimeix una taula amb el criteri A i el B.
 
 **Criteris** (criteri robust del B5, vegeu `docs/DECISIONS.md`), sobre 50
 llavors (`npm run balance --seeds 50`):
@@ -621,6 +704,19 @@ llavors (`npm run balance --seeds 50`):
   12 % de vols en negatiu; cap acte de més de 16 hores de joc.
 - Percentil 90: cap salt de més de 60 vols; cap acte de més de 20 hores de joc.
 - Els cinc tipus base dins del ±20 % de la Corba objectiu de `docs/DESIGN.md`.
+- 0 llavors amb cash < 0 després d'una compra (D2+D5). Només al mode per
+  defecte.
+
+**Criteri B** (D2+D5, cap categoria no domina; `npm run balance -- --tiers`),
+per a cada categoria amb `--tier`, respecte de `--tier standard`:
+
+- la mediana de cada salt de classe a ±8 vols de la de standard;
+- el p90 de cada salt com a molt 5 vols per sobre del p90 del mateix salt a
+  standard (els salts limitats pel rang ja toquen els 60 vols amb standard);
+- menys del 12 % de vols en negatiu (mediana).
+
+Les llavors amb cash < 0 i el cash mínim de cada categoria s'imprimeixen com a
+informació, però no formen part de B (`docs/DECISIONS.md`, 30/09/2026).
 
 Una sola llavor no demostra res: l'informe d'una llavor només és orientatiu.
 
@@ -690,10 +786,10 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | Id | Tasca | Depèn de |
 | --- | --- | --- |
 | D1 | Menú principal Free Flight / Airline, shell i barra superior. **Fet** amb C5: capa `src/ui/` (barrel `index.js`, només pinta i crida `app/`), menú de dues portes amb resposta als cinc estats de `loadCareer`, centre d'operacions amb les set pestanyes "Aviat", barra superior de `topBarModel` (E6), exportar i importar (E9) i panell DEV sobre la partida carregada (E10) | C5 |
-| D2 | Fleet | D1, B3 |
-| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol | D2, B2 |
+| D2 | Fleet. **Fet** amb D5 (`docs/DECISIONS.md` 30/09/2026, G1-G12): una fila per avió amb matrícula, model, categoria, any, hores, cicles, els 4 estats, ubicació, status, hores fins a l'A-check i el C-check, préstec (quota per vol i vols que queden, o al comptat) i venda amb confirmació (`sellQuote`/`sellAircraft` de `finance.js`: cotització amb `priceOf` menys `sellFee`, cancel·la el préstec de l'avió, bloquejada si no és `ready` o si cash + net < 0). `app/market.js` (`fleetModel`, `sellAirframe`) i `ui/fleet.js`. Extres: Settings al menú principal (el mateix panell de la pausa) i el valor de la Vref al tip de la lliçó 7 i a la guia (`aircraftSpeeds`, `FlightModel.vspeeds()`). 79 proves noves amb D5, 1636 en total | D1, B3 |
+| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol. **Nota del D2+D5:** en liquidar cada vol, passa a `computeFlightResult` el `revenueMult` de la categoria de l'avió (`tierOf(airframeTier(a)).revenueMult`) i a `applyFlightWear` el seu `wearMult`; tots dos són opcionals i valen 1 per defecte. El lloguer (G1) va amb D3+D4 | D2, B2 |
 | D4 | Briefing i debrief amb compte de resultats | D3, A4 |
-| D5 | Market: mercat d'ocasió amb historial | D2 |
+| D5 | Market: mercat d'ocasió amb historial. **Fet** amb D2: `career/market.js` (`priceOf`, `typeGroups`, `generateMarket` amb garanties per habilitació i pesos de `mix` i `tierWeights`, `refreshMarket` per `clock.minute`), `derivedRng` a `rng.js`, `purchaseRule`/`buyAircraft` a `finance.js` (al comptat o financat, només amb l'habilitació, amb el coixí de `reserveFlights`), categories d'avió (`Airframe.tier`: preu, edat i estat, `revenueMult` a `economy.js` i `wearMult` a `wear.js`). Harness amb la regla de compra, la mètrica de cash < 0, `--tier` i `--tiers` (criteris A i B de §10). `app/market.js` (`marketModel`, `buyListing`, `devNewMarket`), `ui/market.js` (anuncis per classe, filtre per categoria, efectes i desglossament de les dues modalitats) i botó DEV "new market". Sense lloguer (G1) | D2 |
 | D6 | Pilot, Finance, Crew, Map | D1 |
 | D7 | Escena 3D del menú, reaprofitant càmera i escenografia | D1 |
 
@@ -714,7 +810,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | **Fet** per a les fases 1 i 2 amb F2 (`docs/DECISIONS.md`, 01/10/2026, H1-H10); la fase 3 és F1b. LEGE, LERS, LEIB, LEMH, LELL, LEDA i LESU surten de `world/airport-data.js`, generat per `tools/airports-ourairports.mjs` amb les pistes reals d'OurAirports. ILS per cap (`en.ils`, només als caps marcats dels aeroports nous; LEBL i LEPA, tots). Terreny propi (`World._airportShape`): anell pla per aeroport, con del 20 % i passadís d'aproximació de 20 km amb el fons 120 m sota la senda; LEBL i LEPA idèntics. `RUNWAY_SCALE.hard` només a pistes de 2.000 m o més. Escenografia mandrosa (es construeix a menys de 60 km i s'allibera a més de 80 km) i caps sense ILS sense ALS ni marques de zona de toc. Free Flight amb destí lliure (`Game.opts.dest`, `selAlt` segons la distància, text amb distància, rumb i pista d'arribada, `bearingDeg` nova a `world/geo.js`); pista d'arribada amb `arrivalEnd` (`world/ils.js`: el cap amb ILS, o el de més vent de cara, o la pista més llarga), ruta del ND fins al punt FF a 10 nm i al llindar, i ILS d'arribada sintonitzat des de l'enlairament. 126 proves noves (19 a `airport-data.test.js`, 76 a `airports.test.js`, 23 a `terrain-airports.test.js`, 6 a `arrival-end.test.js`, 2 a `geo.test.js`), 1683 en total |
 | F2 | Taxiways i portes procedimentals | **Fet** amb F1, tots menys LEBL i LEPA: `proceduralDef` (`world/airports.js`) posa la plataforma al costat de l'ARP, amb terminal, torre, hangars i portes per mida (petit 3, mitjà 6, gran 10, de `BALANCE.airportSize` via l'script); `makeAirport` genera les taxiways de la pista ja escalada: petit, un connector i es rodola per la pista (tram `backtrack` a la xarxa, no es pinta); mitjà o més, paral·lela amb connectors als dos caps i al mig. `taxiRoute` troba camí de cada porta a cada cap |
 | F1b | Fase 3: LEVC, LEAL, LECH, LFMP | Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i la costa: `COAST.mainland` de `geo.js` acaba a lat 39,95, i el relleu (`World.heightRaw`, abans dins de `heightProc`) tracta com a illa tot el que és a n < −120000, on cauen València, Alacant i Castelló. Després, mateix pipeline: `ORDER` i `EXTRA` de `tools/airports-ourairports.mjs` |
-| F3 | `world/weather.js` amb llavor | Patrons locals i estacionals |
+| F3 | `world/weather.js` amb llavor | **Fet.** `weatherFor` i `toGameWeather`, purs, sense cablejar al joc (contracte a §7). Patrons locals i estacionals com a taula de dades. 14 proves a `test/weather.test.js` i 1 de puresa a `purity.test.js`, 1656 en total |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
 | F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |
 | F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua); taula de flaps pròpia del M-300 (ara passa el harness molt just: 346 de 360 fpm i 1,44 d'1,45 g) i suports de góndola del X-90. A més, el X-90 és massa llarg i prim i té una ala massa gran: cal refer-ne les proporcions de jet regional | Sense dependències |

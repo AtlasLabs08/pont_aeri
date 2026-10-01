@@ -572,6 +572,141 @@ Decisions d en Marc despres de revisar el PR #27.
   backupCareer(). Com discardCareer, si la copia falla i hi havia partida
   desada, no se sobreescriu res i la UI ho diu.
 
+## 2026-09-30 - D2+D5: flota, mercat d'ocasio i categories
+
+Decisions d en Marc per a D2 (Fleet) i D5 (Market).
+
+- G1. Lloguer fora d aquest PR: va amb el D3+D4, quan hi hagi cobrament per
+  vol. A la pestanya Market no surt cap boto de lloguer.
+- G2. Categories. Cada avio te una categoria que l acompanya sempre
+  (Airframe.tier): 'basic', 'standard', 'premium' o 'deluxe'. No es nomes
+  l estat: es tot el paquet d un avio de segona ma real (edat, estat,
+  historial de manteniment i cabina). Efectes, com a dades a
+  BALANCE.market.tiers: preu (tram propi sobre usedPrice, priceFactor), edat
+  i estat inicial (ageYears, condition), ingressos per vol (revenueMult, la
+  cabina) i desgast (wearMult, construccio i historial). La categoria no
+  canvia amb el desgast: un deluxe gastat continua sent deluxe, pero val menys
+  en vendre'l (G9).
+- G3. Preu dins de la categoria, funcio pura priceOf(typeId, tier, ageYears,
+  condition): ageN i condN (mitjana dels 4 sistemes) retallats a [0, 1] dins
+  dels trams de la categoria; score = ageWeight * (1 - ageN) + (1 -
+  ageWeight) * condN; preu = round(usedPrice * lerp(priceFactor, score)).
+- G4. Mercat = { epoch, listings }, epoch = floor(clock.minute /
+  regenMinutes). refreshMarket(state) es pura: genera una llista nova si falta
+  o si l epoch calculat es mes gran que el desat. Mai Date ni hora real: fins
+  a l E1 el rellotge no avanca i el mercat nomes canvia amb el boto DEV. Tot
+  l atzar surt d un flux derivat de (rngSeed, epoch) que no toca rngCounter
+  (derivedRng, afegit a rng.js sense canviar draw). Grups de tipus segons
+  pilot.ratings i l ordre de BALANCE.ratings (rated, next, other), amb el
+  mapa fleetTypes[..].rating. Composicio: primer les garanties (per a cada
+  habilitacio del pilot, un basic i un standard d un tipus d aquella
+  habilitacio, preferint tipus no coberts; despres, un anunci per a cada
+  tipus rated que no en tingui), i despres fins a n amb els pesos de mix i
+  tierWeights. Generacio de cada anunci: edat i estat uniformes dins dels
+  trams, hores i cicles de l edat, revisions A i C que vencen entre 1 hora i
+  un interval sencer, matricula EC- unica, preu de G3.
+- G5. Pagament a triar: financat (BALANCE.financing, 30 % d entrada, prestec
+  amb makeLoan) o al comptat (preu sencer, loanId null).
+- G6. Regla de compra, una sola funcio (purchaseRule de career/finance.js)
+  que criden el joc i el harness. Q = suma de les quotes per vol de tots els
+  prestecs despres de la compra. Financat: cash - entrada >= reserveFlights *
+  Q. Al comptat: cash - preu >= reserveFlights * Q. Retorna el motiu quan no
+  es pot ('cash' o 'reserve').
+- G7. Nomes es pot comprar si pilot.ratings inclou l habilitacio del tipus.
+  Els altres anuncis es veuen amb el boto desactivat i l habilitacio que falta.
+- G8. L avio comprat queda a company.bases[0], 'ready', groundedUntilMinute 0,
+  amb la categoria i els camps de l anunci, finance { purchasePrice, loanId
+  (o null), leaseId: null } i value = preu. L anunci surt de la llista.
+- G9. Venda: nomes status 'ready'. Cotitzacio = round(priceOf(typeId, tier,
+  referenceYear - yearBuilt, estat actual) * (1 - sellFee)). Es cancel.la el
+  capital pendent del prestec de l avio; net = cotitzacio - pendent. Si cash
+  + net < 0, no es pot vendre. Airframe.value es el preu pagat (sense
+  depreciacio de moment).
+- G10. revenueMult (economy.js) i wearMult (wear.js), parametres opcionals que
+  valen 1 per defecte: amb 1 el resultat es identic. El joc aplicara el
+  revenueMult quan liquidi cada vol, al D3+D4.
+- G11. CareerState.market i Airframe.tier son camps nous sense pujar
+  schemaVersion ni migracio (Airline encara no es a main). La validacio
+  accepta una partida sense market (en carregar-la, refreshMarket la genera)
+  i un Airframe sense tier (es tracta com 'standard').
+- G12. Quatre idees noves a docs/BACKLOG.md: especialitzacio dels avions,
+  branques de carrera i millores, superjumbo amb cabina premium i aspecte
+  visual per categoria.
+
+Valors: els de l encarrec, sense cap ajust. BALANCE.market sencer i
+financing.reserveFlights = 10; revenueMult / wearMult: basic 0,90 / 1,25,
+standard 1 / 1, premium 1,08 / 0,90, deluxe 1,15 / 0,80. revenueMult es
+estrictament creixent i wearMult estrictament decreixent (prova a
+balance.test.js).
+
+Harness (decisions validades per en Marc despres de la primera passada):
+
+- Mode per defecte com fins ara: el primer avio es paga al comptat i la
+  resta financats, a usedPrice, estat 100 i multiplicadors 1. La regla de G6
+  s aplica sobre el cash que queda despres de pagar l habilitacio del tipus.
+  Amb reserveFlights 0 la sortida es identica a la d abans del D2+D5; aleshores
+  16 de les 50 llavors baixaven de 0 despres d una compra (minim -1.759.447
+  EUR). Amb R = 10: cap.
+- Als modes --tier totes les compres son financades, tambe la primera (un
+  Mi-9 deluxe, 455.000 EUR, no es pot pagar al comptat amb el capital
+  inicial).
+- Criteri B (substitueix el de l encarrec). Per a cada categoria, respecte de
+  --tier standard: mediana de cada salt a +-8 vols; p90 de cada salt com a
+  molt 5 vols per sobre del p90 del mateix salt a standard (substitueix el
+  limit absolut de 60: els salts limitats pel rang ja hi toquen amb
+  standard; amb basic o deluxe el G-72 es compra en arribar al rang private
+  i el salt fins al M-200 depen de l XP que falta per a commercial, 61 vols
+  al p90 fes el que fes revenueMult); menys del 12 % de vols en negatiu.
+- La condicio de 0 llavors amb cash < 0 es nomes del mode per defecte
+  (criteri A). Als modes --tier les llavors amb cash < 0 i el cash minim
+  s imprimeixen com a informacio, pero no formen part del criteri B. Motiu:
+  la regla de compra evita que comprar deixi el cash en negatiu; el cas de la
+  llavor 20260932 es una cua de tres aterratges molt dolents (notes 19, 22 i
+  24) just despres de comprar el jumbo, igual a totes les categories (tambe
+  a standard), i cap multiplicador no el corregeix.
+
+Resultat final (npm run balance -- --tiers, 50 llavors; salts en vols,
+mediana / p90):
+
+| Mode | Salts | Vols en negatiu | Cash < 0 (llavors) | Criteri |
+| --- | --- | --- | --- | --- |
+| defecte | 51,5/59, 43/49, 43,5/48, 42,5/57 | 4,5 % | 0 | A compleix |
+| basic | 36,5/47, 46,5/61, 39,5/53, 44/63 | 8,5 % | 1 | B compleix |
+| standard | 36,5/47, 46,5/61, 40/53, 44/63 | 4,5 % | 1 | referencia |
+| premium | 36,5/47, 45,5/61, 42/53, 43/57 | 4 % | 0 | B compleix |
+| deluxe | 39/47, 46/61, 47,5/53, 44/58 | 4 % | 0 | B compleix |
+
+Extres del mateix PR:
+
+- X1. Boto Settings al menu principal: obre el mateix panell que Esc dins
+  d un vol (so, grafics, mesclador, controls, guia), sense els botons del
+  vol, i en tancar-lo es torna al menu principal. Sense duplicar HTML ni
+  logica.
+- X2. El tip de la V/S de la llico 7 diu el valor de la Vref, i la guia de
+  consulta te una entrada Vref amb el valor del Mi-9. Tots dos surten de
+  FlightModel.vspeeds() (core/), la mateixa font que el PFD, amb la massa amb
+  que Game.spawn posa l avio (97 kt al Mi-9). El calcul ja era a core/: no ha
+  calgut cap refactor.
+
+## 2026-10-01 - Informe d aterratge: els rebots curts es compten
+
+- Problema. flight-model.js nomes feia touchdown.bounces++ (sense esdeveniment)
+  en un retoc de menys de 2 s despres d un contacte de mes de 0,5 s, i l informe
+  (Game.report.bounces) nomes pujava dins onTouchdown(), que no llegia mai
+  f.touchdown.bounces: els dos comptes eren disjunts i aquests rebots no
+  arribaven a la nota.
+- Solucio. LandingWatch.step compta la vora de pujada de mainWow (nomes rodes
+  principals) amb l informe obert i la retorna a Game ({ touchdown, bounce });
+  Game fa report.bounces++. La vora del pas en que es crea l informe no es
+  compta (w.landed() la marca). onTouchdown ja no incrementa: no es compta dues
+  vegades. flight-model.js i test/snapshot.json no es toquen.
+- Efecte en la nota. Cada rebot curt que abans no es comptava resta 8 punts a
+  l aterratge (el mateix pes que ja tenia scoreReport per rebot). Les notes
+  d aterratge baixen, doncs, 8 punts per cada rebot curt que abans quedava fora.
+
+## 2026-10-01 - F3: meteo procedimental pura, sense cablejar
+world/weather.js (weatherFor, toGameWeather) fa servir nomes hash2: mateixa entrada, mateixa sortida. Distribucio objectiu: vent apreciable un 20 %, condicions dures (severity >= 0,7) un 6,7 %. Els patrons locals son una taula de dades. Game no es toca: encara no accepta rafegues, visibilitat ni sostre, i Game.updateGusts continua amb Math.random.
+
 ## 2026-10-01 - F1+F2: aeroports
 
 Decisions d en Marc per a F1+F2 (aeroports de les fases 1 i 2, amb

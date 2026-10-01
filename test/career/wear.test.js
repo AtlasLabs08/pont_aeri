@@ -235,3 +235,40 @@ describe('performCheck', () => {
     assert.throws(() => performCheck(worn(), 'B'), Error);
   });
 });
+
+describe('applyFlightWear: wearMult (D2+D5, G10)', () => {
+  const hard = record(-700, { touchdown: { fpm: -700, g: 2.0, onRunway: true } });
+
+  test('sense wearMult i amb wearMult 1, resultat identic', () => {
+    for (const r of [record(-150), hard, record(-150, { touchdown: null })]) {
+      assert.deepEqual(applyFlightWear(airframe(), r, 1), applyFlightWear(airframe(), r));
+    }
+  });
+
+  test('multiplica tot l estat que es perd; hores, cicles i cost no canvien', () => {
+    const base = applyFlightWear(airframe(), hard), m = applyFlightWear(airframe(), hard, 1.25);
+    for (const k of ['engines', 'gear', 'airframe', 'avionics']) {
+      // les condicions s arrodoneixen a 1 decimal: tolerancia d una desena
+      const lost = 100 - base.airframe.condition[k];
+      assert.ok(Math.abs((100 - m.airframe.condition[k]) - 1.25 * lost) <= 0.1 + 1e-9, k);
+    }
+    assert.equal(m.airframe.hours, base.airframe.hours);
+    assert.equal(m.airframe.cycles, base.airframe.cycles);
+    assert.equal(m.cycleCost, base.cycleCost);
+    assert.deepEqual(applyFlightWear(airframe(), hard, 0).airframe.condition, airframe().condition);
+  });
+
+  test('valor exacte amb wearMult 0,8: widebody, 14 h i 9 cicles', () => {
+    // flightDay wb 45 min: hours = 14; cycles = round(14 / 1.5) = 9
+    // engines 100 - 0.0075 * 14 * 0.8 = 99.916 -> 99.9; avionics 100 - 0.05 * 14 * 0.8 = 99.44 -> 99.4
+    // airframe 100 - 0.005 * 9 * 0.8 = 99.964 -> 100; gear (fpm 700, g 2.0):
+    //   100 - (0.02 * 9 + 0.01 * 400 + 5 * 0.4) * 0.8 = 100 - 6.18 * 0.8 = 95.056 -> 95.1
+    assert.deepEqual(applyFlightWear(airframe(), hard, 0.8).airframe.condition,
+      { engines: 99.9, gear: 95.1, airframe: 100, avionics: 99.4 });
+  });
+
+  test('llanca si wearMult no es un numero finit >= 0', () => {
+    assert.throws(() => applyFlightWear(airframe(), hard, -1), /wearMult/);
+    assert.throws(() => applyFlightWear(airframe(), hard, Infinity), /wearMult/);
+  });
+});
