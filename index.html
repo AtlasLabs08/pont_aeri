@@ -138,7 +138,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, distanceKm, bearingDeg
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
@@ -1675,7 +1675,7 @@ const Instruments = {
     }
     c.restore();
     if (!nav) return;
-    // F1: en el vol cronometrat l ILS d arribada esta sintonitzat des de l enlairament: nom, curs i distancia sempre; agulles nomes amb senyal
+    // F1 (H13): l aproximacio de la pista d arribada pot estar sintonitzada des de lluny: nom, curs i distancia sempre; agulles nomes amb senyal
     if (nav.locValid) {
       const dia = (x, y, w, h, out) => { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); if (out) { c.strokeStyle = K.mag; c.lineWidth = 2; c.stroke(); } else { c.fillStyle = K.mag; c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); } };
       const dot = (x, y) => { c.beginPath(); c.arc(x, y, 4.5, 0, 6.3); c.stroke(); };
@@ -2117,8 +2117,9 @@ const Game = {
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
     const other = AIRPORTS[this.destOf(O)]; this.dest = O.mode === 'route' ? other : A;
-    // F1: pista d arribada del vol cronometrat (world/ils.js, arrivalEnd): la de l ILS, o la de mes vent de cara, o la mes llarga
-    this.arrEnd = O.mode === 'route' ? arrivalEnd(other, O.windDir, O.windKt) : null;
+    // F1 (H11, H13): pista d arribada (world/ils.js, flightApproach): en ruta, la del desti; a l inici en final, la de l arrencada;
+    // si no, la de l aeroport triat. tuneArr: se n sintonitza l aproximacio (ILS o RNP) des del principi
+    const fa = flightApproach({ ...O, dest: this.destOf(O) }); this.arrA = fa.A; this.arrEnd = fa.en; this.tuneArr = fa.tuned;
     if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
       // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
       // en vol que 'final' (posicionar i trimar amb trimAircraft), amb una altra posicio, altitud,
@@ -2187,8 +2188,8 @@ const Game = {
   msg(t, secs) { UI.toast(t, secs); },
   /** console.error una sola vegada per clau i per vol: un error persistent a Game.step sortiria a 120 Hz */
   logOnce(key, text, err) { const L = this.errLogged || (this.errLogged = {}); if (L[key]) return; L[key] = true; console.error(text, err); },
-  /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
-  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.arrEnd, this.activeEnd); },
+  /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el sintonitzat; si no, la pista d arribada (H11, fora de les llicons); si no, l assignat */
+  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, currentLesson() ? null : this.arrEnd, this.activeEnd); },
   /** camera a l angle per defecte: tecla Home o doble clic amb el boto dret (Input) */
   resetCamera() { if (this.state !== 'flying') return; Cameras.resetView(this.fdm); this.msg(t('camera.reset')); },
   onKey(code) {
@@ -2252,8 +2253,9 @@ const Game = {
     if (this.opts.autoTrim && !this.ap.on) this.autoTrimmer.update(PHYS_DT, f, c, Input.pitch, Input.down('KeyZ', 'KeyX'));
     if (this.ap.on && (Math.abs(Input.pitch) > 0.5 || Math.abs(Input.roll) > 0.5)) { this.ap.disengage(); this.msg('Autopilot disconnected by control input'); }
     // ILS receiver (auto-tuned to the runway you are lined up with) feeds the approach modes and every display
-    // F1: en el vol cronometrat, l ILS de la pista d arribada des de l enlairament (cap, si no en te); fora, l auto-sintonia de sempre
-    if (this.flight && this.flight.mode === 'route') { const T = this.arrEnd, D = this.dest; if (T && T.ils) { this.nav = ILS.nav(D, T, f); this.nav.idx = D.allEnds.indexOf(T); } else this.nav = null; }
+    // F1 (H13): en ruta i a l inici en final de Free Flight, l aproximacio (ILS o RNP) de la pista d arribada des del principi;
+    // fora d aquests casos (i a les llicons), l auto-sintonia de sempre
+    if (this.tuneArr && !currentLesson()) { const T = this.arrEnd, D = this.arrA; this.nav = ILS.nav(D, T, f); this.nav.idx = D.allEnds.indexOf(T); }
     else if (++this.navN % 30 === 1 || !this.nav) this.nav = ILS.update(f, this.nav, this.activeEnd ? { apt: this.airport.icao, id: this.activeEnd.id } : null);
     else { const A = AIRPORTS[this.nav.apt], i = this.nav.idx, en = A && A.allEnds[i]; if (en) { this.nav = ILS.nav(A, en, f); this.nav.idx = i; if (!this.nav.locValid) this.nav = ILS.update(f, null, null); } else this.nav = null; }
     this.ap.nav = this.nav;
