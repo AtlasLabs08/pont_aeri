@@ -571,3 +571,102 @@ Decisions d en Marc despres de revisar el PR #27.
   balanceVersion passa a BALANCE.version i es desa, pero primer
   backupCareer(). Com discardCareer, si la copia falla i hi havia partida
   desada, no se sobreescriu res i la UI ho diu.
+
+## 2026-10-01 - F1+F2: aeroports
+
+Decisions d en Marc per a F1+F2 (aeroports de les fases 1 i 2, amb
+taxiways i portes procedimentals, i desti lliure a Free Flight).
+
+- H1. Abast: fases 1 i 2, que caben a la graella actual: LEGE, LERS, LEIB,
+  LEMH, LELL, LEDA, LESU. La fase 3 (LEVC, LEAL, LECH, LFMP) necessita
+  ampliar la graella i la costa (geo.js acaba a lat 39,95, i el relleu tracta
+  com a illa n < -120000): va a una tasca nova, F1b (seccio 12).
+- H2. Dades. tools/airports-ourairports.mjs baixa runways.csv i airports.csv
+  d OurAirports (davidmegginson/ourairports-data, branca main) i genera
+  src/world/airport-data.js, comitejat, amb la capcalera "generat per
+  tools/airports-ourairports.mjs, no editar a ma". El joc i les proves no fan
+  mai cap peticio de xarxa. Fora les pistes amb closed=1; peus a metres; si
+  falta el rumb, es calcula de les coordenades dels dos llindars; ids amb
+  sufix L/R/C via ids. El que no surt d OurAirports (ILS, noms curts, terreny)
+  es una taula de l script.
+- H3. ILS per cap de pista, camp nou nomes als aeroports nous: LEGE 20, LERS
+  25, LEIB 24, LEMH 01, LEDA 31; LELL i LESU, cap. ils.js nomes sintonitza
+  els caps marcats. LEBL i LEPA es queden com ara (tots els caps amb ILS).
+- H4. Marques i llums segons el cap. Amb ILS: com ara (precisio, ALS de
+  900 m). Sense ILS: llindar, designacio, eix, punt de mira i PAPI, sense ALS
+  ni marques de zona de toc. LEBL i LEPA no canvien.
+- H5. Taxiways, aprons i portes procedimentals (F2), de la pista i de
+  BALANCE.airportSize: plataforma al costat de l eix on cau el punt de
+  referencia (ARP) d airports.csv (si cau sobre l eix, a l esquerra del
+  primer cap); mida petita, un connector de la plataforma a la pista (es
+  rodola per la pista); mitjana o mes, paral.lela amb connectors als dos caps
+  i un al mig; plataforma, terminal, torre i portes al costat triat, portes
+  per mida al fitxer generat (petit 3, mitja 6, gran 10); bounds calculats
+  perque tot hi capiga. Proves: cami de cada porta a cada cap, res fora de
+  bounds, cap solapament amb la pista fora dels connectors, com a minim una
+  porta.
+- H6. Terreny. Radi d aplanament per aeroport (dades) als aeroports nous;
+  LEBL i LEPA amb el mateix terreny d ara. Per a cada cap nou, la senda de
+  3 graus fins a 10 km del llindar passa com a minim 300 ft per sobre del
+  terreny, i el pendent maxim de la transicio de l aeroport al relleu no passa
+  del 25 %. Si el relleu no ho permet, es rebaixa en un passadis d aproximacio
+  sobre l eix allargat.
+- H7. Dificultat: RUNWAY_SCALE.hard nomes a pistes de 2.000 m o mes. Les mes
+  curtes (LESU, LELL) no s escurcen.
+- H8. Rendiment: l escenografia d un aeroport es construeix a menys de 60 km
+  de l avio i s allibera (geometria i materials) a mes de 80 km. Es mesura al
+  Chromium headless abans i despres (descripcio del PR).
+- H9. Free Flight: selector de desti (tots els aeroports menys l origen). El
+  mode route funciona amb qualsevol parell: desti a Game.opts.dest, ruta del
+  ND directa de l origen al desti, selAlt segons la distancia (taula al lloc
+  del valor fix) i text del mode amb la distancia i el rumb calculats. Els
+  best continuen per aeroport.
+- H10. LEBL i LEPA no canvien en res: geometria, fotografia de LEBL,
+  llicons, startingBase, test/threshold.test.js i test/taxi.test.js. No es
+  toca test/snapshot.json.
+
+Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
+
+- LEGE: OurAirports numera la pista 01/19 (rumb veritable 14), no 02/20.
+  Es mante l id de la font (H2) i l ILS va al 19, el mateix cap fisic que el
+  "20" d H3 (aterratge cap a 194). Si es vol 02/20, es un canvi a la taula
+  de l script.
+- world/ no pot importar career/ (seccio 3): la mida surt de
+  BALANCE.airportSize a l script (tools/ si que pot) i queda escrita al
+  fitxer generat (size, layout, gates). Una prova comprova que coincideix.
+- Mides com a dades: small -> petit, regional -> mitja, major i hub -> gran.
+- Aeroports petits: la xarxa de rodatge inclou el tram de pista (backtrack,
+  no es pinta), perque taxiRoute arribi als dos caps rodant per la pista. Al
+  llindar s arriba encarat al reves i cal girar a la capcalera (no hi ha
+  plataforma de gir: BACKLOG).
+- Les taxiways dels aeroports nous es generen a makeAirport a partir de la
+  pista ja escalada (els connectors cauen als caps a qualsevol dificultat);
+  plataforma, portes, edificis i bounds son fixos. La plataforma es centra a
+  l ARP, sense sortir del tram de pista que queda a hard.
+- Terreny dels aeroports nous (world/terrain.js, _airportShape): nomes
+  retalla el relleu natural amb superficies de pendent acotat, aixi el pendent
+  de la transicio queda limitat per construccio: anell pla de flatR m (petit
+  400, mitja 600, gran 800), despres un con del 20 %, i un passadis en V per
+  cap amb el fons 120 m sota la senda i les parets al 20 %. Sense passadis cap
+  dels set compleix la senda (LESU, 1.353 m per sota; LEDA, 248 m; fins i tot
+  LEMH, per 2,6 m): tots en porten. El passadis arriba a 20 km, no a 10,
+  perque l inici en final de Free Flight es a 10 nm i a LESU el relleu hi
+  tornava a passar per sobre de la senda.
+- Prova de la senda: entre el llindar i el punt on la senda es a 300 ft
+  (uns 1,3 km) el terreny no pot passar de l elevacio de l aeroport; d alla a
+  10 km, 300 ft sota la senda. A l eix i a 150 m a cada costat.
+- Prova del pendent: es transicio una parella de punts veins on el terreny
+  difereix del natural (heightRaw) als dos punts: com a molt 25 %. A la vora,
+  la transicio no pot ser mes abrupta que el relleu natural de la mateixa
+  parella. Els pics llunyans que el con retalla (Pirineu a 13 km de LESU) son
+  relleu natural escarpat i no compten com a transicio. El fons del mar no
+  compta.
+- LEBL i LEPA: alcades identiques a 7.442 mostres preses abans del canvi
+  (test/fixtures/terrain-lebl-lepa.json). No es regenera.
+- Ciutat: urbanAt no posa edificis a menys de 150 m del rectangle dels
+  aeroports nous (LELL es dins de Sabadell).
+- Free Flight: dropSpawnOpts no cal tocar-lo. Nomes esborra els camps spawn*
+  que deixa una llico; dest es una opcio de Free Flight com airport, i les
+  llicons no la fan servir. Altitud del vol cronometrat: fins a 80 km, 8.000 /
+  6.000 ft (jet / turbohelix); fins a 150 km, 15.000 / 11.000; fins a 260 km,
+  24.000 / 17.000 (LEBL-LEPA, com abans); mes, 30.000 / 20.000.
