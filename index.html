@@ -140,6 +140,7 @@ import {
   setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd
 } from './src/world/index.js';
 
+import { modelGeom, legTopY, legLength } from './src/core/model-geom.js';
 import { IS_DEV } from './src/platform/index.js';
 import { t } from './src/i18n/index.js';
 import { LESSONS, CONTROL_KEYS, isLessonAvailable } from './src/career/index.js';
@@ -1309,15 +1310,16 @@ const MODEL_GEOM = {   // visual proportions per category (metres / degrees)
   wb:    { taper: 0.20, dihedral: 6,   wingZ: 1.55,  hSpan: 21.5, hChord: 7.0, finH: 9.4,  finChord: 9.5, finSweep: 42, nacR: 1.95, nacL: 7.3, wheelR: 0.67, noseWheelR: 0.52, bogie: 3, winglet: 0 },
   jumbo: { taper: 0.27, dihedral: 7,   wingZ: 1.60,  hSpan: 22.2, hChord: 8.0, finH: 10.2, finChord: 11,  finSweep: 45, nacR: 1.35, nacL: 5.6, wheelR: 0.62, noseWheelR: 0.55, bogie: 2, winglet: 1.8 }
 };
-// F4/F5: els avions nous reaprofiten la geometria del seu avio base, escalada a la seva mida (geometria propia a F6).
+// F4/F5: els avions nous reaprofiten la geometria del seu avio base, escalada a la seva mida. F6: Mi-9 i X-90 tenen geometria propia (src/core/model-geom.js).
 // Empenatge amb la longitud, gondoles, rodes i posicio de l ala amb el radi del fuselatge, winglet amb l envergadura.
-const MODEL_BASE = { commuter: 'tp', tpShort: 'tp', rj: 'nb', nbShort: 'nb', nbStretch: 'nb', wbEr: 'wb' };
+const MODEL_BASE = { tpShort: 'tp', nbShort: 'nb', nbStretch: 'nb', wbEr: 'wb' };
 for (const [id, base] of Object.entries(MODEL_BASE)) {
   const G = MODEL_GEOM[base], m = AIRCRAFT[id].model, mb = AIRCRAFT[base].model;
   const kL = m.length / mb.length, kR = m.fuseR / mb.fuseR, kB = AIRCRAFT[id].geom.b / AIRCRAFT[base].geom.b;
   MODEL_GEOM[id] = { ...G, wingZ: G.wingZ * kR, hSpan: G.hSpan * kL, hChord: G.hChord * kL, finH: G.finH * kL, finChord: G.finChord * kL,
     nacR: G.nacR * kR, nacL: G.nacL * kR, wheelR: G.wheelR * kR, noseWheelR: G.noseWheelR * kR, winglet: G.winglet * kB };
 }
+for (const id of ['commuter', 'rj']) MODEL_GEOM[id] = modelGeom(AIRCRAFT[id]);
 
 const AircraftModel = {
   /** livery texture wrapped around the fuselage: u = nose->tail, v = around (0 belly, .25 right, .5 crown, .75 left) */
@@ -1353,7 +1355,7 @@ const AircraftModel = {
 
   /** body of revolution with nose droop, tail upsweep and (jumbo) upper-deck hump */
   fuselage(cfg) {
-    const M = cfg.model, L = M.length, R = M.fuseR, NS = 56, NR = 28, tn = M.hump ? 0.13 : 0.12, tt = 0.64;
+    const M = cfg.model, G = MODEL_GEOM[cfg.id], L = M.length, R = M.fuseR, NS = 56, NR = 28, tn = M.hump ? 0.13 : (G.noseFrac || 0.12), tt = G.tailStart || 0.64;
     const pos = [], uv = [], idx = [];
     for (let i = 0; i <= NS; i++) {
       let t = i / NS; t = t < 0.5 ? 0.5 * Math.pow(2 * t, 1.6) : 1 - 0.5 * Math.pow(2 * (1 - t), 1.6);     // denser rings at the ends
@@ -1435,6 +1437,7 @@ const AircraftModel = {
     const F = this.surface({ span: G.finH, cr: G.finChord, ct: G.finChord * 0.36, sweepLE: G.finSweep, dihedral: 0, thick: 0.10, boxEnd: 0.68 });
     const fin = new THREE.Group(); fin.position.set(0, finBaseY, finRootZ); fin.rotation.z = Math.PI / 2; body.add(fin); add(new THREE.Mesh(F.geo, mTail), fin);
     parts.rudder = this.tePiece(F, 0.04, 0.96, mTail); fin.add(parts.rudder);
+    if (G.dorsal) { const D = this.surface({ span: G.finH * 0.42, cr: G.finChord * 0.95, ct: G.finChord * 0.12, sweepLE: 62, dihedral: 0, thick: 0.07, boxEnd: 0.99 }); const dm = add(new THREE.Mesh(D.geo, mTail), fin); dm.position.z = -G.finChord * 0.62; dm.position.x = -0.15; }
     const Hs = this.surface({ span: G.hSpan / 2, cr: G.hChord, ct: G.hChord * 0.4, sweepLE: M.sweep > 10 ? M.sweep + 6 : 8, dihedral: M.tail === 'T' ? 0 : 7, thick: 0.10, boxEnd: 0.66 });
     parts.elevators = [];
     for (const side of [1, -1]) { const hg = new THREE.Group(); hg.scale.x = side;
@@ -1451,25 +1454,40 @@ const AircraftModel = {
         const fan = add(new THREE.Mesh(new THREE.CircleGeometry(r * 0.8, 24), mDark), eg); fan.position.z = -l * 0.5 + 0.35; fan.rotation.y = Math.PI;
         const spin = add(new THREE.Mesh(new THREE.ConeGeometry(r * 0.22, r * 0.5, 12), mMetal), eg); spin.rotation.x = -Math.PI / 2; spin.position.z = -l * 0.5 + 0.2;
         const blades = new THREE.Group(); for (let k = 0; k < 9; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(r * 0.75, 0.05, 0.02), mMetal); bl.position.x = r * 0.42; const h = new THREE.Group(); h.rotation.z = k / 9 * 6.283; h.add(bl); blades.add(h); } blades.position.z = -l * 0.5 + 0.3; eg.add(blades);
-        // pylon up to the wing
-        const py = add(new THREE.Mesh(new THREE.BoxGeometry(0.32, r * 0.9 + 0.7, l * 0.85), mNac), eg); py.position.set(0, r * 0.9, l * 0.12);
+        if (G.mount === 'rear') {
+          // rear-fuselage mount: a swept stub from the top-inboard of the nacelle into the side of the fuselage (the inner end sits inside the skin)
+          const dx = -Math.sign(ep[1]) * (Math.abs(ep[1]) - M.fuseR * 0.45), y0 = -r * 0.30, y1 = r * 0.62, yi0 = -r * 0.10, yi1 = r * 0.95, z0 = -l * 0.30, z1 = l * 0.62, zi0 = l * 0.02, zi1 = l * 0.90;
+          const V = [[0, y0, z0], [0, y1, z0], [0, y1, z1], [0, y0, z1], [dx, yi0, zi0], [dx, yi1, zi0], [dx, yi1, zi1], [dx, yi0, zi1]], pos = [];
+          for (const q of [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1], [3, 2, 6], [3, 6, 7], [1, 5, 6], [1, 6, 2], [0, 3, 7], [0, 7, 4]]) for (const i of q) pos.push(...V[i]);
+          const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3)); pg.computeVertexNormals(); add(new THREE.Mesh(pg, mNac), eg);
+        } else {
+          // pylon up to the wing
+          const py = add(new THREE.Mesh(new THREE.BoxGeometry(0.32, r * 0.9 + 0.7, l * 0.85), mNac), eg); py.position.set(0, r * 0.9, l * 0.12);
+        }
         parts.engines.push({ blades, group: eg });
       } else {
         // spinner/blades/disc proportions fixed at the tp category's nacR/nacL (0.62 / 4.6): scale by r,l so smaller/larger airframes keep the same ratio
-        const r = G.nacR, l = G.nacL;
-        const nac = add(new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mNac), eg); nac.scale.set(r, r * 1.05, l * 0.5); nac.position.set(0, -0.4032 * r, 0.2826 * l);
+        const r = G.nacR, l = G.nacL, nBl = G.blades || 6;
+        if (G.mount === 'wing') {
+          // own turboprop nacelle: intake chin, cowl that runs back past the trailing edge of the wing, tapering tail cone with an exhaust stub
+          const prof = [[0.60, -0.22], [0.82, -0.19], [0.97, -0.10], [1.0, 0.0], [1.0, 0.40], [0.90, 0.62], [0.66, 0.84], [0.30, 0.99], [0.0, 1.0]].reverse().map(p => new THREE.Vector2(p[0] * r, -p[1] * l));
+          const nac = add(new THREE.Mesh(new THREE.LatheGeometry(prof, 20), mNac), eg); nac.rotation.x = -Math.PI / 2; nac.scale.y = 1; nac.position.set(0, -r * 0.05, 0);
+          const chin = add(new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mDark), eg); chin.scale.set(r * 0.55, r * 0.30, l * 0.07); chin.position.set(0, -r * 0.78, -l * 0.19);
+          const ex = add(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.10, r * 0.14, r * 0.9, 8), mMetal), eg); ex.rotation.z = Math.PI / 2; ex.position.set(Math.sign(ep[1]) * r * 0.62, -r * 0.18, l * 0.42);
+        } else {
+          const nac = add(new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mNac), eg); nac.scale.set(r, r * 1.05, l * 0.5); nac.position.set(0, -0.4032 * r, 0.2826 * l);
+        }
         const spin = add(new THREE.Mesh(new THREE.ConeGeometry(0.5806 * r, 0.2065 * l, 12), mDark), eg); spin.rotation.x = -Math.PI / 2; spin.position.z = -0.2935 * l;
-        const blades = new THREE.Group(); for (let k = 0; k < 6; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(2.8226 * r, 0.4194 * r, 0.0645 * r), mDark); bl.position.x = 1.6935 * r; bl.rotation.x = 0.5; const h = new THREE.Group(); h.rotation.z = k / 6 * 6.283; h.add(bl); blades.add(h); bl.castShadow = true; }
+        const blades = new THREE.Group(); for (let k = 0; k < nBl; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(2.8226 * r, 0.4194 * r, 0.0645 * r), mDark); bl.position.x = 1.6935 * r; bl.rotation.x = 0.5; const h = new THREE.Group(); h.rotation.z = k / nBl * 6.283; h.add(bl); blades.add(h); bl.castShadow = true; }
         blades.position.z = -0.2609 * l; eg.add(blades);
         const disc = new THREE.Mesh(new THREE.CircleGeometry(3.1452 * r, 28), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })); disc.position.z = -0.2609 * l; eg.add(disc);
         parts.engines.push({ blades, disc, group: eg });
       }
     });
     // ---------- landing gear ----------
-    const gz = cfg.gear.zStatic + cfg.gear.staticDefl;
     const leg = (x, y, isNose) => {
-      const wr = isNose ? G.noseWheelR : G.wheelR, topY = isNose ? -M.fuseR * 0.75 : (M.wing === 'high' ? -M.fuseR * 0.7 : wingY - 0.2), pivot = new THREE.Group(); pivot.position.set(y, topY, -x); body.add(pivot);
-      const slide = new THREE.Group(); pivot.add(slide); const len = gz + topY - wr;        // from pivot down to the axle
+      const wr = isNose ? G.noseWheelR : G.wheelR, topY = legTopY(cfg, G, isNose), pivot = new THREE.Group(); pivot.position.set(y, topY, -x); body.add(pivot);
+      const slide = new THREE.Group(); pivot.add(slide); const len = legLength(cfg, G, isNose);        // from pivot down to the axle
       const st = add(new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.2, wr * 0.24, len, 10), mStrut), slide); st.position.y = -len / 2;
       const ax = isNose ? 1 : G.bogie, wgeo = new THREE.CylinderGeometry(wr, wr, wr * 0.62, 18); wgeo.rotateZ(Math.PI / 2); const wheels = [];
       for (let a = 0; a < ax; a++) for (const s of [1, -1]) { const w = add(new THREE.Mesh(wgeo, mTyre), slide); w.position.set(s * wr * 0.62, -len, (a - (ax - 1) / 2) * wr * 2.35); wheels.push(w); }
