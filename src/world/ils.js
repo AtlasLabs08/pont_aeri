@@ -21,6 +21,11 @@
  *   destinationEnd(A, ...candidats) -> cap de pista de destinacio a A: el
  *     primer candidat que sigui un cap de pista d A (index.html hi passa el
  *     sintonitzat i despres l assignat); si cap ho es, el primer d A.
+ *
+ * ILS per cap (F1, docs/DECISIONS.md, 2026-10-01, H3): nomes els caps amb
+ * en.ils (airports.js) tenen ILS. update() no sintonitza mai els altres i
+ * nav() hi dona el localitzador i la senda sense senyal (locValid fals).
+ * Un cap sense el camp (LEBL, LEPA, la pista sintetica del harness) en te.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -49,7 +54,7 @@ export const ILS = {
   nav(A, en, f) {
     const o = f.out, g = this.geom(A, en, f.e, f.n, f.h - f.cfg.gear.zStatic);
     g.A = A; g.en = en; g.crs = en.hdg * DEG; g.ident = 'ILS ' + en.id; g.apt = A.icao;
-    g.locValid = g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
+    g.locValid = en.ils !== false && g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
     g.gsDev = g.gsAng - this.GS;
     g.gsValid = g.locValid && !f.wow && g.dG > 120 && g.dist < 16 * NM && Math.abs(g.locAng) < 10 * DEG && Math.abs(g.gsDev) < 6 * DEG;
     g.locDots = g.locAng / this.LOC_DOT; g.gsDots = g.gsDev / this.GS_DOT;
@@ -64,6 +69,7 @@ export const ILS = {
     for (const id of AIRPORT_ORDER) {
       const A = AIRPORTS[id]; if (Math.hypot(f.e - A.e, f.n - A.n) > this.RANGE + 6000) continue;
       A.allEnds.forEach((en, i) => {
+        if (en.ils === false) return;
         const g = this.nav(A, en, f); if (!g.locValid || g.hdgDiff > 100 * DEG) return;
         let score = Math.abs(g.locAng) * 3 + g.hdgDiff;
         if (prev && prev.apt === A.icao && prev.idx === i) score -= 0.35;               // hysteresis: keep the tuned ILS
