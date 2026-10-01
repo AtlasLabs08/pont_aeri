@@ -31,20 +31,23 @@ const FT_M = 0.3048;
 const LAYOUT_BY_SIZE = { small: 'small', regional: 'medium', major: 'large', hub: 'large' };
 const GATES_BY_LAYOUT = { small: 3, medium: 6, large: 10 };
 
-/* el que no surt d OurAirports. ils: caps de pista amb ILS (H3). terrain (H6):
- * flatR = radi d aplanament en m al voltant del rectangle de l aeroport;
- * corridor = passadis d aproximacio sobre l eix allargat de cada cap (null si
- * no cal): len = m des del llindar on s acaba, edge = m de transicio lateral */
+/* el que no surt d OurAirports. ils: caps de pista amb ILS (H3). terrain (H6,
+ * world/terrain.js): flatR = amplada en m de l anell pla al voltant del
+ * rectangle de l aeroport (petit 400, mitja 600, gran 800); corridor =
+ * passadis d aproximacio sobre l eix allargat de cada cap (null si no cal):
+ * len = m des del llindar fins on arriba el fons. Sense passadis, cap dels set
+ * compleix la senda (300 ft fins a 10 km): tots en porten. 20 km cobreix l inici
+ * en final de Free Flight (10 nm = 18,5 km); a LESU el relleu hi torna a pujar. */
 const EXTRA = {
   // LEGE: H3 diu "20". OurAirports numera la pista 01/19 (rumb veritable 14): el
   // cap 19 es el mateix cap fisic (aterratge cap a 194). Es manten l id de la font.
-  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['19'], terrain: { flatR: 1500, corridor: null } },
-  LERS: { name: 'Reus', city: 'Reus', ils: ['25'], terrain: { flatR: 1500, corridor: null } },
-  LEIB: { name: 'Eivissa', city: 'Eivissa', ils: ['24'], terrain: { flatR: 1500, corridor: null } },
-  LEMH: { name: 'Menorca', city: 'Maó', ils: ['01'], terrain: { flatR: 1500, corridor: null } },
-  LELL: { name: 'Sabadell', city: 'Sabadell', ils: [], terrain: { flatR: 1500, corridor: null } },
-  LEDA: { name: 'Lleida-Alguaire', city: 'Lleida', ils: ['31'], terrain: { flatR: 1500, corridor: null } },
-  LESU: { name: 'La Seu d\'Urgell', city: 'La Seu d\'Urgell', ils: [], terrain: { flatR: 1500, corridor: null } }
+  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['19'], terrain: { flatR: 600, corridor: { len: 20000 } } },
+  LERS: { name: 'Reus', city: 'Reus', ils: ['25'], terrain: { flatR: 600, corridor: { len: 20000 } } },
+  LEIB: { name: 'Eivissa', city: 'Eivissa', ils: ['24'], terrain: { flatR: 800, corridor: { len: 20000 } } },
+  LEMH: { name: 'Menorca', city: 'Maó', ils: ['01'], terrain: { flatR: 600, corridor: { len: 20000 } } },
+  LELL: { name: 'Sabadell', city: 'Sabadell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } },
+  LEDA: { name: 'Lleida-Alguaire', city: 'Lleida', ils: ['31'], terrain: { flatR: 400, corridor: { len: 20000 } } },
+  LESU: { name: 'La Seu d\'Urgell', city: 'La Seu d\'Urgell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } }
 };
 const ORDER = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
 
