@@ -16,6 +16,8 @@
  * depenen):
  *   en.ils    cada cap de pista: true si te ILS. def.ils (llista d ids) nomes
  *             als aeroports nous; sense def.ils, tots els caps en tenen (H3).
+ *   en.kind   aproximacio del cap (H12): 'ILS' si en.ils, 'RNP' si no. Tots
+ *             els caps en tenen una, amb la mateixa interficie (ILS.nav).
  *   def.terrain  { flatR, corridor } nomes als aeroports nous (H6).
  *   twy.conn  true als trams de taxiway que entren a la pista (connectors).
  *   twy.backtrack  true al tram de rodatge sobre l eix de la pista (aeroports
@@ -62,7 +64,7 @@ export function makeAirport(def, lenK) {
   }
   for (const p of def.aprons) A.paved.push({ a1: p[0], c1: p[2], a2: p[1], c2: p[2], hw: p[3] / 2, kind: 'apron' });
   for (const s of A.paved) { const dx = s.a2 - s.a1, dy = s.c2 - s.c1; s.L = Math.hypot(dx, dy); s.ux = dx / s.L; s.uy = dy / s.L; }
-  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; en.ils = !def.ils || def.ils.includes(en.id); A.allEnds.push(en); }));
+  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; en.ils = !def.ils || def.ils.includes(en.id); en.kind = en.ils ? 'ILS' : 'RNP'; A.allEnds.push(en); }));
   return A;
 }
 /** is the local point (a,c) on pavement? returns the segment (or apron polygon) or null */

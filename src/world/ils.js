@@ -22,10 +22,13 @@
  *     primer candidat que sigui un cap de pista d A (index.html hi passa el
  *     sintonitzat i despres l assignat); si cap ho es, el primer d A.
  *
- * ILS per cap (F1, docs/DECISIONS.md, 2026-10-01, H3): nomes els caps amb
- * en.ils (airports.js) tenen ILS. update() no sintonitza mai els altres i
- * nav() hi dona el localitzador i la senda sense senyal (locValid fals).
- * Un cap sense el camp (LEBL, LEPA, la pista sintetica del harness) en te.
+ * ILS per cap (F1, docs/DECISIONS.md, 2026-10-01, H3 i H12): nomes els caps
+ * amb en.ils (airports.js) tenen ILS; la resta dels aeroports nous tenen una
+ * aproximacio RNP (en.kind) amb la mateixa interficie: nav() hi dona curs i
+ * senda de 3 graus igual, i ident = en.kind + ' ' + id ('ILS 25', 'RNP 21').
+ * update() (l auto-sintonia) nomes sintonitza ILS; una RNP nomes es sintonitza
+ * a proposit (flightApproach, H13). Un cap sense els camps (LEBL, LEPA, la
+ * pista sintetica del harness) es ILS.
  *
  *   arrivalEnd(A, windDir, windKt) -> cap de pista d arribada a A del vol
  *     cronometrat de Free Flight (docs/DECISIONS.md, 2026-10-01, pista
@@ -82,8 +85,8 @@ export const ILS = {
   /** full receiver output for a chosen runway end */
   nav(A, en, f) {
     const o = f.out, g = this.geom(A, en, f.e, f.n, f.h - f.cfg.gear.zStatic);
-    g.A = A; g.en = en; g.crs = en.hdg * DEG; g.ident = 'ILS ' + en.id; g.apt = A.icao;
-    g.locValid = en.ils !== false && g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
+    g.A = A; g.en = en; g.crs = en.hdg * DEG; g.kind = en.kind || 'ILS'; g.ident = g.kind + ' ' + en.id; g.apt = A.icao;
+    g.locValid = g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
     g.gsDev = g.gsAng - this.GS;
     g.gsValid = g.locValid && !f.wow && g.dG > 120 && g.dist < 16 * NM && Math.abs(g.locAng) < 10 * DEG && Math.abs(g.gsDev) < 6 * DEG;
     g.locDots = g.locAng / this.LOC_DOT; g.gsDots = g.gsDev / this.GS_DOT;

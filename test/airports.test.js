@@ -66,10 +66,32 @@ describe('H3: ILS per cap de pista', () => {
     }
   });
 
-  test('ILS.nav en un cap sense ILS: sense senyal', () => {
-    const A = AIRPORTS.LESU, en = A.allEnds[0], g = ILS.nav(A, en, onFinal(A, en, 6));
-    assert.equal(g.locValid, false);
-    assert.equal(g.gsValid, false);
+  test('H12: cada cap te aproximacio: ILS als de H3, RNP a la resta dels aeroports nous', () => {
+    for (const id of NEW) for (const en of AIRPORTS[id].allEnds) assert.equal(en.kind, AIRPORT_DATA[id].ils.includes(en.id) ? 'ILS' : 'RNP', `${id} ${en.id}`);
+    for (const id of ['LEBL', 'LEPA']) for (const en of AIRPORTS[id].allEnds) assert.equal(en.kind, 'ILS', `${id} ${en.id}`);
+    assert.deepEqual(AIRPORTS.LESU.allEnds.map(e => e.kind), ['RNP', 'RNP']);
+    assert.deepEqual(AIRPORTS.LERS.allEnds.map(e => e.id + ' ' + e.kind), ['07 RNP', '25 ILS']);
+  });
+
+  test('H12: una RNP dona curs i senda com un ILS (mateixa interficie): nom, senyal i desviacions', () => {
+    for (const [id, k] of [['LESU', 0], ['LESU', 1], ['LELL', 0], ['LEGE', 0]]) {
+      const A = AIRPORTS[id], en = A.allEnds[k], f = onFinal(A, en, 6), g = ILS.nav(A, en, f);
+      assert.equal(g.kind, 'RNP'); assert.equal(g.ident, 'RNP ' + en.id);
+      assert.ok(g.locValid && g.gsValid, `${id} ${en.id}: sense senyal`);
+      assert.ok(Math.abs(g.locDots) < 1e-6 && Math.abs(g.gsDots) < 0.05, `${id} ${en.id}: fora de l eix o de la senda`);
+      // la mateixa geometria que si fos un ILS
+      const gi = ILS.nav(A, Object.assign(Object.create(Object.getPrototypeOf(en)), en, { kind: 'ILS', ils: true }), f);
+      for (const k2 of ['locAng', 'gsAng', 'hPath', 'dist', 'distThr', 'locDots', 'gsDots']) assert.equal(g[k2], gi[k2], k2);
+    }
+    const A = AIRPORTS.LERS, en = A.allEnds[1], g = ILS.nav(A, en, onFinal(A, en, 6));
+    assert.equal(g.ident, 'ILS 25'); assert.equal(g.kind, 'ILS');
+  });
+
+  test('H12: LEBL i LEPA, el mateix ILS que abans (nom ILS + id, senyal a 6 nm)', () => {
+    for (const id of ['LEBL', 'LEPA']) for (const en of AIRPORTS[id].allEnds) {
+      const g = ILS.nav(AIRPORTS[id], en, onFinal(AIRPORTS[id], en, 6));
+      assert.equal(g.ident, 'ILS ' + en.id); assert.ok(g.locValid && g.gsValid);
+    }
   });
 });
 
