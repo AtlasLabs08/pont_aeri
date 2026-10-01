@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd flightApproach
+ * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd flightApproach finalFix FINAL_FIX_NM
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -43,6 +43,9 @@
  *     arrivalEnd, sintonitzada. Inici 'final' (sense ruta): l aeroport triat,
  *     el cap de l arrencada (runway), sintonitzada. Altrament: l aeroport
  *     triat, arrivalEnd, sense sintonitzar (l auto-sintonia de sempre).
+ *   finalFix(A, en) -> { e, n, a, c, name, h }   punt d aproximacio final
+ *     (H14): FINAL_FIX_NM abans del llindar d en, sobre l eix allargat; nom
+ *     'FF' + designacio ('FF21'); h = alcada de la senda de 3 graus en m MSL.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -70,6 +73,12 @@ export function flightApproach({ mode, start, airport, dest, runway, windDir, wi
   const A = AIRPORTS[airport];
   if (start === 'final') return { A, en: A.allEnds[(runway || 0) % A.allEnds.length], tuned: true };
   return { A, en: arrivalEnd(A, windDir, windKt), tuned: false };
+}
+
+export const FINAL_FIX_NM = 10;
+export function finalFix(A, en) {
+  const d = FINAL_FIX_NM * NM, a = en.thr[0] - en.dir[0] * d, c = en.thr[1] - en.dir[1] * d, w = A.toWorld(a, c);
+  return { e: w[0], n: w[1], a, c, name: 'FF' + en.id, h: A.elev + (d + ILS.GS_S) * Math.tan(ILS.GS) };
 }
 
 export const ILS = {

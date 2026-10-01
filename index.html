@@ -138,7 +138,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, distanceKm, bearingDeg
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, finalFix, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
@@ -1705,6 +1705,12 @@ const Instruments = {
     for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id]; c.strokeStyle = K.white; c.lineWidth = Math.max(2, 50 * sc);
       for (const r of A.runways) { const p1 = A.toWorld(r.p1[0], r.p1[1]), p2 = A.toWorld(r.p2[0], r.p2[1]), a = toS(p1[0], p1[1]), b = toS(p2[0], p2[1]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
       const s = toS(A.e, A.n); this.font(c, 14, true); c.fillStyle = K.cyan; c.textAlign = 'left'; c.fillText(A.icao, s[0] + 10, s[1] + 14); if (rng > 20) { c.strokeStyle = K.cyan; c.lineWidth = 1.5; c.beginPath(); c.arc(s[0], s[1], 7, 0, 6.3); c.stroke(); } }
+    // F1 (H14): arrival runway and final approach fix, always (even when the terrain hides the airport outside)
+    if (S.arrA) { const A = S.arrA, r = S.arrEnd.rw, p1 = A.toWorld(r.p1[0], r.p1[1]), p2 = A.toWorld(r.p2[0], r.p2[1]), a = toS(p1[0], p1[1]), b = toS(p2[0], p2[1]), T = A.toWorld(S.arrEnd.thr[0], S.arrEnd.thr[1]), t = toS(T[0], T[1]);
+      c.strokeStyle = K.green; c.lineWidth = Math.max(4, 60 * sc); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+      this.font(c, 13, true); c.fillStyle = K.green; c.textAlign = 'right'; c.fillText('RW' + S.arrEnd.id, t[0] - 8, t[1] + 4);
+      const F = toS(S.arrFF.e, S.arrFF.n); c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.moveTo(F[0], F[1] - 7); c.lineTo(F[0] + 7, F[1]); c.lineTo(F[0], F[1] + 7); c.lineTo(F[0] - 7, F[1]); c.closePath(); c.stroke();
+      this.font(c, 13, true); c.fillStyle = K.white; c.textAlign = 'left'; c.fillText(S.arrFF.name, F[0] + 10, F[1] - 8); }
     if (S.nav && S.nav.locValid) { const A = AIRPORTS[S.nav.apt], en = A && A.allEnds[S.nav.idx];
       if (en) { const p0 = A.toWorld(en.thr[0], en.thr[1]), p1 = A.toWorld(en.thr[0] - en.dir[0] * 15 * NM, en.thr[1] - en.dir[1] * 15 * NM), a = toS(p0[0], p0[1]), b = toS(p1[0], p1[1]);
         c.strokeStyle = K.mag; c.lineWidth = 1.8; c.setLineDash([12, 8]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
@@ -1727,6 +1733,9 @@ const Instruments = {
     // destinacio: fins al capcal de la pista (world/ils.js, thresholdDistNm), com la resta de vistes
     if (S.dest) { const en = Game.destEnd(S.dest), T = S.dest.toWorld(en.thr[0], en.thr[1]), d = thresholdDistNm(S.dest, en, f.e, f.n), eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.dest.icao, 502, 16); c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 502, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 502, 56);
       const brg = wrap360(Math.atan2(T[0] - f.e, T[1] - f.n) * RAD); c.fillStyle = K.cyan; c.fillText('BRG ' + ('00' + Math.round(brg)).slice(-3), 502, 76); }
+    // F1 (H14): beside the destination, distance and time to the final approach fix
+    if (S.arrA && S.arrFF) { const d = Math.hypot(S.arrFF.e - f.e, S.arrFF.n - f.n) / NM, eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.arrFF.name, 418, 16);
+      c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 418, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 418, 56); }
     c.textAlign = 'left'; c.fillStyle = K.cyan; c.fillText('RNG ' + rng, 10, 498); c.fillStyle = '#8a8f98'; c.fillText(rng / 2, cx + 6, cy - R / 2 - 8);
   },
 
@@ -2168,13 +2177,11 @@ const Game = {
     const ROUTE_ALT = [[80, 8000, 6000], [150, 15000, 11000], [260, 24000, 17000], [Infinity, 30000, 20000]];
     const km = distanceKm(A.lat, A.lon, other.lat, other.lon), ra = ROUTE_ALT.find(r => km <= r[0]);
     this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? (cfg.type === 'jet' ? ra[1] : ra[2]) : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
-    // route for the navigation display (F1): end of the departure runway -> final approach fix 10 nm out on the
-    // extended centreline of the arrival runway (FF + runway) -> arrival threshold
-    if (O.mode === 'route') {
-      const T = this.arrEnd, d0 = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len);
-      const ff = other.toWorld(T.thr[0] - T.dir[0] * 10 * NM, T.thr[1] - T.dir[1] * 10 * NM), thr = other.toWorld(T.thr[0], T.thr[1]);
-      this.route = [{ e: d0[0], n: d0[1], name: A.icao }, { e: ff[0], n: ff[1], name: 'FF' + T.id }, { e: thr[0], n: thr[1], name: 'RW' + T.id }];
-    } else this.route = null;
+    // route for the navigation display (F1, H14): final approach fix 10 nm out on the extended centreline of the arrival
+    // runway (world/ils.js, finalFix) -> arrival threshold; in route mode it starts at the end of the departure runway
+    const T = this.arrEnd, FF = this.arrFF = finalFix(this.arrA, T), thr = this.arrA.toWorld(T.thr[0], T.thr[1]);
+    this.route = [{ e: FF.e, n: FF.n, name: FF.name }, { e: thr[0], n: thr[1], name: 'RW' + T.id }];
+    if (O.mode === 'route') { const d0 = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len); this.route.unshift({ e: d0[0], n: d0[1], name: A.icao }); }
     this.flight = { mode: O.mode, t: 0, started: false, airborne: false, maxAlt: 0, from: A, to: other, done: false, landings: 0 };
     if (O.start === 'final') this.ap.toggleApp();          // on the ILS already: the flight director guides from the first second
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
@@ -2373,7 +2380,7 @@ const Game = {
     else if (this.state === 'menu') { f._airdata(this.env, 0, 0); this.time += dt; }
     const ak = (f.out.ias - this.lastIas) / Math.max(dt * this.timeAccel, 1e-3); this.accelKt += (ak - this.accelKt) * Math.min(1, 2 * dt); this.lastIas = f.out.ias;
   },
-  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: this.route, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
+  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
 };
 
 /* ============================================================================
