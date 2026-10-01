@@ -1,7 +1,9 @@
 /* Proves de finalFix (world/ils.js): punt d aproximacio final del ND (H14,
  * docs/DECISIONS.md, 2026-10-01). A 10 nm del llindar, sobre l eix allargat,
  * amb el nom FF + designacio, i la senda de 3 graus hi passa per sobre del
- * terreny a tots els caps dels aeroports nous (300 ft, el marge d H6).
+ * terreny a tots els caps dels aeroports nous (300 ft, el marge d H6), en
+ * tota la conca del voltant del FF (terrain.corridor.basin): s hi pot girar
+ * per enfilar la pista vingui d on vingui la ruta.
  *
  * Correr:  npm test
  */
@@ -9,7 +11,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, AIRPORT_ORDER, World, ILS, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
+import { AIRPORTS, AIRPORT_ORDER, AIRPORT_DATA, World, ILS, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
 const NEW = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
@@ -42,6 +44,18 @@ describe('finalFix (H14)', () => {
       for (const t of [-500, 0, 500]) {
         const w = A.toWorld(F.a - en.dir[1] * t, F.c + en.dir[0] * t), h = World.heightAt(w[0], w[1]);
         assert.ok(F.h - h >= 300 * 0.3048, `${id} ${en.id} (${t} m): senda ${F.h.toFixed(0)} m, terreny ${h.toFixed(0)} m`);
+      }
+    }
+  });
+
+  for (const id of NEW) test(`${id}: conca del FF: a menys del radi, el terreny queda 300 ft sota la senda al FF`, () => {
+    const A = AIRPORTS[id], R = AIRPORT_DATA[id].terrain.corridor.basin;
+    assert.ok(R >= 3000, 'radi de la conca');
+    for (const en of A.allEnds) {
+      const F = finalFix(A, en);
+      for (let r = 0; r <= R; r += 500) for (let k = 0; k < 16; k++) {
+        const w = A.toWorld(F.a + r * Math.cos(k * Math.PI / 8), F.c + r * Math.sin(k * Math.PI / 8)), h = World.heightAt(w[0], w[1]);
+        assert.ok(F.h - h >= 300 * 0.3048, `${id} ${en.id} a ${r} m del FF: senda ${F.h.toFixed(0)} m, terreny ${h.toFixed(0)} m`);
       }
     }
   });

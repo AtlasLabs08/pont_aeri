@@ -16,17 +16,19 @@
  *     l aeroport a AIRPORT_CONE_SLOPE per metre; i, si terrain.corridor, un
  *     passadis en V sobre l eix allargat de cada cap (fins a corridor.len m)
  *     amb el fons AIRPORT_PATH_MARGIN_M per sota de la senda de 3 graus i les
- *     parets al pendent del con. On cap limit no actua, el relleu es el natural.
+ *     parets al pendent del con, i una conca de corridor.basin m de radi al
+ *     voltant del punt d aproximacio final (finalFix, 10 nm) al mateix marge
+ *     sota la senda al FF. On cap limit no actua, el relleu es el natural.
  *   El passadis es calcula amb la pista real (dificultat normal): el terreny
  *   no canvia amb la dificultat.
  */
 
-import { DEG, clamp, lerp, smoothstep } from '../core/constants.js';
+import { DEG, NM, clamp, lerp, smoothstep } from '../core/constants.js';
 import { vnoise, fbm, ridged } from '../core/noise.js';
 import { SURF } from '../core/flight-model.js';
 import { ll, COAST, RIDGES, VALLEYS, URBAN, ROADS } from './geo.js';
 import { AIRPORTS, AIRPORT_ORDER, airportPavedAt } from './airports.js';
-import { ILS } from './ils.js';
+import { ILS, FINAL_FIX_NM } from './ils.js';
 
 export const AIRPORT_CONE_SLOPE = 0.2;          // pendent maxim del con al voltant d un aeroport nou
 export const AIRPORT_PATH_MARGIN_M = 120;       // el passadis deixa el terreny aquests m per sota de la senda (300 ft = 91,4 m)
@@ -187,6 +189,14 @@ export const World = {
         const out = Math.hypot(Math.max(0, t - wc), s - sc);
         const cap = E + Math.max(0, (sc + ILS.GS_S) * tg - AIRPORT_PATH_MARGIN_M) + AIRPORT_CONE_SLOPE * out;
         if (g > cap) g = cap;
+        // conca al voltant del punt d aproximacio final (H14): a menys de corridor.basin m del FF, el terreny es
+        // com a molt AIRPORT_PATH_MARGIN_M sota la senda al FF, i les parets pugen al pendent del con. Hi cap el gir
+        // per enfilar la pista vingui d on vingui la ruta.
+        if (T.corridor.basin) {
+          const sF = FINAL_FIX_NM * NM, r = Math.hypot(ra + en.dir[0] * sF, rc + en.dir[1] * sF);
+          const capF = E + (sF + ILS.GS_S) * tg - AIRPORT_PATH_MARGIN_M + AIRPORT_CONE_SLOPE * Math.max(0, r - T.corridor.basin);
+          if (g > capF) g = capF;
+        }
       }
     }
     // anell pla de flatR m al voltant del rectangle, i despres el con (amb un genoll suau de CONE_KNEE_M)

@@ -37,15 +37,17 @@ const GATES_BY_LAYOUT = { small: 3, medium: 6, large: 10 };
  * passadis d aproximacio sobre l eix allargat de cada cap (null si no cal):
  * len = m des del llindar fins on arriba el fons. Sense passadis, cap dels set
  * compleix la senda (300 ft fins a 10 km): tots en porten. 20 km cobreix l inici
- * en final de Free Flight (10 nm = 18,5 km); a LESU el relleu hi torna a pujar. */
+ * en final de Free Flight (10 nm = 18,5 km); a LESU el relleu hi torna a pujar.
+ * basin = radi en m de la conca al voltant del punt d aproximacio final (H14):
+ * hi cap el gir per enfilar la pista encara que la ruta hi arribi de costat. */
 const EXTRA = {
-  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['20'], terrain: { flatR: 600, corridor: { len: 20000 } } },
-  LERS: { name: 'Reus', city: 'Reus', ils: ['25'], terrain: { flatR: 600, corridor: { len: 20000 } } },
-  LEIB: { name: 'Eivissa', city: 'Eivissa', ils: ['24'], terrain: { flatR: 800, corridor: { len: 20000 } } },
-  LEMH: { name: 'Menorca', city: 'Maó', ils: ['01'], terrain: { flatR: 600, corridor: { len: 20000 } } },
-  LELL: { name: 'Sabadell', city: 'Sabadell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } },
-  LEDA: { name: 'Lleida-Alguaire', city: 'Lleida', ils: ['31'], terrain: { flatR: 400, corridor: { len: 20000 } } },
-  LESU: { name: 'La Seu d\'Urgell', city: 'La Seu d\'Urgell', ils: [], terrain: { flatR: 400, corridor: { len: 20000 } } }
+  LEGE: { name: 'Girona-Costa Brava', city: 'Girona', ils: ['20'], terrain: { flatR: 600, corridor: { len: 20000, basin: 4000 } } },
+  LERS: { name: 'Reus', city: 'Reus', ils: ['25'], terrain: { flatR: 600, corridor: { len: 20000, basin: 4000 } } },
+  LEIB: { name: 'Eivissa', city: 'Eivissa', ils: ['24'], terrain: { flatR: 800, corridor: { len: 20000, basin: 4000 } } },
+  LEMH: { name: 'Menorca', city: 'Maó', ils: ['01'], terrain: { flatR: 600, corridor: { len: 20000, basin: 4000 } } },
+  LELL: { name: 'Sabadell', city: 'Sabadell', ils: [], terrain: { flatR: 400, corridor: { len: 20000, basin: 4000 } } },
+  LEDA: { name: 'Lleida-Alguaire', city: 'Lleida', ils: ['31'], terrain: { flatR: 400, corridor: { len: 20000, basin: 4000 } } },
+  LESU: { name: 'La Seu d\'Urgell', city: 'La Seu d\'Urgell', ils: [], terrain: { flatR: 400, corridor: { len: 20000, basin: 4000 } } }
 };
 /* excepcions de designacio: nomes els ids dels caps, la geometria continua sortint
  * d OurAirports. Clau: ids d OurAirports 'le/he'; valor: ids reals [le, he].
