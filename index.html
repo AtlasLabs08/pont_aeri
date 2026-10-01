@@ -138,7 +138,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, distanceKm, bearingDeg
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, tailwindKt, MAX_TAILWIND_KT, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { modelGeom, legTopY, legLength } from './src/core/model-geom.js';
@@ -1729,7 +1729,8 @@ const Instruments = {
       this.font(c, 13, true); c.fillStyle = K.green; c.textAlign = 'right'; c.fillText('RW' + S.arrEnd.id, t[0] - 8, t[1] + 4);
       // approach fixes (IF if the route needs it, FF) with the minimum crossing altitude in ft beside the name (H16)
       for (const x of S.arrFixes || [S.arrFF]) { const F = toS(x.e, x.n); c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.moveTo(F[0], F[1] - 7); c.lineTo(F[0] + 7, F[1]); c.lineTo(F[0], F[1] + 7); c.lineTo(F[0] - 7, F[1]); c.closePath(); c.stroke();
-        this.font(c, 13, true); c.fillStyle = K.white; c.textAlign = 'left'; c.fillText(x.name + ' ' + x.minFt, F[0] + 10, F[1] - 8); } }
+        this.font(c, 13, true); c.fillStyle = K.white; c.textAlign = 'left'; c.fillText(x.name + ' ' + x.minFt, F[0] + 10, F[1] - 8); }
+      if (S.arrMea) { const M = toS(S.arrMea.e, S.arrMea.n); this.font(c, 13, true); c.fillStyle = K.white; c.textAlign = 'center'; c.fillText('MEA ' + S.arrMea.ft, M[0], M[1] - 10); } }
     // F1 (H15): tuned approach course (ILS or RNP), cyan and dashed, from the threshold to beyond the final approach fix
     if (S.nav && (S.nav.locValid || S.arrA)) { const A = AIRPORTS[S.nav.apt], en = A && A.allEnds[S.nav.idx];
       if (en) { const p0 = A.toWorld(en.thr[0], en.thr[1]), p1 = A.toWorld(en.thr[0] - en.dir[0] * 15 * NM, en.thr[1] - en.dir[1] * 15 * NM), a = toS(p0[0], p0[1]), b = toS(p1[0], p1[1]);
@@ -2157,7 +2158,8 @@ const Game = {
     // si no, la de l aeroport triat. tuneArr: se n sintonitza l aproximacio (ILS o RNP) des del principi
     const fa = flightApproach({ ...O, dest: this.destOf(O) }); this.arrA = fa.A; this.arrEnd = fa.en; this.tuneArr = fa.tuned; this.arrFixes = null;
     // F1 (H16): en ruta, la pista d arribada ha de tenir una ruta volable (world/route.js): directa al FF o per l IF
-    if (O.mode === 'route') { const R = this.routePlan(O); this.arrEnd = R.plan.en; this.arrFixes = R.plan.fixes;
+    this.arrPlan = null;
+    if (O.mode === 'route') { const R = this.arrPlan = this.routePlan(O); this.arrEnd = R.plan.en; this.arrFixes = R.plan.fixes;
       if (R.plan.fallback && IS_DEV) console.warn(`[DEV] ${R.B.icao}: cap cap volable des de ${A.icao} a ${R.cruiseFt} ft; ${R.plan.en.id}, el de mes vent de cara`); }
     if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
       // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
@@ -2203,14 +2205,17 @@ const Game = {
       f.reset({ onGround: true, n: p[1], e: p[0], hdg, groundH: A.elev, flaps: ctl.flaps }); ctl.trim = clamp(tr.trim, -1, 1); ctl.parkBrake = true;
     }
     this.autoTrimmer = new AutoTrim(); this.nav = null; this.navN = 0; this._apWas = false; Sound.reset();
-    this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? this.cruiseFt(O.aircraft, A, other) : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
+    this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? this.arrPlan.plan.cruiseFt : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
     // route for the navigation display (F1, H14, H16): [intermediate fix 20 nm out ->] final approach fix 10 nm out on the
     // extended centreline of the arrival runway (world/route.js, approachFix) -> arrival threshold; in route mode it starts
     // at the end of the departure runway
     const T = this.arrEnd, fixes = this.arrFixes || [approachFix(this.arrA, T, 10, 'FF')], thr = this.arrA.toWorld(T.thr[0], T.thr[1]);
     this.arrFixes = fixes; this.arrFF = fixes[fixes.length - 1];
     this.route = [...fixes.map(x => ({ e: x.e, n: x.n, name: x.name })), { e: thr[0], n: thr[1], name: 'RW' + T.id }];
-    if (O.mode === 'route') { const d0 = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len); this.route.unshift({ e: d0[0], n: d0[1], name: A.icao }); }
+    this.arrMea = null;
+    if (O.mode === 'route') { const d0 = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len); this.route.unshift({ e: d0[0], n: d0[1], name: A.icao });
+      // H17b: al mig del primer tram, la MEA si passa del creuer de la taula
+      const P = this.arrPlan; if (P.plan.meaFt > P.cruiseFt) this.arrMea = { e: (d0[0] + fixes[0].e) / 2, n: (d0[1] + fixes[0].n) / 2, ft: P.plan.meaFt }; }
     this.flight = { mode: O.mode, t: 0, started: false, airborne: false, maxAlt: 0, from: A, to: other, done: false, landings: 0 };
     if (O.start === 'final') this.ap.toggleApp();          // on the ILS already: the flight director guides from the first second
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
@@ -2227,8 +2232,9 @@ const Game = {
   routePlan(O) {
     const A = AIRPORTS[O.airport], B = AIRPORTS[this.destOf(O)], dep = A.allEnds[O.runway % A.allEnds.length], cruiseFt = this.cruiseFt(O.aircraft, A, B);
     const p = A.toWorld(dep.thr[0] + dep.dir[0] * dep.rw.len, dep.thr[1] + dep.dir[1] * dep.rw.len), origin = { e: p[0], n: p[1] };
-    if (!World.ready) { const en = arrivalEnd(B, O.windDir, O.windKt); return { B, origin, cruiseFt, plan: { en, fixes: [approachFix(B, en, 10, 'FF')], usesIF: false, fallback: false } }; }
-    return { B, origin, cruiseFt, plan: planArrival({ origin, cruiseM: cruiseFt * FT, A: B, windDir: O.windDir, windKt: O.windKt }) };
+    if (!World.ready) { const en = arrivalEnd(B, O.windDir, O.windKt); return { B, origin, cruiseFt, plan: { en, fixes: [approachFix(B, en, 10, 'FF')], usesIF: false, fallback: false, meaFt: 0, cruiseFt, tailwindKt: tailwindKt(en, O.windDir, O.windKt) } }; }
+    // H17: el primer tram es vola a max(creuer de la taula, MEA); un cap nomes cau si la MEA passa del sostre de l avio
+    return { B, origin, cruiseFt, plan: planArrival({ origin, cruiseFt, ceilingFt: AIRCRAFT[O.aircraft].limits.ceiling, A: B, windDir: O.windDir, windKt: O.windKt }) };
   },
   destOf(O) { return O.dest && O.dest !== O.airport && AIRPORTS[O.dest] ? O.dest : (O.airport === 'LEBL' ? 'LEPA' : 'LEBL'); },
   msg(t, secs) { UI.toast(t, secs); },
@@ -2419,7 +2425,7 @@ const Game = {
     else if (this.state === 'menu') { f._airdata(this.env, 0, 0); this.time += dt; }
     const ak = (f.out.ias - this.lastIas) / Math.max(dt * this.timeAccel, 1e-3); this.accelKt += (ak - this.accelKt) * Math.min(1, 2 * dt); this.lastIas = f.out.ias;
   },
-  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
+  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, arrMea: currentLesson() ? null : this.arrMea, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
 };
 
 /* ============================================================================
@@ -2934,8 +2940,9 @@ const UI = {
   modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[Game.destOf(O)];
     // F1 (H9): distancia i rumb de les coordenades reals (distanceKm, bearingDeg), no el text fix de LEBL-LEPA
     const nm = Math.round(distanceKm(a.lat, a.lon, b.lat, b.lon) * 1000 / NM), hdg = ('00' + Math.round(bearingDeg(a.lat, a.lon, b.lat, b.lon)) % 360).slice(-3);
-    const rwy = b.icao + ' ' + Game.routePlan(O).plan.en.id;       // F1 (H16): la pista d arribada volable
-    this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy }) : 'No objectives. Every landing on a runway is still scored.'; },
+    // F1 (H16, H17): la pista d arribada volable, l altitud de creuer que toca i l avis de vent de cua
+    const P = Game.routePlan(O).plan, rwy = b.icao + ' ' + P.en.id, alt = P.cruiseFt, tw = Math.round(P.tailwindKt);
+    this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy, alt }) + (P.tailwindKt > MAX_TAILWIND_KT ? ' ' + t('freeFlight.tailwind', { kt: tw }) : '') : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
