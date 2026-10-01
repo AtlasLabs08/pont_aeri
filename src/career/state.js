@@ -17,6 +17,11 @@
  *   exportJson(state)        -> text, o null si no es serialitzable
  *   importJson(text)         -> CareerState o null (passa per migrate)
  *
+ * Camps opcionals sense pujar SCHEMA_VERSION (D2+D5, docs/DECISIONS.md
+ * 30/09/2026, G11): market ({ epoch, listings }, el genera refreshMarket de
+ * market.js en carregar la partida si falta) i Airframe.tier (sense, es
+ * tracta com 'standard'). Si hi son, es validen.
+ *
  * Per afegir una versio d esquema: puja SCHEMA_VERSION i afegeix a MIGRATIONS
  * la funcio que passa de la versio anterior a la nova. migrate() les encadena.
  */
@@ -33,6 +38,8 @@ const REPUTATION_MAX = 100;
 const STARTING_RANK = 'student';
 
 const AIRFRAME_STATUS = ['ready', 'maintenance', 'dispatched', 'inFlight'];
+const CONDITION_KEYS = ['engines', 'gear', 'airframe', 'avionics'];
+const TIER_KEYS = BALANCE.market.tiers.map(t => t.key);
 const ICAO_RE = /^[A-Z0-9]{4}$/;
 const ROUTE_RE = /^([A-Z0-9]{4})-([A-Z0-9]{4})$/;
 
@@ -176,6 +183,34 @@ function checkState(s, err) {
     need(err, 'school.attempts', sc.attempts, v => isObject(v) && Object.values(v).every(isNatural));
     need(err, 'school.graduated', sc.graduated, isBoolean);
   }
+
+  // opcional (G11): una partida sense mercat es valida
+  if (s.market !== undefined) checkMarket(s.market, err);
+}
+
+function checkMarket(m, err) {
+  if (!isObject(m)) { err.push('market: no es un objecte'); return; }
+  need(err, 'market.epoch', m.epoch, isNatural);
+  if (!Array.isArray(m.listings)) { err.push('market.listings: no es una llista'); return; }
+  const seen = new Set();
+  m.listings.forEach((l, i) => {
+    const at = 'market.listings[' + i + ']';
+    if (!isObject(l)) { err.push(at + ': no es un objecte'); return; }
+    need(err, at + '.reg', l.reg, isNonEmptyString);
+    if (isNonEmptyString(l.reg)) {
+      if (seen.has(l.reg)) err.push(at + '.reg: matricula repetida ' + l.reg);
+      seen.add(l.reg);
+    }
+    need(err, at + '.typeId', l.typeId, isNonEmptyString);
+    need(err, at + '.tier', l.tier, isTier);
+    need(err, at + '.yearBuilt', l.yearBuilt, Number.isInteger);
+    need(err, at + '.hours', l.hours, isNonNegative);
+    need(err, at + '.cycles', l.cycles, isNatural);
+    need(err, at + '.condition', l.condition, isCondition);
+    need(err, at + '.maintenance', l.maintenance, v => isObject(v) &&
+      isNonNegative(v.nextAHours) && isNonNegative(v.nextCHours));
+    need(err, at + '.price', l.price, isNatural, 'ha de ser un enter d euros no negatiu');
+  });
 }
 
 function checkAirframe(a, at, err) {
@@ -185,8 +220,7 @@ function checkAirframe(a, at, err) {
   need(err, at + '.yearBuilt', a.yearBuilt, Number.isInteger);
   need(err, at + '.hours', a.hours, isNonNegative);
   need(err, at + '.cycles', a.cycles, isNatural);
-  need(err, at + '.condition', a.condition, v => isObject(v) &&
-    ['engines', 'gear', 'airframe', 'avionics'].every(k => isFiniteNumber(v[k])));
+  need(err, at + '.condition', a.condition, isCondition);
   need(err, at + '.location', a.location, isIcao);
   need(err, at + '.status', a.status, v => AIRFRAME_STATUS.includes(v));
   need(err, at + '.groundedUntilMinute', a.groundedUntilMinute, isNatural);
@@ -195,6 +229,8 @@ function checkAirframe(a, at, err) {
   need(err, at + '.finance', a.finance, v => isObject(v) &&
     Number.isInteger(v.purchasePrice) && isStringOrNull(v.loanId) && isStringOrNull(v.leaseId));
   need(err, at + '.value', a.value, Number.isInteger, 'ha de ser un enter d euros');
+  // opcional (G11): sense tier, l avio es tracta com 'standard'
+  if (a.tier !== undefined) need(err, at + '.tier', a.tier, isTier);
 }
 
 function checkOrder(o, at, err) {
@@ -226,6 +262,8 @@ function isStringArray(v) { return Array.isArray(v) && v.every(isString); }
 function isObjectArray(v) { return Array.isArray(v) && v.every(isObject); }
 function isIcao(v) { return typeof v === 'string' && ICAO_RE.test(v); }
 function isIcaoArray(v) { return Array.isArray(v) && v.every(isIcao); }
+function isTier(v) { return TIER_KEYS.includes(v); }
+function isCondition(v) { return isObject(v) && CONDITION_KEYS.every(k => isFiniteNumber(v[k])); }
 
 /** 'AAAA-BBBB' amb A <= B. Mateix aeroport als dos costats es valid (circuit). */
 function isRouteKey(v) {

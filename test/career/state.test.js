@@ -271,3 +271,58 @@ describe('exportJson i importJson', () => {
     }
   });
 });
+
+describe('validate: mercat i categoria (D2+D5, G11)', () => {
+  function listing(reg, extra) {
+    return {
+      reg, typeId: 'commuter', tier: 'basic', yearBuilt: 2001, hours: 30000, cycles: 37500,
+      condition: { engines: 60, gear: 70, airframe: 65, avionics: 58 },
+      maintenance: { nextAHours: 30200, nextCHours: 33000 }, price: 240000, ...extra
+    };
+  }
+
+  test('una partida sense market es valida', () => {
+    const s = fullCareer();
+    assert.equal(s.market, undefined);
+    assert.deepEqual(validate(s), { ok: true, errors: [] });
+  });
+
+  test('un Airframe sense tier es valid; amb tier, nomes una categoria de BALANCE.market.tiers', () => {
+    const s = fullCareer();
+    assert.equal(s.fleet[0].tier, undefined);
+    assert.equal(validate(s).ok, true);
+    for (const t of BALANCE.market.tiers) {
+      s.fleet[0].tier = t.key;
+      assert.equal(validate(s).ok, true, t.key);
+    }
+    s.fleet[0].tier = 'gold';
+    assert.match(errorsOf(s), /fleet\[0\]\.tier/);
+  });
+
+  test('un market ben format es valid, i passa per migrate i importJson', () => {
+    const s = fullCareer();
+    s.market = { epoch: 3, listings: [listing('EC-KAA'), listing('EC-KAB', { tier: 'deluxe', typeId: 'nb' })] };
+    assert.deepEqual(validate(s), { ok: true, errors: [] });
+    assert.deepEqual(importJson(exportJson(s)), s);
+  });
+
+  test('camps del market i dels anuncis', () => {
+    const cases = [
+      [s => { s.market = []; }, /market: no es un objecte/],
+      [s => { s.market.epoch = -1; }, /market\.epoch/],
+      [s => { s.market.listings = {}; }, /market\.listings/],
+      [s => { s.market.listings[0].tier = 'gold'; }, /market\.listings\[0\]\.tier/],
+      [s => { s.market.listings[0].price = 1.5; }, /market\.listings\[0\]\.price/],
+      [s => { delete s.market.listings[0].condition.engines; }, /market\.listings\[0\]\.condition/],
+      [s => { s.market.listings[0].maintenance = { nextAHours: 1 }; }, /market\.listings\[0\]\.maintenance/],
+      [s => { s.market.listings[1].reg = 'EC-KAA'; }, /matricula repetida EC-KAA/]
+    ];
+    for (const [mutate, re] of cases) {
+      const s = fullCareer();
+      s.market = { epoch: 0, listings: [listing('EC-KAA'), listing('EC-KAB')] };
+      mutate(s);
+      assert.equal(validate(s).ok, false, re.source);
+      assert.match(errorsOf(s), re);
+    }
+  });
+});

@@ -31,7 +31,12 @@
  *                        CONTROL_KEYS }: el parametre val la primera tecla
  *                        del comandament (app/lesson-run.js, LessonRun.tips);
  *                        params, valors numerics presos d altres dades
- *                        d aquest fitxer (mai escrits al text i18n).
+ *                        d aquest fitxer (mai escrits al text i18n);
+ *                        speeds es { parametre: velocitat de
+ *                        FlightModel.vspeeds() }: el parametre val aquella
+ *                        velocitat, en nusos, per a l avio de la llico
+ *                        (aircraftSpeeds d app/lesson-run.js, la mateixa
+ *                        font que el PFD).
  *       taxi            (llico 'taxi') { maxDistToThrM, maxLatOffsetM,
  *                        maxGroundKt, rerouteM }: els tres primers son els
  *                        llindars de reachedThreshold; rerouteM, metres que
@@ -173,7 +178,7 @@ export const LESSONS = [
     aids: { flareBar: false, autoDebrief: true },
     // final curt: alineat, a la senda i en configuracio d aterratge; tot va de l arrodoniment
     spawn: { distNm: 3 },
-    tips: [{ key: 'school.tip.verticalSpeed' }] },
+    tips: [{ key: 'school.tip.verticalSpeed', speeds: { vref: 'vref' } }] },
   { id: 'ils', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.ils.title', goalKey: 'school.lesson.ils.goal',
     criteria: [{ metric: 'ilsFlown', op: 'eq', value: true },

@@ -10,9 +10,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { GUIDE, guideSections } from '../../src/app/guide.js';
-import { keyLabel } from '../../src/app/lesson-run.js';
+import { keyLabel, aircraftSpeeds } from '../../src/app/lesson-run.js';
 import { CONTROL_KEYS } from '../../src/career/index.js';
-import { setLang } from '../../src/i18n/index.js';
+import { setLang, t } from '../../src/i18n/index.js';
 import en from '../../src/i18n/en.js';
 import ca from '../../src/i18n/ca.js';
 
@@ -98,5 +98,18 @@ describe('guia de consulta: textos', () => {
 
   test('la guia es nomes consulta: cap seccio no te criteris', () => {
     for (const s of GUIDE) assert.deepEqual(Object.keys(s).sort(), ['id', 'items', 'kind']);
+  });
+});
+
+describe('entrada Vref (X2 del D2+D5)', () => {
+  test('a la seccio del HUD, amb la Vref del Mi-9 de la mateixa font que el PFD', () => {
+    const row = guideSections().find(s => s.id === 'hud').rows.find(r => r.textKey === 'guide.hud.vref.text');
+    assert.ok(row);
+    assert.equal(row.term, 'Vref');
+    assert.deepEqual(row.params, { vref: aircraftSpeeds('commuter').vref });
+    assert.match(t(row.textKey, row.params), new RegExp('threshold with landing flaps\\. Migjorn Mi-9: ' + row.params.vref + ' kt\\.'));
+    setLang('ca');
+    assert.match(t(row.textKey, row.params), new RegExp('llindar de la pista amb els flaps d\'aterratge\\. Migjorn Mi-9: ' + row.params.vref + ' kt\\.'));
+    setLang('en');
   });
 });
