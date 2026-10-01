@@ -124,7 +124,7 @@ export default {
   'school.flareBar': 'Sink {sink} / target {target} fpm',
   'freeFlight.dest': 'Destination',
   'freeFlight.mode.route': 'Timed flight to a destination',
-  'freeFlight.routeNote': 'Timed flight {from} to {to}: {nm} nm on a heading near {hdg}°. The summary appears once you have landed and slowed down at {to}.',
+  'freeFlight.routeNote': 'Timed flight {from} to {to}, arrival runway {rwy}: {nm} nm on a heading near {hdg}°. The summary appears once you have landed and slowed down at {to}.',
   'camera.reset': 'Camera back to the default angle',
   'menu.title': 'Pont Aeri',
   'menu.subtitle': 'Departures',

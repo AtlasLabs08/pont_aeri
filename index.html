@@ -138,7 +138,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, distanceKm, bearingDeg
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
@@ -1674,14 +1674,17 @@ const Instruments = {
       bars(); c.strokeStyle = K.mag; c.lineWidth = 3; bars();
     }
     c.restore();
-    if (!nav || !nav.locValid) return;
-    const dia = (x, y, w, h, out) => { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); if (out) { c.strokeStyle = K.mag; c.lineWidth = 2; c.stroke(); } else { c.fillStyle = K.mag; c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); } };
-    const dot = (x, y) => { c.beginPath(); c.arc(x, y, 4.5, 0, 6.3); c.stroke(); };
-    c.strokeStyle = K.white; c.lineWidth = 2; const ly = cy + 124, D = 38;
-    for (const k of [-2, -1, 1, 2]) dot(cx + k * D, ly); c.fillStyle = K.white; c.fillRect(cx - 1, ly - 9, 2, 18);
-    dia(cx + clamp(nav.locDots, -2.3, 2.3) * D, ly, 11, 8, Math.abs(nav.locDots) > 2.3);
-    if (nav.gsValid) { const gx = cx + 116; c.strokeStyle = K.white; c.lineWidth = 2; for (const k of [-2, -1, 1, 2]) dot(gx, cy + k * D); c.fillStyle = K.white; c.fillRect(gx - 9, cy - 1, 18, 2);
-      dia(gx, cy + clamp(nav.gsDots, -2.3, 2.3) * D, 8, 11, Math.abs(nav.gsDots) > 2.3); }
+    if (!nav) return;
+    // F1: en el vol cronometrat l ILS d arribada esta sintonitzat des de l enlairament: nom, curs i distancia sempre; agulles nomes amb senyal
+    if (nav.locValid) {
+      const dia = (x, y, w, h, out) => { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); if (out) { c.strokeStyle = K.mag; c.lineWidth = 2; c.stroke(); } else { c.fillStyle = K.mag; c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); } };
+      const dot = (x, y) => { c.beginPath(); c.arc(x, y, 4.5, 0, 6.3); c.stroke(); };
+      c.strokeStyle = K.white; c.lineWidth = 2; const ly = cy + 124, D = 38;
+      for (const k of [-2, -1, 1, 2]) dot(cx + k * D, ly); c.fillStyle = K.white; c.fillRect(cx - 1, ly - 9, 2, 18);
+      dia(cx + clamp(nav.locDots, -2.3, 2.3) * D, ly, 11, 8, Math.abs(nav.locDots) > 2.3);
+      if (nav.gsValid) { const gx = cx + 116; c.strokeStyle = K.white; c.lineWidth = 2; for (const k of [-2, -1, 1, 2]) dot(gx, cy + k * D); c.fillStyle = K.white; c.fillRect(gx - 9, cy - 1, 18, 2);
+        dia(gx, cy + clamp(nav.gsDots, -2.3, 2.3) * D, 8, 11, Math.abs(nav.gsDots) > 2.3); }
+    }
     this.font(c, 15, true); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = K.mag; c.fillText(nav.ident, 6, 452);
     this.font(c, 14); c.fillStyle = K.white; c.fillText('CRS ' + ('00' + Math.round(nav.en.hdg)).slice(-3), 6, 472); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', 6, 492);
   },
@@ -2111,6 +2114,8 @@ const Game = {
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
     const other = AIRPORTS[this.destOf(O)]; this.dest = O.mode === 'route' ? other : A;
+    // F1: pista d arribada del vol cronometrat (world/ils.js, arrivalEnd): la de l ILS, o la de mes vent de cara, o la mes llarga
+    this.arrEnd = O.mode === 'route' ? arrivalEnd(other, O.windDir, O.windKt) : null;
     if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
       // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
       // en vol que 'final' (posicionar i trimar amb trimAircraft), amb una altra posicio, altitud,
@@ -2159,8 +2164,13 @@ const Game = {
     const ROUTE_ALT = [[80, 8000, 6000], [150, 15000, 11000], [260, 24000, 17000], [Infinity, 30000, 20000]];
     const km = distanceKm(A.lat, A.lon, other.lat, other.lon), ra = ROUTE_ALT.find(r => km <= r[0]);
     this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? (cfg.type === 'jet' ? ra[1] : ra[2]) : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
-    // route for the navigation display: direct from the origin to the destination (F1, H9)
-    this.route = O.mode === 'route' ? [{ e: A.e, n: A.n, name: A.icao }, { e: other.e, n: other.n, name: other.icao }] : null;
+    // route for the navigation display (F1): end of the departure runway -> final approach fix 10 nm out on the
+    // extended centreline of the arrival runway (FF + runway) -> arrival threshold
+    if (O.mode === 'route') {
+      const T = this.arrEnd, d0 = A.toWorld(en.thr[0] + en.dir[0] * en.rw.len, en.thr[1] + en.dir[1] * en.rw.len);
+      const ff = other.toWorld(T.thr[0] - T.dir[0] * 10 * NM, T.thr[1] - T.dir[1] * 10 * NM), thr = other.toWorld(T.thr[0], T.thr[1]);
+      this.route = [{ e: d0[0], n: d0[1], name: A.icao }, { e: ff[0], n: ff[1], name: 'FF' + T.id }, { e: thr[0], n: thr[1], name: 'RW' + T.id }];
+    } else this.route = null;
     this.flight = { mode: O.mode, t: 0, started: false, airborne: false, maxAlt: 0, from: A, to: other, done: false, landings: 0 };
     if (O.start === 'final') this.ap.toggleApp();          // on the ILS already: the flight director guides from the first second
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
@@ -2175,7 +2185,7 @@ const Game = {
   /** console.error una sola vegada per clau i per vol: un error persistent a Game.step sortiria a 120 Hz */
   logOnce(key, text, err) { const L = this.errLogged || (this.errLogged = {}); if (L[key]) return; L[key] = true; console.error(text, err); },
   /** capcal de la pista de destinacio a l aeroport A (world/ils.js, destinationEnd): el de l ILS sintonitzat, si no l assignat */
-  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.activeEnd); },
+  destEnd(A) { return destinationEnd(A, this.nav && this.nav.en, this.arrEnd, this.activeEnd); },
   /** camera a l angle per defecte: tecla Home o doble clic amb el boto dret (Input) */
   resetCamera() { if (this.state !== 'flying') return; Cameras.resetView(this.fdm); this.msg(t('camera.reset')); },
   onKey(code) {
@@ -2239,7 +2249,9 @@ const Game = {
     if (this.opts.autoTrim && !this.ap.on) this.autoTrimmer.update(PHYS_DT, f, c, Input.pitch, Input.down('KeyZ', 'KeyX'));
     if (this.ap.on && (Math.abs(Input.pitch) > 0.5 || Math.abs(Input.roll) > 0.5)) { this.ap.disengage(); this.msg('Autopilot disconnected by control input'); }
     // ILS receiver (auto-tuned to the runway you are lined up with) feeds the approach modes and every display
-    if (++this.navN % 30 === 1 || !this.nav) this.nav = ILS.update(f, this.nav, this.activeEnd ? { apt: this.airport.icao, id: this.activeEnd.id } : null);
+    // F1: en el vol cronometrat, l ILS de la pista d arribada des de l enlairament (cap, si no en te); fora, l auto-sintonia de sempre
+    if (this.flight && this.flight.mode === 'route') { const T = this.arrEnd, D = this.dest; if (T && T.ils) { this.nav = ILS.nav(D, T, f); this.nav.idx = D.allEnds.indexOf(T); } else this.nav = null; }
+    else if (++this.navN % 30 === 1 || !this.nav) this.nav = ILS.update(f, this.nav, this.activeEnd ? { apt: this.airport.icao, id: this.activeEnd.id } : null);
     else { const A = AIRPORTS[this.nav.apt], i = this.nav.idx, en = A && A.allEnds[i]; if (en) { this.nav = ILS.nav(A, en, f); this.nav.idx = i; if (!this.nav.locValid) this.nav = ILS.update(f, null, null); } else this.nav = null; }
     this.ap.nav = this.nav;
     const wasOn = this.ap.on; this.ap.update(PHYS_DT, c); if (wasOn && !this.ap.on) this.msg('AUTOPILOT DISCONNECT', 4);
@@ -2830,7 +2842,7 @@ const UI = {
     const timeTxt = () => { const h = Math.floor(O.hours), m = Math.round((O.hours - h) * 60); const el = Math.asin(clamp(celestial(O.hours).sun[1], -1, 1)) * RAD; this.$('timeVal').textContent = ('0' + h).slice(-2) + ':' + ('0' + m % 60).slice(-2) + ' local, ' + (el > 8 ? 'daylight' : el > -1 ? 'golden hour' : el > -8 ? 'twilight' : 'night'); };
     this.$('optTime').addEventListener('input', e => { O.hours = +e.target.value; Game.hours = O.hours; timeTxt(); });
     const windTxt = () => { this.$('windVal').textContent = O.windKt < 0.5 ? 'calm' : ('00' + O.windDir).slice(-3) + '\u00b0 at ' + O.windKt + ' kt'; };
-    this.$('optWindDir').addEventListener('input', e => { O.windDir = +e.target.value; windTxt(); }); this.$('optWindKt').addEventListener('input', e => { O.windKt = +e.target.value; windTxt(); });
+    this.$('optWindDir').addEventListener('input', e => { O.windDir = +e.target.value; windTxt(); this.modeText(); }); this.$('optWindKt').addEventListener('input', e => { O.windKt = +e.target.value; windTxt(); this.modeText(); });
     this.$('btnFly').addEventListener('click', () => this.startFlight());
     this.$('btnResume').addEventListener('click', () => this.pause(false)); this.$('btnRestart').addEventListener('click', () => { this.pause(false); this.restart(); }); this.$('btnMenu').addEventListener('click', () => this.toMenu());
     this.$('btnHelp').addEventListener('click', () => this.toggleHelp());
@@ -2866,7 +2878,8 @@ const UI = {
   modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[Game.destOf(O)];
     // F1 (H9): distancia i rumb de les coordenades reals (distanceKm, bearingDeg), no el text fix de LEBL-LEPA
     const nm = Math.round(distanceKm(a.lat, a.lon, b.lat, b.lon) * 1000 / NM), hdg = ('00' + Math.round(bearingDeg(a.lat, a.lon, b.lat, b.lon)) % 360).slice(-3);
-    this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg }) : 'No objectives. Every landing on a runway is still scored.'; },
+    const rwy = b.icao + ' ' + arrivalEnd(b, O.windDir, O.windKt).id;
+    this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy }) : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();

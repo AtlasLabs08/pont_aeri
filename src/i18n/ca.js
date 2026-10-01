@@ -121,7 +121,7 @@ export default {
   'school.flareBar': 'Sink {sink} / objectiu {target} fpm',
   'freeFlight.dest': 'Destinació',
   'freeFlight.mode.route': 'Vol cronometrat a un destí',
-  'freeFlight.routeNote': 'Vol cronometrat de {from} a {to}: {nm} nm amb un rumb proper a {hdg}°. El resum surt quan hagis aterrat i frenat a {to}.',
+  'freeFlight.routeNote': 'Vol cronometrat de {from} a {to}, pista d\'arribada {rwy}: {nm} nm amb un rumb proper a {hdg}°. El resum surt quan hagis aterrat i frenat a {to}.',
   'camera.reset': 'Càmera a l\'angle per defecte',
   'menu.title': 'Pont Aeri',
   'menu.subtitle': 'Sortides',
