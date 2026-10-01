@@ -571,3 +571,6 @@ Decisions d en Marc despres de revisar el PR #27.
   balanceVersion passa a BALANCE.version i es desa, pero primer
   backupCareer(). Com discardCareer, si la copia falla i hi havia partida
   desada, no se sobreescriu res i la UI ho diu.
+
+## 2026-10-01 - F3: meteo procedimental pura, sense cablejar
+world/weather.js (weatherFor, toGameWeather) fa servir nomes hash2: mateixa entrada, mateixa sortida. Distribucio objectiu: vent apreciable un 20 %, condicions dures (severity >= 0,7) un 6,7 %. Els patrons locals son una taula de dades. Game no es toca: encara no accepta rafegues, visibilitat ni sostre, i Game.updateGusts continua amb Math.random.

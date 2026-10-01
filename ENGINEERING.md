@@ -495,6 +495,33 @@ export function draw(state) {
   sortir igual encara que el jugador tanqui i obri el joc.
 - Cada `DispatchOrder` desa el seu `rngCounter` en crear-se.
 
+### Contracte de la meteo (`src/world/weather.js`, F3)
+
+```js
+weatherFor({ icao, month, hour, day, seed }) -> {
+  windDirDeg,   // 0-359, d on ve el vent
+  windKt, gustKt,   // enters; gustKt >= windKt
+  visibilityM,  // 50-10000
+  ceilingFt,    // 100-10000, o null = cel net
+  turbulence,   // 0-1
+  pattern,      // clau de WEATHER_PATTERNS, o 'general'
+  severity,     // 0-1: el pitjor entre vent, visibilitat, sostre i turbulencia
+  hard          // severity >= HARD_SEVERITY (0,7)
+}
+toGameWeather(w) -> { windDir, windKt, turb, gustKt, visibilityM, ceilingFt }
+```
+
+- `month` 1-12, `hour` 0-23, `day` enter: els passa qui la crida (el rellotge
+  arriba a l'E1). `weatherFor` no llegeix cap rellotge.
+- Mateixa entrada, mateixa sortida: tot l'atzar surt de `hash2`.
+- Distribucio sobre tots els aeroports, mesos i hores: vent apreciable (>= 12 kt
+  o ratxes >= 18 kt) en un 20 % +-4 punts, `hard` en un 6,7 % +-2.
+- Els patrons locals son una taula de dades (`WEATHER_PATTERNS`): afegir-ne un
+  no toca codi. Els aeroports sense patro fan servir el general.
+- `toGameWeather` passa a les unitats de `Game.opts`: `windDir` 0-350 de 10 en
+  10, `windKt` enter 0-40, `turb` boolea (`turbulence >= 0,35`). `Game` encara no
+  accepta rafegues, visibilitat ni sostre: es retornen com a dades.
+
 ---
 
 ## 8. Persistència
@@ -695,7 +722,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | --- | --- | --- |
 | F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | Pistes reals d'OurAirports |
 | F2 | Taxiways i portes procedimentals | Tots menys LEBL i LEPA |
-| F3 | `world/weather.js` amb llavor | Patrons locals i estacionals |
+| F3 | `world/weather.js` amb llavor | **Fet.** `weatherFor` i `toGameWeather`, purs, sense cablejar al joc (contracte a §7). Patrons locals i estacionals com a taula de dades. 14 proves a `test/weather.test.js` i 1 de puresa a `purity.test.js`, 1572 en total |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
 | F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |
 | F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua); taula de flaps pròpia del M-300 (ara passa el harness molt just: 346 de 360 fpm i 1,44 d'1,45 g) i suports de góndola del X-90. A més, el X-90 és massa llarg i prim i té una ala massa gran: cal refer-ne les proporcions de jet regional | Sense dependències |
