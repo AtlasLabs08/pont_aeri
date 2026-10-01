@@ -687,3 +687,48 @@ Extres del mateix PR:
   FlightModel.vspeeds() (core/), la mateixa font que el PFD, amb la massa amb
   que Game.spawn posa l avio (97 kt al Mi-9). El calcul ja era a core/: no ha
   calgut cap refactor.
+
+## 2026-10-01 - Market en targetes i ofertes
+
+Decisions d en Marc.
+
+- K1. Ofertes. A cada llista del mercat, entre offers.count[0] i
+  offers.count[1] anuncis (triats amb el mateix flux derivat de G4, sense
+  tocar rngCounter) surten amb una rebaixa uniforme dins de offers.discount.
+  L anunci desa listPrice (el preu de G3) i offerPct, i price = round(listPrice
+  * (1 - offerPct)). Les garanties de G4 no canvien. Pot ser oferta qualsevol
+  anunci.
+- K2. Venda. Cotitzacio = round(min(priceOf(estat actual),
+  finance.purchasePrice) * (1 - sellFee)). Mai es pot vendre per mes del que
+  es va pagar menys la comissio (evita comprar ofertes per revendre-les).
+- K3. BALANCE.market.offers = { count: [1, 2], discount: [0.10, 0.20] }. Sense
+  pujar version. El harness no canvia (no compra al mercat).
+- K4. Targetes. El Market passa de llista a graella de targetes, la mateixa
+  quantitat d anuncis: imatge a dalt, etiqueta de categoria i, si es oferta,
+  "Oferta -15 %" / "Deal -15 %"; model i any; preu en gran i, si es oferta,
+  l original ratllat; hores, estat mitja (0-100) i ingressos (x1,08); sense
+  habilitacio, targeta apagada amb cadenat i l habilitacio que falta. En
+  clicar-la s obre el desglossament de compra que ja existeix. Filtres:
+  els de categoria mes "Ofertes". Graella: 1 columna al mobil, 2-4 a
+  l ordinador. Agrupacio per classe, amb titol sobre cada grup.
+- K5. Imatges. Mapa de dades typeId -> imatge i, sense imatge, silueta de
+  costat per classe en SVG inline (commuter, turbohelix, jet regional,
+  narrowbody, widebody, jumbo). Com afegir un render: ENGINEERING.md, seccio 15.
+
+Detalls d implementacio (sense canviar cap contracte):
+
+- Els fitxers estatics van a public/aircraft/ (Vite els serveix a l arrel i el
+  build fa servir base './', amb la ruta relativa aircraft/<fitxer>). El mapa
+  es a src/app/aircraft-images.js, buit fins que hi hagi renders.
+- Tots els anuncis generats porten listPrice i offerPct (0 si no son oferta).
+  Els desats abans de K1 no els tenen: validate els accepta opcionals i el
+  model de targeta els llegeix com listPrice = price, offerPct = 0 (G11, sense
+  migracio).
+- Les ofertes es trien al final del flux derivat (despres de les garanties i
+  del farciment), de manera que la resta de cada llista es identica a la
+  d abans de K1 i rngCounter no es toca.
+- El text de la cotitzacio de venda diu "mai per sobre del que vas pagar".
+- Prova de mutacio de K2: sense el min a sellQuote, falla la prova de venda
+  d una oferta ("K2: un avio comprat en oferta es ven per com a molt
+  purchasePrice * (1 - sellFee)"); restaurat, torna a passar.
+
