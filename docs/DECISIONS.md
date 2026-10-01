@@ -703,3 +703,7 @@ Extres del mateix PR:
 - Efecte en la nota. Cada rebot curt que abans no es comptava resta 8 punts a
   l aterratge (el mateix pes que ja tenia scoreReport per rebot). Les notes
   d aterratge baixen, doncs, 8 punts per cada rebot curt que abans quedava fora.
+
+## 2026-10-01 - F3: meteo procedimental pura, sense cablejar
+world/weather.js (weatherFor, toGameWeather) fa servir nomes hash2: mateixa entrada, mateixa sortida. Distribucio objectiu: vent apreciable un 20 %, condicions dures (severity >= 0,7) un 6,7 %. Els patrons locals son una taula de dades. Game no es toca: encara no accepta rafegues, visibilitat ni sostre, i Game.updateGusts continua amb Math.random.
+
