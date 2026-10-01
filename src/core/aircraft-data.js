@@ -349,7 +349,7 @@ export const AIRCRAFT = {
       nose: [19.5, 0, 1.2], belly: [0, 0, 1.5]
     },
     eye: [18.3, -0.50, -0.90],
-    model: { length: 39.1, noseX: 19.9, fuseR: 1.35, wing: 'low', sweep: 26, tail: 'T' },
+    model: { length: 39.1, noseX: 19.9, fuseR: 1.55, wing: 'low', sweep: 26, tail: 'T' },
     test: { toMass: 39000, ldgMass: 36000, rotPitch: 9, climbPitchMax: 17 },
     expect: {
       vr: [135, 155], toRoll: [1200, 2000], to35: [1600, 2500], climb: [2000, 3800],

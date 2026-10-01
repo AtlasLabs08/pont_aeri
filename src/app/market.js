@@ -4,8 +4,8 @@
  * 'career:changed' amb updateCareer (airline.js).
  * NOU: tasques D2+D5 d ENGINEERING.md.
  *
- * EXPORTA: MINUTES_PER_DAY listingOffer marketModel fleetModel buyListing
- *          sellAirframe devNewMarket
+ * EXPORTA: MINUTES_PER_DAY listingOffer cardModel marketModel fleetModel
+ *          buyListing sellAirframe devNewMarket
  *
  * IMPORTA: career/ (BALANCE, tierOf, airframeTier, purchaseRule,
  *   buyAircraft, sellQuote, sellAircraft, generateMarket, marketEpoch),
@@ -21,6 +21,17 @@
  *     financed = purchaseRule de cada modalitat, amb reason 'rating' si el
  *     pilot no te l habilitacio (G7, passa per davant); financed porta a
  *     mes totalCost = instalment * termFlights (cost total del prestec).
+ *   cardModel(offer) -> { reg, typeId, name, tier, year, isOffer, offerPct,
+ *     price, listPrice, hours, condition, revenueMult, image, silhouette,
+ *     locked, missingRating }   (K4, K5) la targeta d un anunci
+ *     (offer = listingOffer). tier = clau de la categoria; year = yearBuilt;
+ *     isOffer = offerPct > 0 i offerPct es el percentatge enter (15 = -15 %);
+ *     price = el que es paga; listPrice = el preu ratllat, nomes si isOffer
+ *     (sino null); hours enter; condition = mitjana dels 4 estats, entera,
+ *     0-100; revenueMult = el de la categoria; image = URL (aircraft-images.js)
+ *     o null i, aleshores, silhouette = la de la classe (SILHOUETTES);
+ *     locked = no te l habilitacio, i missingRating = quina (o null). Un
+ *     anunci desat abans de K1 es llegeix com listPrice = price, sense oferta.
  *   marketModel(state) -> { groups: [{ rating, offers }], renewDays, count }
  *     una llista per habilitacio, en l ordre de BALANCE.ratings (commuter,
  *     turboprop, narrowbody, widebody, quad = jumbo), nomes les que tenen
@@ -42,6 +53,7 @@ import {
 } from '../career/index.js';
 import { AIRCRAFT } from '../core/index.js';
 import { currentCareer, updateCareer } from './airline.js';
+import { imageOf, silhouetteOf } from './aircraft-images.js';
 
 export const MINUTES_PER_DAY = 1440;
 
@@ -63,6 +75,24 @@ export function listingOffer(state, listing) {
     toC: listing.maintenance.nextCHours - listing.hours,
     cash: rule('cash'),
     financed: { ...financed, totalCost: financed.loan.instalment * financed.loan.termFlights }
+  };
+}
+
+const CONDITION_KEYS = ['engines', 'gear', 'airframe', 'avionics'];
+
+export function cardModel(offer) {
+  const l = offer.listing;
+  const isOffer = (l.offerPct ?? 0) > 0;
+  const image = imageOf(l.typeId);
+  return {
+    reg: l.reg, typeId: l.typeId, name: offer.name, tier: l.tier, year: l.yearBuilt,
+    isOffer, offerPct: isOffer ? Math.round(l.offerPct * 100) : 0,
+    price: l.price, listPrice: isOffer ? (l.listPrice ?? l.price) : null,
+    hours: Math.round(l.hours),
+    condition: Math.round(CONDITION_KEYS.reduce((s, k) => s + l.condition[k], 0) / CONDITION_KEYS.length),
+    revenueMult: offer.tier.revenueMult,
+    image, silhouette: image ? null : silhouetteOf(l.typeId),
+    locked: !offer.hasRating, missingRating: offer.hasRating ? null : offer.rating
   };
 }
 

@@ -1,6 +1,7 @@
-/* Pestanya Market del centre d operacions (D5, docs/DECISIONS.md 30/09/2026):
- * anuncis agrupats per classe, filtre per categoria i, en triar-ne un, els
- * efectes de la categoria i les dues maneres de pagar amb el desglossament.
+/* Pestanya Market del centre d operacions (D5, docs/DECISIONS.md 30/09/2026 i
+ * 01/10/2026, K4): targetes d anuncis agrupades per classe, filtre per categoria
+ * i per ofertes i, en clicar-ne una, els efectes de la categoria i les dues
+ * maneres de pagar amb el desglossament. Imatge o silueta (ui/silhouettes.js).
  * Sense lloguer (G1). Nomes pinta marketModel (app/market.js) i crida
  * onBuy, que l encaminador passa a buyListing.
  * NOU: tasca D5 d ENGINEERING.md.
@@ -15,8 +16,10 @@
 
 import { t, fmtMoney, fmtNumber } from '../i18n/index.js';
 import { BALANCE } from '../career/index.js';
+import { cardModel } from '../app/index.js';
 import { el } from './dom.js';
-import { tierBadge, conditionCells } from './fleet.js';
+import { tierBadge } from './fleet.js';
+import { silhouette, padlock } from './silhouettes.js';
 
 const TIERS = BALANCE.market.tiers.map(x => x.key);
 
@@ -65,42 +68,56 @@ function detail(offer, { onBuy, onClose }) {
     el('div', { class: 'pa-btns' }, button(t('market.close'), onClose)));
 }
 
-function listingRow(offer, onSelect) {
-  const l = offer.listing;
+function stat(label, value) {
+  return el('span', { class: 'pa-stat' }, el('i', {}, label), el('b', {}, value));
+}
+
+function card(offer, onSelect, selected) {
+  const c = cardModel(offer);
   const act = e => { if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } };
-  return el('div', { class: 'pa-row pa-click pa-listing' + (offer.hasRating ? '' : ' pa-locked'), role: 'button', tabindex: 0,
-    onclick: act, onkeydown: act },
-    el('span', { class: 'pa-name' }, offer.name, ' ', tierBadge(l.tier),
-      el('span', { class: 'pa-desc' }, el('span', { class: 'pa-code' }, l.reg), ' · ',
-        t('market.year', { year: l.yearBuilt, hours: fmtNumber(l.hours), cycles: fmtNumber(l.cycles) })),
-      el('span', { class: 'pa-desc' }, t('market.checks', { a: fmtNumber(offer.toA), c: fmtNumber(offer.toC) })),
-      offer.hasRating ? null : el('span', { class: 'pa-desc pa-warn' }, t('market.needsRating', { rating: t('rating.' + offer.rating) }))),
-    conditionCells(l.condition),
-    el('span', { class: 'pa-price' }, fmtMoney(l.price)));
+  return el('div', { class: 'pa-card' + (c.locked ? ' pa-locked' : '') + (c.isOffer ? ' pa-deal' : '') + (selected ? ' pa-selected' : ''),
+    role: 'button', tabindex: 0, 'aria-label': c.name + ' ' + c.reg, 'aria-expanded': String(!!selected), onclick: act, onkeydown: act },
+    el('div', { class: 'pa-card-img' },
+      c.image ? el('img', { src: c.image, alt: c.name, loading: 'lazy' }) : silhouette(c.silhouette),
+      el('span', { class: 'pa-card-tags' }, tierBadge(c.tier),
+        c.isOffer ? el('span', { class: 'pa-deal-tag' }, t('market.deal', { pct: fmtNumber(c.offerPct) })) : null),
+      c.locked ? el('span', { class: 'pa-card-lock', title: t('market.card.locked') }, padlock()) : null),
+    el('div', { class: 'pa-card-body' },
+      el('h5', {}, c.name, el('span', { class: 'pa-year' }, ' ', c.year)),
+      el('span', { class: 'pa-code' }, c.reg),
+      el('div', { class: 'pa-card-price' },
+        el('b', {}, fmtMoney(c.price)),
+        c.isOffer ? el('s', { title: t('market.card.listPrice', { price: fmtMoney(c.listPrice) }) }, fmtMoney(c.listPrice)) : null),
+      el('div', { class: 'pa-stats' },
+        stat(t('market.card.hours'), fmtNumber(c.hours)),
+        stat(t('market.col.condition'), fmtNumber(c.condition)),
+        stat(t('market.card.revenue'), t('market.mult', { value: fmtNumber(c.revenueMult, 2) }))),
+      c.locked ? el('p', { class: 'pa-card-need' }, padlock(), t('market.needsRating', { rating: t('rating.' + c.missingRating) })) : null));
 }
 
 export function marketPanel(model, { onBuy }) {
   const node = el('div', { class: 'pa-panel' });
   let filter = null, selected = null;
   function render() {
-    const filters = [null, ...TIERS].map(key => el('button', { type: 'button', 'aria-pressed': String(filter === key),
-      onclick: () => { filter = key; selected = null; render(); } }, key === null ? t('market.filter.all') : t('tier.' + key)));
-    const groups = model.groups.map(g => ({ ...g, offers: g.offers.filter(o => filter === null || o.listing.tier === filter) }))
-      .filter(g => g.offers.length > 0);
+    const filters = [null, 'deals', ...TIERS].map(key => el('button', { type: 'button', 'aria-pressed': String(filter === key),
+      onclick: () => { filter = key; selected = null; render(); } },
+      key === null ? t('market.filter.all') : key === 'deals' ? t('market.filter.deals') : t('tier.' + key)));
+    const keep = o => filter === null || (filter === 'deals' ? (o.listing.offerPct ?? 0) > 0 : o.listing.tier === filter);
+    const groups = model.groups.map(g => ({ ...g, offers: g.offers.filter(keep) })).filter(g => g.offers.length > 0);
+    const close = () => { selected = null; render(); };
     node.replaceChildren(el('div', {},
       el('h3', {}, t('market.title')),
       el('p', { class: 'pa-dim' }, t('market.renew', { count: model.renewDays })),
       el('div', { class: 'pa-filter', role: 'group', 'aria-label': t('market.filter') }, el('span', {}, t('market.filter')), filters),
       groups.length === 0 ? el('p', { class: 'pa-dim' }, t('market.empty')) : null,
-      groups.map(g => el('div', {},
+      groups.map(g => el('section', {},
         el('h4', { class: 'pa-group' }, t('market.group.' + g.rating)),
-        el('div', { class: 'pa-board pa-market' },
-          el('div', { class: 'pa-head' }, el('span', {}, t('market.col.aircraft')), el('span', {}, t('market.col.condition')),
-            el('span', { class: 'pa-price' }, t('market.col.price'))),
+        el('div', { class: 'pa-cards' },
           g.offers.map(o => o.listing.reg === selected
-            ? [listingRow(o, () => { selected = null; render(); }),
-               detail(o, { onBuy, onClose: () => { selected = null; render(); } })]
-            : listingRow(o, () => { selected = o.listing.reg; render(); })))))));
+            ? [card(o, close, true), detail(o, { onBuy, onClose: close })]
+            : card(o, () => { selected = o.listing.reg; render(); })))))));
+    const open = node.querySelector('.pa-offer');
+    if (open && open.scrollIntoView) open.scrollIntoView({ block: 'nearest' });
   }
   render();
   return node;

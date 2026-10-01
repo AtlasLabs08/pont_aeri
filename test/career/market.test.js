@@ -191,8 +191,9 @@ describe('generateMarket (G4)', () => {
           assert.ok(Number.isInteger(v) && v >= t.condition[0] && v <= t.condition[1], l.reg + ' estat ' + v);
         }
         const used = BALANCE.usedPrice[l.typeId];
-        assert.ok(l.price >= Math.round(used * t.priceFactor[0]) && l.price <= Math.round(used * t.priceFactor[1]), l.reg + ' preu');
-        assert.equal(l.price, priceOf(l.typeId, l.tier, age, l.condition));
+        assert.ok(l.listPrice >= Math.round(used * t.priceFactor[0]) && l.listPrice <= Math.round(used * t.priceFactor[1]), l.reg + ' preu');
+        assert.equal(l.listPrice, priceOf(l.typeId, l.tier, age, l.condition));
+        assert.equal(l.price, Math.round(l.listPrice * (1 - l.offerPct)), l.reg + ' preu rebaixat');
         const base = age * M.hoursPerYear[cls];
         assert.ok(l.hours >= Math.round(base * (1 - M.hoursJitter)) && l.hours <= Math.round(base * (1 + M.hoursJitter)), l.reg + ' hores');
         assert.equal(l.cycles, Math.round(l.hours / M.hoursPerCycle[cls]));
@@ -225,6 +226,80 @@ describe('generateMarket (G4)', () => {
     assert.ok(g.market.listings.some(l => l.typeId === 'commuter' && l.tier === 'basic'));
     assert.ok(g.market.listings.some(l => l.typeId === 'commuter' && l.tier === 'standard'));
     assert.equal(validate(g).ok, true);
+  });
+});
+
+describe('ofertes (K1)', () => {
+  const O = M.offers;
+  const offersOf = m => m.listings.filter(l => l.offerPct > 0);
+  const ratingSets = [1, 2, 3, 4, 5].map(n => RATING_ORDER.slice(0, n));
+
+  test('determinisme: mateixa llavor i epoch, mateixes ofertes; i no toquen rngCounter', () => {
+    const s = career(['commuter', 'turboprop']);
+    s.rngCounter = 9;
+    const before = structuredClone(s);
+    assert.deepEqual(generateMarket(s, 3), generateMarket(s, 3));
+    assert.equal(s.rngCounter, 9);
+    assert.deepEqual(s, before);
+    const mark = m => offersOf(m).map(l => l.reg + ':' + l.offerPct);
+    assert.notDeepEqual(mark(generateMarket(s, 3)), mark(generateMarket(s, 4)));
+  });
+
+  test('el nombre d ofertes es dins de offers.count, i la rebaixa dins de offers.discount', () => {
+    const seen = new Set();
+    for (let epoch = 0; epoch < 120; epoch++) {
+      const m = generateMarket(career(ratingSets[epoch % 5], 100 + epoch), epoch);
+      const k = offersOf(m).length;
+      assert.ok(k >= O.count[0] && k <= O.count[1], 'ofertes ' + k);
+      seen.add(k);
+      for (const l of offersOf(m)) {
+        assert.ok(l.offerPct >= O.discount[0] && l.offerPct <= O.discount[1], l.reg + ' ' + l.offerPct);
+      }
+    }
+    for (let k = O.count[0]; k <= O.count[1]; k++) assert.ok(seen.has(k), 'mai surten ' + k + ' ofertes');
+  });
+
+  test('price = round(listPrice * (1 - offerPct)); sense oferta, price = listPrice i offerPct = 0', () => {
+    for (let epoch = 0; epoch < 60; epoch++) {
+      for (const l of generateMarket(career(ratingSets[epoch % 5], epoch), epoch).listings) {
+        assert.ok(Number.isInteger(l.price) && Number.isInteger(l.listPrice), l.reg);
+        assert.equal(l.price, Math.round(l.listPrice * (1 - l.offerPct)), l.reg);
+        if (l.offerPct === 0) assert.equal(l.price, l.listPrice, l.reg);
+        else assert.ok(l.price < l.listPrice, l.reg);
+      }
+    }
+  });
+
+  test('generar-les no canvia rngCounter, ni la resta de la llista: nomes preu, listPrice i offerPct', () => {
+    // les ofertes surten al final del flux: tot el que no es preu es igual al d abans de K1
+    const s = career(['commuter', 'turboprop', 'narrowbody']);
+    const m = generateMarket(s, 7);
+    const again = generateMarket(s, 7);
+    const strip = ({ price, offerPct, ...rest }) => rest;
+    assert.deepEqual(m.listings.map(strip), again.listings.map(strip));
+    assert.equal(s.rngCounter, 0);
+  });
+
+  test('les garanties de G4 es compleixen amb ofertes, i qualsevol anunci pot ser oferta', () => {
+    const offeredTiers = new Set(), offeredGuaranteed = new Set();
+    for (let epoch = 0; epoch < 300; epoch++) {
+      const ratings = ratingSets[epoch % 5];
+      const m = generateMarket(career(ratings, 7 * epoch), epoch);
+      assert.ok(m.listings.length >= guaranteeCount(ratings));
+      for (const rating of ratings) {
+        for (const tier of GUARANTEED_TIERS) {
+          assert.ok(m.listings.some(l => ratingOf(l.typeId) === rating && l.tier === tier), rating + ' ' + tier);
+        }
+      }
+      for (const typeId of typeGroups(ratings).rated) {
+        assert.ok(m.listings.some(l => l.typeId === typeId), 'tipus rated sense anunci: ' + typeId);
+      }
+      m.listings.slice(0, guaranteeCount(ratings)).forEach(l => { if (l.offerPct > 0) offeredGuaranteed.add(l.tier); });
+      offersOf(m).forEach(l => offeredTiers.add(l.tier));
+      assert.deepEqual(validate({ ...career(ratings, 7 * epoch), market: m }), { ok: true, errors: [] });
+    }
+    assert.equal(offeredTiers.size, M.tiers.length, 'cada categoria pot ser oferta');
+    assert.ok(offeredGuaranteed.size > 0, 'un anunci garantit tambe pot ser oferta');
   });
 });
 

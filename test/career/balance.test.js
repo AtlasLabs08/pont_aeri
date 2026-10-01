@@ -218,6 +218,14 @@ describe('BALANCE: mercat d ocasio i categories (D2+D5)', () => {
     pairs(M.tiers, (lo, hi) => assert.equal(hi.priceFactor[0], lo.priceFactor[1], lo.key + ' -> ' + hi.key));
   });
 
+  test('offers (K3): count enters 0 < lo <= hi i discount dins de (0, 1), ordenats', () => {
+    const { count, discount } = M.offers;
+    assert.ok(Number.isInteger(count[0]) && Number.isInteger(count[1]) && count[0] >= 1 && count[0] <= count[1]);
+    assert.ok(count[1] <= M.listings[0], 'les ofertes caben a la llista mes curta');
+    assert.ok(discount[0] > 0 && discount[0] <= discount[1] && discount[1] < 1);
+    assert.deepEqual([count, discount], [[1, 2], [0.10, 0.20]]);
+  });
+
   test('standard te revenueMult i wearMult exactament 1', () => {
     const s = M.tiers.find(t => t.key === 'standard');
     assert.equal(s.revenueMult, 1);

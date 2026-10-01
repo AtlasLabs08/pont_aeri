@@ -303,7 +303,9 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
  * @property {number} cycles
  * @property {{engines:number, gear:number, airframe:number, avionics:number}} condition
  * @property {{nextAHours:number, nextCHours:number}} maintenance   hores absolutes, com l Airframe
- * @property {number} price          euros enters (priceOf)
+ * @property {number} listPrice      K1. Opcional: el preu de priceOf, sense rebaixa; sense, price
+ * @property {number} offerPct       K1. Opcional: rebaixa 0..1 (0 = sense oferta)
+ * @property {number} price          euros enters que es paguen: round(listPrice * (1 - offerPct))
  */
 
 /** @typedef {{name:string, xp:number, rank:string, ratings:string[],
@@ -348,6 +350,15 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
   `app/` crida `refreshMarket`. L'atzar del mercat surt de
   `derivedRng(rngSeed, 'market', epoch)` i no toca `rngCounter`. La categoria
   d'un avió no canvia mai, ni amb el desgast.
+- **Ofertes i regla de venda** (`docs/DECISIONS.md` 01/10/2026, K1-K2): els
+  anuncis generats porten `listPrice` i `offerPct` (0 si no hi ha oferta); un
+  anunci desat abans no els té i es llegeix com `listPrice = price`,
+  `offerPct = 0` (`validate` els accepta opcionals). `Airframe.finance.purchasePrice`
+  és el que es va pagar. **La cotització de venda és
+  `round(min(priceOf(estat actual), finance.purchasePrice) * (1 - sellFee))`**:
+  mai es ven per més del que es va pagar menys la comissió, així comprar
+  ofertes per revendre-les no dona guany. No treguis el `min`: una prova ho
+  vigila (`test/career/finance.test.js`).
 
 ---
 
@@ -405,7 +416,8 @@ export const BALANCE = {
     referenceYear: 2026, ageWeight: 0.5,
     hoursPerYear:  { commuter: 1200, turboprop: 1800, narrowbody: 2600, widebody: 4200 },
     hoursPerCycle: { commuter: 0.8,  turboprop: 1.0,  narrowbody: 1.5,  widebody: 5.0 },
-    hoursJitter: 0.3, sellFee: 0.10
+    hoursJitter: 0.3, sellFee: 0.10,
+    offers: { count: [1, 2], discount: [0.10, 0.20] }   // K1: ofertes per llista i rebaixa uniforme
   },
   contractFeePerLeg: { commuter: 3000, turboprop: 6000, narrowbody: 18000, widebody: 40000 },
 
@@ -512,6 +524,12 @@ export const BALANCE = {
   school: { passScore: 45, mercyScore: 30, mercyAttempt: 3, graduationXp: 250 }
 };
 ```
+
+`market.offers` (K1): a cada llista, entre `count[0]` i `count[1]` anuncis
+(qualsevol, garantits inclosos) surten amb una rebaixa uniforme dins de
+`discount`. Es trien al final del flux derivat del mercat (`derivedRng`),
+després de les garanties i del farciment: no mouen cap altra tirada ni
+`rngCounter`. Sense pujar `version`.
 
 ---
 
@@ -793,6 +811,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol. **Nota del D2+D5:** en liquidar cada vol, passa a `computeFlightResult` el `revenueMult` de la categoria de l'avió (`tierOf(airframeTier(a)).revenueMult`) i a `applyFlightWear` el seu `wearMult`; tots dos són opcionals i valen 1 per defecte. El lloguer (G1) va amb D3+D4 | D2, B2 |
 | D4 | Briefing i debrief amb compte de resultats | D3, A4 |
 | D5 | Market: mercat d'ocasió amb historial. **Fet** amb D2: `career/market.js` (`priceOf`, `typeGroups`, `generateMarket` amb garanties per habilitació i pesos de `mix` i `tierWeights`, `refreshMarket` per `clock.minute`), `derivedRng` a `rng.js`, `purchaseRule`/`buyAircraft` a `finance.js` (al comptat o financat, només amb l'habilitació, amb el coixí de `reserveFlights`), categories d'avió (`Airframe.tier`: preu, edat i estat, `revenueMult` a `economy.js` i `wearMult` a `wear.js`). Harness amb la regla de compra, la mètrica de cash < 0, `--tier` i `--tiers` (criteris A i B de §10). `app/market.js` (`marketModel`, `buyListing`, `devNewMarket`), `ui/market.js` (anuncis per classe, filtre per categoria, efectes i desglossament de les dues modalitats) i botó DEV "new market". Sense lloguer (G1) | D2 |
+| D5b | Market en targetes. **Fet** (`docs/DECISIONS.md` 01/10/2026, K1-K5): ofertes al mercat (`generateMarket`, `listPrice`/`offerPct`), regla de venda K2 a `sellQuote`, graella de targetes responsive amb filtre Ofertes (`cardModel` a `app/market.js`, `ui/market.js`), mapa d'imatges `app/aircraft-images.js` + `public/aircraft/` i siluetes SVG per classe (`ui/silhouettes.js`) | D5 |
 | D6 | Pilot, Finance, Crew, Map | D1 |
 | D7 | Escena 3D del menú, reaprofitant càmera i escenografia | D1 |
 
@@ -816,7 +835,7 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 | F3 | `world/weather.js` amb llavor | **Fet.** `weatherFor` i `toGameWeather`, purs, sense cablejar al joc (contracte a §7). Patrons locals i estacionals com a taula de dades. 14 proves a `test/weather.test.js` i 1 de puresa a `purity.test.js`, 1656 en total |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
 | F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |
-| F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua); taula de flaps pròpia del M-300 (ara passa el harness molt just: 346 de 360 fpm i 1,44 d'1,45 g) i suports de góndola del X-90. A més, el X-90 és massa llarg i prim i té una ala massa gran: cal refer-ne les proporcions de jet regional | Sense dependències |
+| F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua); taula de flaps pròpia del M-300 (ara passa el harness molt just: 346 de 360 fpm i 1,44 d'1,45 g) i suports de góndola del X-90. A més, el X-90 és massa llarg i prim i té una ala massa gran: cal refer-ne les proporcions de jet regional | Sense dependències. **Fet a mitges (només geometria visual):** Mi-9 i X-90 amb geometria pròpia a `src/core/model-geom.js` (ratios sobre les mides de l'avió), pilons de góndola al fuselatge del X-90 i `test/model-geom.test.js`. **Pendent:** la taula de flaps del M-300 (física) |
 
 ### Bloc M — Migració pendent (paral·lel, baixa prioritat)
 
@@ -855,3 +874,27 @@ els quatre avions, aterratge amb informe.
 | El balanç queda malament tard | B5 bloqueja tot el bloc C |
 | `index.html` torna a créixer sense control | Codi nou d'Airline a `src/`; a `index.html` només el cablejat |
 | Pujar `three` de versió sense voler | Fixat a 0.128 a `package.json` |
+
+---
+
+## 15. Com afegir la imatge d'un avió
+
+Les targetes del Market (K4, K5) mostren la imatge del tipus d'avió o, si no
+en té, una silueta de la seva classe. Per posar un render definitiu:
+
+1. Posa el fitxer a **`public/aircraft/`** (per exemple `migjorn-mi-9.webp`).
+   Vite serveix `public/` tal com és, i `vite build` el copia a `dist/`; no
+   cal importar-lo des del codi. La ruta que fa servir el joc és relativa
+   (`aircraft/<fitxer>`), així que va igual a github.io, a pages.dev i en local.
+2. Afegeix **una línia** al mapa de `src/app/aircraft-images.js`, amb el
+   `typeId` (`commuter`, `tpShort`, `tp`, `rj`, `nbShort`, `nb`, `nbStretch`,
+   `wb`, `wbEr`, `jumbo`):
+
+   ```js
+   export const AIRCRAFT_IMAGES = Object.freeze({
+     commuter: 'migjorn-mi-9.webp'
+   });
+   ```
+
+Res més: la targeta deixa de pintar la silueta d'aquell tipus. Proporció
+recomanada 5:2 (la imatge es redimensiona dins la targeta sense retallar-se).

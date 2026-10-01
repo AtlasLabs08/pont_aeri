@@ -44,7 +44,9 @@
  * @property {number} cycles
  * @property {{engines:number, gear:number, airframe:number, avionics:number}} condition
  * @property {{nextAHours:number, nextCHours:number}} maintenance   hores absolutes, com l Airframe
- * @property {number} price          euros enters (priceOf de market.js)
+ * @property {number} price          euros enters: el que es paga, listPrice menys l oferta
+ * @property {number} [listPrice]    K1. Opcional: el preu de priceOf, sense la rebaixa; sense, price
+ * @property {number} [offerPct]     K1. Opcional: rebaixa 0..1 (0 = sense oferta); price = round(listPrice * (1 - offerPct))
  */
 
 /** @typedef {{name:string, xp:number, rank:string, ratings:string[],
