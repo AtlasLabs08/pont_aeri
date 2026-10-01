@@ -951,9 +951,9 @@ Com s ha aplicat:
   340 m a partir de 9 km, perque el tram IF -> FF tingui els 1.000 ft) fins a
   22 nm, on fa un capcal; amplada que creix amb la distancia i ondula amb
   soroll; vores al 8 % amb arrencada suau i unio suau amb el relleu natural;
-  relleu de soroll al fons. Les depressions al voltant de l aeroport es
+  relleu de soroll al fons (fins a 80 m, escala de 6 km, nomes rebaixa). Les depressions al voltant de l aeroport es
   reomplen amb el mateix pendent. Pendent de la transicio (dins la vall):
-  maxim 11,7 % (LESU); la prova en mira el 12 % a 55 km de cada aeroport.
+  maxim 11,4 % (LESU); la prova en mira el 12 % a 55 km de cada aeroport.
   On la vall s uneix amb relleu natural mes escarpat, mai no hi es mes
   abrupta que el natural.
 - La conca del FF ja no cal: amb la vall i l IF, totes les rutes que es fan

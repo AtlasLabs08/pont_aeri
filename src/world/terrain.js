@@ -34,7 +34,7 @@ import { ILS } from './ils.js';
 
 /* vall dels aeroports nous (H16): pendent de les vores, arrencada suau de la vora (m), eixamplament del fons per m,
 ^ * ondulacio de l amplada (m) i la seva escala (m), relleu del fons (m, nomes rebaixa) i la seva escala (m), suavitat de la unio (m) */
-export const VALLEY = { wall: 0.08, knee: 1200, widen: 0.08, wobbleM: 600, wobbleScaleM: 9000, reliefM: 30, reliefScaleM: 2500, softM: 40 };
+export const VALLEY = { wall: 0.08, knee: 1200, widen: 0.08, wobbleM: 600, wobbleScaleM: 9000, reliefM: 80, reliefScaleM: 6000, softM: 40 };
 /** marge del fons de la vall per sota de la senda de 3 graus a s m abans del llindar */
 export function valleyMarginM(s) { return s <= 4000 ? 130 : s >= 9000 ? 340 : lerp(130, 340, (s - 4000) / 5000); }
 const SHAPE_RANGE_M = 70000;                     // abast des de l origen: mes enlla, la vall (22 nm i el capcal) ja no talla res
@@ -199,7 +199,7 @@ export const World = {
           cap = Math.min(cap, F + V.wall * Math.hypot(ramp(t - Math.max(W, S.w0), V.knee), sp - sl));
         }
         return cap; };
-      if (h > capAt(V.wobbleM) - V.softM) {
+      if (h > capAt(V.wobbleM) - V.reliefM - V.softM) {
         const k = V.reliefScaleM, w = V.wobbleScaleM, cap = capAt(V.wobbleM * fbm(e / w + 31, n / w - 17, 2))
           - V.reliefM * (0.5 + 0.5 * fbm(e / k + 7, n / k + 3, 3)) * smoothstep(2000, 5000, d);
         g = smin(h, cap, V.softM);
