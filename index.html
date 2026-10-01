@@ -65,6 +65,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
   <h2>Flight</h2>
   <div class="row"><label for="optMode">Mode</label><select id="optMode"><option value="free">Free flight</option><option value="route">Barcelona &rarr; Palma timed flight</option></select></div><p id="modeNote"></p>
   <div class="row"><label for="optAirport">Airport</label><select id="optAirport"></select></div>
+  <div class="row" id="rowDest"><label for="optDest"></label><select id="optDest"></select></div>
   <div class="row"><label for="optRunway">Active runway</label><select id="optRunway"></select></div>
   <div class="row"><label for="optDifficulty">Runway length</label><select id="optDifficulty"><option value="easy">Easy: very long runways (+45%)</option><option value="normal" selected>Normal: real lengths</option><option value="hard">Hard: short runways (60%)</option></select></div>
   <div class="row"><label for="optStart">Start position</label><select id="optStart"><option value="gate">Parked at a gate, engines running</option><option value="runway" selected>Lined up on the runway</option><option value="final">On final approach, 10 nm out</option></select></div>
@@ -137,7 +138,7 @@ import {
 
 import {
   AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
-  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd
+  setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { IS_DEV } from './src/platform/index.js';
@@ -2095,7 +2096,7 @@ const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terra
 
 const Game = {
   state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
-  opts: { aircraft: 'nb', airport: 'LEBL', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
+  opts: { aircraft: 'nb', airport: 'LEBL', dest: 'LEPA', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
   env: { windN: 0, windE: 0, gustN: 0, gustE: 0, gustD: 0, groundHeight: (n, e) => World.groundAt(e, n), surface: (n, e) => World.surfaceAt(e, n) },
   lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, landingWatch: new LandingWatch(), lastIas: 0, accelKt: 0, debug: false, help: false,
 
@@ -2109,7 +2110,7 @@ const Game = {
     this.env.windN = -Math.cos(O.windDir * DEG) * O.windKt * KT; this.env.windE = -Math.sin(O.windDir * DEG) * O.windKt * KT;
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
-    const other = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.dest = O.mode === 'route' ? other : A;
+    const other = AIRPORTS[this.destOf(O)]; this.dest = O.mode === 'route' ? other : A;
     if (O.start === 'final' || O.start === 'airborne' || O.start === 'downwind') {
       // 'airborne' i 'downwind' (nomes l escola, llicons 5 i 6): mateix mecanisme d inicialitzacio
       // en vol que 'final' (posicionar i trimar amb trimAircraft), amb una altra posicio, altitud,
@@ -2154,10 +2155,12 @@ const Game = {
       f.reset({ onGround: true, n: p[1], e: p[0], hdg, groundH: A.elev, flaps: ctl.flaps }); ctl.trim = clamp(tr.trim, -1, 1); ctl.parkBrake = true;
     }
     this.autoTrimmer = new AutoTrim(); this.nav = null; this.navN = 0; this._apWas = false; Sound.reset();
-    this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? (cfg.type === 'jet' ? 24000 : 17000) : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
-    // route for the navigation display
-    const dep = A.toWorld(en.thr[0] + en.dir[0] * 9000, en.thr[1] + en.dir[1] * 9000), mid = [(A.e + other.e) / 2 + 9000, (A.n + other.n) / 2];
-    this.route = O.mode === 'route' ? [{ e: A.e, n: A.n, name: A.icao }, { e: dep[0], n: dep[1], name: 'DEP' }, { e: mid[0], n: mid[1], name: 'MID' }, { e: other.e, n: other.n, name: other.icao }] : null;
+    // F1 (H9): altitud seleccionada del vol cronometrat segons la distancia: [fins a km, jet ft, turbohelix ft]. LEBL-LEPA (202 km): 24000 / 17000, com abans
+    const ROUTE_ALT = [[80, 8000, 6000], [150, 15000, 11000], [260, 24000, 17000], [Infinity, 30000, 20000]];
+    const km = distanceKm(A.lat, A.lon, other.lat, other.lon), ra = ROUTE_ALT.find(r => km <= r[0]);
+    this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? (cfg.type === 'jet' ? ra[1] : ra[2]) : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
+    // route for the navigation display: direct from the origin to the destination (F1, H9)
+    this.route = O.mode === 'route' ? [{ e: A.e, n: A.n, name: A.icao }, { e: other.e, n: other.n, name: other.icao }] : null;
     this.flight = { mode: O.mode, t: 0, started: false, airborne: false, maxAlt: 0, from: A, to: other, done: false, landings: 0 };
     if (O.start === 'final') this.ap.toggleApp();          // on the ILS already: the flight director guides from the first second
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
@@ -2166,6 +2169,8 @@ const Game = {
     Recorder.start({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelPlannedKg: f.fuel, paxOnBoard: 0, plannedArrivalMin: null });
     this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
+  /** destinacio del vol cronometrat (F1, H9): opts.dest si es un altre aeroport; si no, LEPA des de LEBL i LEBL des de la resta */
+  destOf(O) { return O.dest && O.dest !== O.airport && AIRPORTS[O.dest] ? O.dest : (O.airport === 'LEBL' ? 'LEPA' : 'LEBL'); },
   msg(t, secs) { UI.toast(t, secs); },
   /** console.error una sola vegada per clau i per vol: un error persistent a Game.step sortiria a 120 Hz */
   logOnce(key, text, err) { const L = this.errLogged || (this.errLogged = {}); if (L[key]) return; L[key] = true; console.error(text, err); },
@@ -2806,11 +2811,16 @@ const UI = {
     document.querySelectorAll('input[name=ac]').forEach(r => r.addEventListener('change', () => { O.aircraft = r.value; Game.setAircraft(r.value); Game.spawn(); Cameras.mode = 'orbit'; this.bestText(); }));
     const fillRw = () => { const A = AIRPORTS[O.airport]; this.$('optRunway').innerHTML = A.allEnds.map((e, i) => `<option value="${i}">Runway ${e.id} (${('00' + Math.round(e.hdg) % 360).slice(-3)}\u00b0, ${e.rw.len} m)</option>`).join(''); O.runway = Math.min(O.runway, A.allEnds.length - 1); this.$('optRunway').value = O.runway; };
     this.$('optAirport').innerHTML = AIRPORT_ORDER.map(id => `<option value="${id}">${AIRPORTS[id].name} (${id})</option>`).join(''); fillRw();
+    // F1 (H9): destinacio del vol cronometrat, qualsevol aeroport menys l origen
+    this.$('optMode').querySelector('option[value=route]').textContent = t('freeFlight.mode.route'); this.$('rowDest').querySelector('label').textContent = t('freeFlight.dest');
+    const fillDest = () => { O.dest = Game.destOf(O); this.$('optDest').innerHTML = AIRPORT_ORDER.filter(id => id !== O.airport).map(id => `<option value="${id}">${AIRPORTS[id].name} (${id})</option>`).join(''); this.$('optDest').value = O.dest; this.$('rowDest').hidden = O.mode !== 'route'; };
+    fillDest();
+    this.$('optDest').addEventListener('change', e => { O.dest = e.target.value; this.modeText(); });
     const respawn = () => { Game.spawn(); Cameras.mode = 'orbit'; };
-    this.$('optAirport').addEventListener('change', e => { O.airport = e.target.value; O.runway = 0; fillRw(); respawn(); this.modeText(); this.bestText(); });
+    this.$('optAirport').addEventListener('change', e => { O.airport = e.target.value; O.runway = 0; fillRw(); fillDest(); respawn(); this.modeText(); this.bestText(); });
     this.$('optRunway').addEventListener('change', e => { O.runway = +e.target.value; respawn(); });
     this.$('optStart').addEventListener('change', e => { O.start = e.target.value; respawn(); });
-    this.$('optMode').addEventListener('change', e => { O.mode = e.target.value; this.modeText(); });
+    this.$('optMode').addEventListener('change', e => { O.mode = e.target.value; fillDest(); this.modeText(); });
     this.$('optDifficulty').addEventListener('change', e => { O.difficulty = e.target.value; setRunwayDifficulty(O.difficulty); AirportScenery.rebuild(); fillRw(); respawn(); this.bestText(); });
     this.$('optTurb').addEventListener('change', e => { O.turb = e.target.checked; });
     this.$('optAutoTrim').addEventListener('change', e => { O.autoTrim = e.target.checked; });
@@ -2853,7 +2863,10 @@ const UI = {
   bestText() { const O = Game.opts, b = Best.get(O.aircraft, O.airport, O.difficulty); this.$('bestNote').textContent = b ? `Your best landing here in this aircraft: ${b.score} / 100 (${b.fpm} fpm, ${b.date}).` : 'No landing recorded here yet in this aircraft.'; },
   replay(on) { this.el.replaybar.hidden = !on; if (!on && this.reportWasOpen) { this.el.report.hidden = false; this.reportWasOpen = false; } },
   replayTime(t) { this.el.replaytime.textContent = (t < 0 ? 'touchdown in ' + (-t).toFixed(1) + ' s' : (t).toFixed(1) + ' s after touchdown') + '   (' + Cameras.mode + ' camera)'; },
-  modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[O.airport === 'LEBL' ? 'LEPA' : 'LEBL']; this.$('modeNote').textContent = O.mode === 'route' ? `Timed flight ${a.city} to ${b.city}: about 110 nm on a heading near ${O.airport === 'LEBL' ? '165' : '345'}\u00b0. The summary appears once you have landed and slowed down at ${b.city}.` : 'No objectives. Every landing on a runway is still scored.'; },
+  modeText() { const O = Game.opts, a = AIRPORTS[O.airport], b = AIRPORTS[Game.destOf(O)];
+    // F1 (H9): distancia i rumb de les coordenades reals (distanceKm, bearingDeg), no el text fix de LEBL-LEPA
+    const nm = Math.round(distanceKm(a.lat, a.lon, b.lat, b.lon) * 1000 / NM), hdg = ('00' + Math.round(bearingDeg(a.lat, a.lon, b.lat, b.lon)) % 360).slice(-3);
+    this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg }) : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();

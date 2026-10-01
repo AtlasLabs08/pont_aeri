@@ -1,7 +1,7 @@
 /* Geografia: projeccio lat/lon, costa, serralades, valls, urbanitzacio, vies.
  * ORIGEN: linies 1272-1368 de l'original (SECTION 8).
  *
- * EXPORTA: GEO ll distanceKm COAST RIDGES VALLEYS URBAN ROADS
+ * EXPORTA: GEO ll distanceKm bearingDeg COAST RIDGES VALLEYS URBAN ROADS
  *
  * IMPORTA: res de core. Son dades geografiques pures.
  */
@@ -14,6 +14,12 @@ export function distanceKm(lat1, lon1, lat2, lon2) {
   const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+/** rumb inicial ortodromic (graus veritables, 0..360) de (lat1, lon1) a (lat2, lon2). F1: text del vol cronometrat */
+export function bearingDeg(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180, dLon = (lon2 - lon1) * r;
+  const y = Math.sin(dLon) * Math.cos(lat2 * r), x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dLon);
+  return (Math.atan2(y, x) / r + 360) % 360;
 }
 
 /* ---- coastlines as (lon, lat) polygons ---- */
