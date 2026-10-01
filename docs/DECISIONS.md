@@ -842,3 +842,70 @@ fisica ni test/snapshot.json.
   sintonitzat i despres la pista d arribada.
 - UI.modeText afegeix la pista d arribada ("LERS 25") i s actualitza si es
   canvia el vent al menu.
+
+## 2026-10-01 - F1: H11-H15, la pista d arribada sempre al ND
+
+Decisions d en Marc despres de provar el PR #31 al navegador. Substitueixen
+l entrada anterior sobre la pista d arribada (en conserven el que encaixa).
+Volant cap a LESU, les muntanyes tapaven l aeroport i el ND no deia ni on era
+la pista ni per on enfilar-la; en mode ruta la linia magenta anava d aeroport
+a aeroport, l ILS sintonitzat era el de l aeroport mes proper, i la linia
+continua (ruta) i la discontinua (localitzador) no s entenien. Objectiu: que
+el pilot sapiga sempre, nomes mirant el ND, on es la pista d arribada i per on
+l ha d enfilar, encara que no la vegi. Sense tocar la fisica de
+core/flight-model.js ni test/snapshot.json.
+
+- H11. Pista d arribada (arrivalEnd i flightApproach, world/ils.js, purs): al
+  desti, el cap amb ILS; si n hi ha diversos o cap, el de mes vent de cara amb
+  el vent del vol; sense vent, el de la pista mes llarga (empat: el primer
+  cap). En mode 'route', la del desti; a l inici "en final", la de la propia
+  arrencada; a la resta de Free Flight, la de l aeroport triat.
+- H12. Aproximacio a tots els caps: en.kind 'ILS' als caps de H3 i 'RNP' a la
+  resta dels aeroports nous; LEBL i LEPA, tots 'ILS'. Mateixa interficie que
+  l ILS (ILS.nav: curs i senda de 3 graus); el PFD mostra "ILS 25" o "RNP 21"
+  amb les mateixes escales. Marques i llums segueixen H4. El pilot automatic
+  segueix la RNP a traves de world/ils.js sense tocar core/ (llegeix nomes la
+  geometria de nav).
+- H13. Sintonia: en mode 'route', des de l enlairament, l aproximacio de la
+  pista d arribada; a l inici "en final", la de la pista de l arrencada. Fora
+  d aixo, com abans (l auto-sintonia, que nomes tria ILS).
+- H14. Ruta del ND: en mode 'route', final de la pista de sortida -> FF (10 nm
+  sobre l eix allargat de la pista d arribada, nom "FF" + designacio) ->
+  llindar; a l inici "en final" i a Free Flight sense ruta, FF -> llindar. La
+  pista d arribada i el FF es dibuixen sempre. Al costat del desti, la
+  distancia i el temps fins al FF. UI.modeText diu la pista d arribada.
+- H15. Un estil per a cada cosa al ND: ruta magenta continua i gruixuda; curs
+  sintonitzat cian discontinu, del llindar fins mes enlla del FF, amb
+  l etiqueta "ILS 25" o "RNP 21" a l extrem; pista d arribada en verd amb el
+  nom; FF en rombe amb el nom. Cap altra linia magenta. Llegenda petita amb
+  els quatre elements.
+
+Com s ha aplicat:
+
+- Mode 'route' amb inici en final: mana la ruta (la pista d arribada es la
+  del desti).
+- Llicons: res no canvia. Game.step nomes fa la sintonia d H13 fora de les
+  llicons, el ND de les llicons no rep la ruta ni la pista d arribada, i la
+  distancia a la pista no prefereix la pista d arribada. Comprovat al
+  Chromium amb les llicons ils, landing i taxi: el mateix ILS i el mateix cap
+  que a dev.
+- El curs cian i el nom al PFD surten encara que no hi hagi senyal (mes
+  enlla de 25 nm); les agulles, nomes amb senyal.
+- La linia del rumb seleccionat del pilot automatic (abans magenta
+  discontinua) passa a gris; el requadre del rumb seleccionat continua
+  magenta, perque no es una linia.
+- Textos nous de la llegenda a i18n (nd.legend.*). Els identificadors (FF21,
+  RW21, RNP 21) i les unitats (NM, MIN) son els del ND.
+- Terreny: conca de 4 km (terrain.corridor.basin) al voltant del FF de cada
+  cap nou, 120 m sota la senda al FF i parets al 20 %. Al Prat -> La Seu (03,
+  sense vent) el tram final creuava la paret del passadis a 1.854 m, per
+  sobre del FF (1.793 m), i el gir al FF entrava a les parets. Amb la conca,
+  el turbohelix hi aterra seguint la ruta.
+- Limit conegut, sense resoldre: Prat -> La Seu quan la pista d arribada es
+  la 21 (vent del sud-oest). El tram directe fins al FF21 creua relleu natural
+  de 2.700-2.800 m entre 13 i 8 nm abans del FF, per sobre d un descens de
+  3 graus cap al FF; seguint la ruta tal com la defineix H14 no s hi pot
+  baixar. Proposta per a en Marc (no implementada perque canvia H14): un punt
+  intermedi sobre l eix allargat mes enlla del FF (per exemple a 20 nm), o
+  que H11 descarti un cap si el tram fins al seu FF no es pot volar des de
+  l origen.
