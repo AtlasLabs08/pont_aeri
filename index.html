@@ -1699,8 +1699,8 @@ const Instruments = {
     c.strokeStyle = '#2b7a8c'; c.lineWidth = 1.5; c.fillStyle = 'rgba(60,80,50,0.35)';
     for (const P of World.coastPolys || []) { c.beginPath(); let any = false; P.forEach((p, i) => { const s = toS(p[0], p[1]); if (Math.abs(s[0]) < 3000 && Math.abs(s[1]) < 3000) any = true; if (i) c.lineTo(s[0], s[1]); else c.moveTo(s[0], s[1]); }); c.closePath(); if (any) { c.fill(); c.stroke(); } }
     // route
-    if (S.route) { c.strokeStyle = K.mag; c.lineWidth = 2.5; c.beginPath(); S.route.forEach((p, i) => { const s = toS(p.e, p.n); if (i) c.lineTo(s[0], s[1]); else c.moveTo(s[0], s[1]); }); c.stroke();
-      this.font(c, 13); c.fillStyle = K.white; c.textAlign = 'left'; for (const p of S.route) { const s = toS(p.e, p.n); c.strokeStyle = K.white; c.lineWidth = 1.5; c.beginPath(); c.moveTo(s[0], s[1] - 6); c.lineTo(s[0] + 6, s[1]); c.lineTo(s[0], s[1] + 6); c.lineTo(s[0] - 6, s[1]); c.closePath(); c.stroke(); c.fillText(p.name, s[0] + 9, s[1] - 8); } }
+    // F1 (H15): planned route, magenta, solid and thick (the final approach fix is drawn below, the runway in green)
+    if (S.route) { c.strokeStyle = K.mag; c.lineWidth = 4; c.lineJoin = 'round'; c.beginPath(); S.route.forEach((p, i) => { const s = toS(p.e, p.n); if (i) c.lineTo(s[0], s[1]); else c.moveTo(s[0], s[1]); }); c.stroke(); }
     // airports: runways to scale + label
     for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id]; c.strokeStyle = K.white; c.lineWidth = Math.max(2, 50 * sc);
       for (const r of A.runways) { const p1 = A.toWorld(r.p1[0], r.p1[1]), p2 = A.toWorld(r.p2[0], r.p2[1]), a = toS(p1[0], p1[1]), b = toS(p2[0], p2[1]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
@@ -1711,17 +1711,18 @@ const Instruments = {
       this.font(c, 13, true); c.fillStyle = K.green; c.textAlign = 'right'; c.fillText('RW' + S.arrEnd.id, t[0] - 8, t[1] + 4);
       const F = toS(S.arrFF.e, S.arrFF.n); c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.moveTo(F[0], F[1] - 7); c.lineTo(F[0] + 7, F[1]); c.lineTo(F[0], F[1] + 7); c.lineTo(F[0] - 7, F[1]); c.closePath(); c.stroke();
       this.font(c, 13, true); c.fillStyle = K.white; c.textAlign = 'left'; c.fillText(S.arrFF.name, F[0] + 10, F[1] - 8); }
-    if (S.nav && S.nav.locValid) { const A = AIRPORTS[S.nav.apt], en = A && A.allEnds[S.nav.idx];
+    // F1 (H15): tuned approach course (ILS or RNP), cyan and dashed, from the threshold to beyond the final approach fix
+    if (S.nav && (S.nav.locValid || S.arrA)) { const A = AIRPORTS[S.nav.apt], en = A && A.allEnds[S.nav.idx];
       if (en) { const p0 = A.toWorld(en.thr[0], en.thr[1]), p1 = A.toWorld(en.thr[0] - en.dir[0] * 15 * NM, en.thr[1] - en.dir[1] * 15 * NM), a = toS(p0[0], p0[1]), b = toS(p1[0], p1[1]);
-        c.strokeStyle = K.mag; c.lineWidth = 1.8; c.setLineDash([12, 8]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
-        this.font(c, 13, true); c.fillStyle = K.mag; c.textAlign = 'left'; c.fillText(S.nav.ident, b[0] + 6, b[1]); } }
+        c.strokeStyle = K.cyan; c.lineWidth = 2.5; c.setLineDash([12, 8]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
+        this.font(c, 13, true); c.fillStyle = K.cyan; c.textAlign = 'left'; c.fillText(S.nav.ident, b[0] + 6, b[1]); } }
     // range arcs + compass rose
     c.strokeStyle = '#8a8f98'; c.lineWidth = 1.2; c.setLineDash([6, 6]); for (const k of [0.25, 0.5, 0.75]) { c.beginPath(); c.arc(cx, cy, R * k, Math.PI * 1.08, Math.PI * 1.92); c.stroke(); } c.setLineDash([]);
     c.restore();
     c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, R, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
     this.font(c, 14); c.fillStyle = K.white; c.textAlign = 'center'; c.textBaseline = 'middle';
     for (let h = 0; h < 360; h += 5) { const a = wrapPi((h - o.hdg) * DEG); if (Math.abs(a) > 0.43 * Math.PI) continue; const s = Math.sin(a), k = Math.cos(a), r1 = h % 10 === 0 ? R + 12 : R + 7; c.beginPath(); c.moveTo(cx + s * R, cy - k * R); c.lineTo(cx + s * r1, cy - k * r1); c.stroke(); if (h % 30 === 0) c.fillText(h / 10, cx + s * (R + 24), cy - k * (R + 24)); }
-    const ba = wrapPi((ap.selHdg - o.hdg) * DEG); if (Math.abs(ba) < 0.43 * Math.PI) { c.save(); c.translate(cx, cy); c.rotate(ba); c.strokeStyle = K.mag; c.lineWidth = 3; c.strokeRect(-9, -R - 12, 18, 10); if (ap.on) { c.setLineDash([8, 8]); c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -R); c.stroke(); } c.restore(); }
+    const ba = wrapPi((ap.selHdg - o.hdg) * DEG); if (Math.abs(ba) < 0.43 * Math.PI) { c.save(); c.translate(cx, cy); c.rotate(ba); c.strokeStyle = K.mag; c.lineWidth = 3; c.strokeRect(-9, -R - 12, 18, 10); if (ap.on) { c.strokeStyle = '#8a8f98'; c.setLineDash([3, 6]); c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -R); c.stroke(); } c.restore(); }
     // track line + aircraft symbol
     c.save(); c.translate(cx, cy); c.rotate(wrapPi((o.track - o.hdg) * DEG) * (o.gs > 30 ? 1 : 0)); c.strokeStyle = K.green; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, -20); c.lineTo(0, -R); c.stroke(); c.restore();
     c.strokeStyle = K.amber; c.lineWidth = 3; c.beginPath(); c.moveTo(cx, cy - 16); c.lineTo(cx, cy + 22); c.moveTo(cx - 18, cy); c.lineTo(cx + 18, cy); c.moveTo(cx - 8, cy + 18); c.lineTo(cx + 8, cy + 18); c.stroke();
@@ -1736,6 +1737,13 @@ const Instruments = {
     // F1 (H14): beside the destination, distance and time to the final approach fix
     if (S.arrA && S.arrFF) { const d = Math.hypot(S.arrFF.e - f.e, S.arrFF.n - f.n) / NM, eta = o.gs > 40 ? d / o.gs * 60 : 0; c.textAlign = 'right'; c.fillStyle = K.white; c.fillText(S.arrFF.name, 418, 16);
       c.fillStyle = K.green; c.fillText(d.toFixed(1) + ' NM', 418, 36); if (eta) c.fillText(Math.round(eta) + ' MIN', 418, 56); }
+    // F1 (H15): small legend of the four guidance symbols (Free Flight only)
+    if (S.arrA) { const x = 382, y = 418, row = (k, i, draw) => { draw(x + 8, y + 12 + i * 17); c.fillStyle = '#c9ced6'; c.textAlign = 'left'; c.fillText(t(k), x + 36, y + 13 + i * 17); };
+      c.fillStyle = 'rgba(8,12,18,0.72)'; c.fillRect(x, y, 124, 74); this.font(c, 11); c.textBaseline = 'middle';
+      const seg = (col, w, dash) => (x0, y0) => { c.strokeStyle = col; c.lineWidth = w; c.setLineDash(dash); c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 + 20, y0); c.stroke(); c.setLineDash([]); };
+      row('nd.legend.route', 0, seg(K.mag, 4, [])); row('nd.legend.course', 1, seg(K.cyan, 2, [6, 4])); row('nd.legend.runway', 2, seg(K.green, 5, []));
+      row('nd.legend.fix', 3, (x0, y0) => { c.strokeStyle = K.white; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0 + 10, y0 - 5); c.lineTo(x0 + 15, y0); c.lineTo(x0 + 10, y0 + 5); c.lineTo(x0 + 5, y0); c.closePath(); c.stroke(); });
+      this.font(c, 15); }
     c.textAlign = 'left'; c.fillStyle = K.cyan; c.fillText('RNG ' + rng, 10, 498); c.fillStyle = '#8a8f98'; c.fillText(rng / 2, cx + 6, cy - R / 2 - 8);
   },
 
