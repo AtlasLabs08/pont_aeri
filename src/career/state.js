@@ -210,6 +210,11 @@ function checkMarket(m, err) {
     need(err, at + '.maintenance', l.maintenance, v => isObject(v) &&
       isNonNegative(v.nextAHours) && isNonNegative(v.nextCHours));
     need(err, at + '.price', l.price, isNatural, 'ha de ser un enter d euros no negatiu');
+    // K1: opcionals, un anunci desat abans de les ofertes no els te
+    if (l.listPrice !== undefined) need(err, at + '.listPrice', l.listPrice, isNatural, 'ha de ser un enter d euros no negatiu');
+    if (l.offerPct !== undefined) {
+      need(err, at + '.offerPct', l.offerPct, v => typeof v === 'number' && v >= 0 && v < 1, 'ha de ser un numero a [0, 1)');
+    }
   });
 }
 

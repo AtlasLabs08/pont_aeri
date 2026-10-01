@@ -46,7 +46,16 @@
  *     2 * hoursJitter * u)); cycles = round(hours / hoursPerCycle[cls]);
  *     maintenance.nextAHours / nextCHours = hours + enter uniforme entre 1
  *     i checks.A / C.intervalHours (hores absolutes, com wear.js); reg
- *     'EC-' + 3 lletres, unica entre la flota i la llista; price = priceOf.
+ *     'EC-' + 3 lletres, unica entre la flota i la llista; listPrice =
+ *     priceOf, offerPct = 0 i price = listPrice.
+ *       3) Ofertes (K1, docs/DECISIONS.md 01/10/2026): despres de 1) i 2),
+ *          amb el mateix flux, de manera que no canvia cap altra tirada. k =
+ *          enter uniforme de market.offers.count (com a molt la mida de la
+ *          llista); k anuncis diferents, de qualsevol categoria, reben
+ *          offerPct = uniforme dins de offers.discount i price =
+ *          round(listPrice * (1 - offerPct)). Els anuncis desats abans de K1
+ *          no tenen listPrice ni offerPct: es llegeixen com listPrice =
+ *          price i offerPct = 0.
  *   refreshMarket(state) -> la mateixa partida si state.market.epoch >=
  *     marketEpoch(clock.minute); si falta market o l epoch calculat es mes
  *     gran, una partida nova amb market = generateMarket(state, epoch).
@@ -158,8 +167,9 @@ export function generateMarket(state, epoch) {
       nextAHours: hours + randInt(1, BALANCE.checks.A.intervalHours),
       nextCHours: hours + randInt(1, BALANCE.checks.C.intervalHours)
     };
+    const listPrice = priceOf(typeId, tier, ageYears, condition);
     listings.push({ reg: newReg(), typeId, tier, yearBuilt: M.referenceYear - ageYears, hours, cycles,
-      condition, maintenance, price: priceOf(typeId, tier, ageYears, condition) });
+      condition, maintenance, listPrice, offerPct: 0, price: listPrice });
     covered.add(typeId);
   };
 
@@ -182,6 +192,18 @@ export function generateMarket(state, epoch) {
     const group = groups[weighted(M.mix)];
     const pool = group.length ? group : groups.rated.length ? groups.rated : types;
     add(pick(pool), pickTier());
+  }
+
+  // 3) Ofertes (K1): despres de tot lo anterior, perque no mogui cap altra tirada
+  const [lo, hi] = M.offers.count;
+  const k = Math.min(randInt(lo, hi), listings.length);
+  const idx = listings.map((_, i) => i);
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(u() * (idx.length - i));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+    const l = listings[idx[i]];
+    l.offerPct = lerp(M.offers.discount[0], M.offers.discount[1], u());
+    l.price = Math.round(l.listPrice * (1 - l.offerPct));
   }
   return { epoch, listings };
 }

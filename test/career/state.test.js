@@ -313,6 +313,8 @@ describe('validate: mercat i categoria (D2+D5, G11)', () => {
       [s => { s.market.listings = {}; }, /market\.listings/],
       [s => { s.market.listings[0].tier = 'gold'; }, /market\.listings\[0\]\.tier/],
       [s => { s.market.listings[0].price = 1.5; }, /market\.listings\[0\]\.price/],
+      [s => { s.market.listings[0].listPrice = -1; }, /market\.listings\[0\]\.listPrice/],
+      [s => { s.market.listings[0].offerPct = 1; }, /market\.listings\[0\]\.offerPct/],
       [s => { delete s.market.listings[0].condition.engines; }, /market\.listings\[0\]\.condition/],
       [s => { s.market.listings[0].maintenance = { nextAHours: 1 }; }, /market\.listings\[0\]\.maintenance/],
       [s => { s.market.listings[1].reg = 'EC-KAA'; }, /matricula repetida EC-KAA/]
