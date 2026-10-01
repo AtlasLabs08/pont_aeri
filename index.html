@@ -933,6 +933,7 @@ const Terrain = {
       const e = nd.e0 + i * step, n = nd.n0 + j * step, hi = (j + 1) * M + (i + 1);
       let h = H[hi];
       const ab = World._airportBlend(e, n); if (ab && !ab[3].photo) h -= 2.2 * smoothstep(0.80, 1.0, ab[0]);       // sink under the airport slab
+      else { const sp = World._shapeAt(e, n); if (sp && sp.d < 450) h -= 2.2 * (1 - smoothstep(370, 450, sp.d)); }      // F1: the same under the slab of a new airport (bounds + 260 m)
       pos[k * 3] = e - ce; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -(n - cn);
       const dx = J.fine ? J.DX[hi] : (H[hi + 1] - H[hi - 1]) / (2 * step), dn = J.fine ? J.DN[hi] : (H[hi + M] - H[hi - M]) / (2 * step), il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
       nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = dn * il;
@@ -1090,11 +1091,29 @@ const AirportScenery = {
     const asph = noiseTexture(256, [58, 60, 64], 0.10, 11, 1, true), conc = noiseTexture(256, [128, 128, 124], 0.08, 12, 1), grass = noiseTexture(256, [74, 98, 52], 0.12, 13, 1);
     const layer = (map, k, extra) => new THREE.MeshStandardMaterial(Object.assign({ map, roughness: 0.95, metalness: 0, side: THREE.DoubleSide, depthWrite: false }, extra || {}));      // coplanar-safe: stacked a few cm apart, drawn in order, never written to depth
     this.mats = { grass: new THREE.MeshStandardMaterial({ map: grass, roughness: 1, side: THREE.DoubleSide }), twy: layer(conc, 1), rwy: layer(asph, 2), white: layer(null, 3, { color: 0xe9e9e4 }), yellow: layer(null, 3, { color: 0xe0b41c }), rubber: layer(null, 3, { color: 0x111111, transparent: true, opacity: 0.35 }) };
-    for (const id of AIRPORT_ORDER) this.build(AIRPORTS[id]);
+    this.shared = new Set([...Object.values(this.mats), this.lightMat, this.bMat]);
+    for (const id of AIRPORT_ORDER) this.place(AIRPORTS[id]);
+    this.update(Game.fdm ? Game.fdm.e : AIRPORTS.LEBL.e, Game.fdm ? Game.fdm.n : AIRPORTS.LEBL.n);
+  },
+  // F1 (H8): l escenografia d un aeroport es construeix a menys de BUILD_M i s allibera a mes de DROP_M
+  BUILD_M: 60000, DROP_M: 80000,
+  /** torre per a la camera de torre, encara que l escenografia no estigui construida */
+  place(A) { const tw = A.tower; A.towerPos = A.toWorld(tw.a, tw.c); A.towerH = A.elev + tw.h + 3; },
+  /** construeix els aeroports propers a (e, n) i allibera els llunyans (geometria i materials propis) */
+  update(e, n) {
+    for (const id of AIRPORT_ORDER) {
+      const A = AIRPORTS[id], d = Math.hypot(e - A.e, n - A.n);
+      if (!A.group && d < this.BUILD_M) this.build(A); else if (A.group && d > this.DROP_M) { this.dispose(A.group); A.group = null; }
+    }
+  },
+  dispose(g) {
+    unanchor(g); R3.scene.remove(g);
+    g.traverse(o => { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) if (!this.shared.has(m)) m.dispose(); });
   },
   /** after a runway-length (difficulty) change: drop the old airport scenery and build the new layout */
   rebuild() {
-    for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id], g = A.oldGroup; if (g) { unanchor(g); R3.scene.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); A.oldGroup = null; } if (!A.group) this.build(A); }
+    const f = Game.fdm;
+    for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id], g = A.oldGroup; if (g) { this.dispose(g); A.oldGroup = null; } this.place(A); if (!A.group && (!f || Math.hypot(f.e - A.e, f.n - A.n) < this.BUILD_M)) this.build(A); }
   },
   build(A) {
     const grp = new THREE.Group(); anchor(grp, A.e, A.n, A.elev); R3.scene.add(grp); A.group = grp;
@@ -1107,9 +1126,9 @@ const AirportScenery = {
     };
     const seg = (arr, a1, c1, a2, c2, hw) => { const dx = a2 - a1, dy = c2 - c1, l = Math.hypot(dx, dy), nx = -dy / l * hw, ny = dx / l * hw; quad(arr, [[a1 + nx, c1 + ny], [a2 + nx, c2 + ny], [a2 - nx, c2 - ny], [a1 - nx, c1 - ny]]); };
     const photo = !!A.photo;             // photo airport: the orthophoto shows taxiways, aprons and buildings
-    for (const s of A.paved) if (!photo || s.kind === 'rwy') seg(s.kind === 'rwy' ? L.rwy : L.twy, s.a1, s.c1, s.a2, s.c2, s.hw);
-    // taxiway centrelines
-    if (!photo) for (const s of A.paved) if (s.kind === 'twy') seg(L.yellow, s.a1, s.c1, s.a2, s.c2, 0.35);
+    for (const s of A.paved) if ((!photo || s.kind === 'rwy') && !s.backtrack) seg(s.kind === 'rwy' ? L.rwy : L.twy, s.a1, s.c1, s.a2, s.c2, s.hw);
+    // taxiway centrelines (the backtrack lane of a small airport is the runway itself: not painted)
+    if (!photo) for (const s of A.paved) if (s.kind === 'twy' && !s.backtrack) seg(L.yellow, s.a1, s.c1, s.a2, s.c2, 0.35);
     const LS = new LightSet(), WH = [1, 0.96, 0.85], YE = [1, 0.75, 0.2], RE = [1, 0.08, 0.05], GR = [0.1, 1, 0.3], BL = [0.15, 0.3, 1], TG = [0.2, 1, 0.45];
     const yAt = (a, c) => { const w = A.toWorld(a, c); return Math.max(World.heightAt(w[0], w[1]), 0) - A.elev; };
     // ---- runways ----
@@ -1129,9 +1148,9 @@ const AirportScenery = {
         if (ei === 0) for (let s = 100; s < R.len - 100; s += 50) rect(L.white, s, s + 30, -0.45, 0.45);
         // side stripes
         if (ei === 0) for (const sg of [1, -1]) rect(L.white, 0, R.len, sg * (hw - 1.5), sg * (hw - 0.4));
-        // aiming point + touchdown zone
+        // aiming point + touchdown zone (F1, H4: an end without ILS has no touchdown zone marks and no approach lights)
         for (const sg of [1, -1]) rect(L.white, 400, 455, sg * 9, sg * 17);
-        [[150, 3], [300, 3], [600, 2], [750, 2], [900, 1]].forEach(([s, nb]) => { for (const sg of [1, -1]) for (let b = 0; b < nb; b++) rect(L.white, s, s + 22.5, sg * (9 + b * 3.2), sg * (11 + b * 3.2)); });
+        if (en.ils !== false) [[150, 3], [300, 3], [600, 2], [750, 2], [900, 1]].forEach(([s, nb]) => { for (const sg of [1, -1]) for (let b = 0; b < nb; b++) rect(L.white, s, s + 22.5, sg * (9 + b * 3.2), sg * (11 + b * 3.2)); });
         rect(L.rubber, 300, 750, -7, 7);
         // ---- lights for a landing in this direction (beam points back toward the approaching aircraft) ----
         const hdg = en.hdg * DEG, beam = hdg + Math.PI, put = (s, t, col, size, type, extra, yy) => { const p = P(s, t); LS.add(X(p[0], p[1]), yy === undefined ? 0.3 : yy, Z(p[0], p[1]), col, size, type, beam, extra); };
@@ -1139,16 +1158,18 @@ const AirportScenery = {
         for (let s = 0; s <= R.len; s += 60) for (const sg of [1, -1]) put(s, sg * (hw + 2), s > R.len - 600 ? YE : WH, 1.25, 1);   // edge (last 600 m yellow)
         for (let s = 15; s < R.len; s += 30) { const rem = R.len - s; put(s, 0, rem < 300 ? RE : (rem < 900 && Math.floor(s / 30) % 2 ? RE : WH), 0.9, 1); }   // centreline colour coding
         // approach lighting system: 900 m centreline barrettes + crossbar at 300 m + sequenced flashers
-        for (let s = -30; s >= -900; s -= 30) { const p = P(s, 0), yy = yAt(p[0], p[1]) + 1.5; for (const t of [-1.5, 0, 1.5]) put(s, t, WH, 1.5, 1, 0, yy); if (s <= -300) put(s, 0, [1, 1, 1], 3.2, 3, (900 + s) / 600 * 0.42, yy + 0.3); }
-        for (let t = -15; t <= 15; t += 3) if (Math.abs(t) > 2) { const p = P(-300, t); put(-300, t, WH, 1.5, 1, 0, yAt(p[0], p[1]) + 1.5); }
-        for (let s = -30; s >= -270; s -= 30) for (const sg of [1, -1]) for (const t of [7.5, 9, 10.5]) { const p = P(s, sg * t); put(s, sg * t, RE, 1.2, 1, 0, yAt(p[0], p[1]) + 1.5); }
+        if (en.ils !== false) {
+          for (let s = -30; s >= -900; s -= 30) { const p = P(s, 0), yy = yAt(p[0], p[1]) + 1.5; for (const t of [-1.5, 0, 1.5]) put(s, t, WH, 1.5, 1, 0, yy); if (s <= -300) put(s, 0, [1, 1, 1], 3.2, 3, (900 + s) / 600 * 0.42, yy + 0.3); }
+          for (let t = -15; t <= 15; t += 3) if (Math.abs(t) > 2) { const p = P(-300, t); put(-300, t, WH, 1.5, 1, 0, yAt(p[0], p[1]) + 1.5); }
+          for (let s = -30; s >= -270; s -= 30) for (const sg of [1, -1]) for (const t of [7.5, 9, 10.5]) { const p = P(s, sg * t); put(s, sg * t, RE, 1.2, 1, 0, yAt(p[0], p[1]) + 1.5); }
+        }
         // PAPI: four units left of the runway abeam the aiming point, 3 degree glide path
         [3.5, 3.17, 2.83, 2.5].forEach((ang, i) => put(420, hw + 15 + i * 9, WH, 3.0, 2, ang, 0.8));
         en.papi = P(420, 0);
       });
     }
     // ---- taxiway lights ----
-    for (const s of A.paved) if (s.kind === 'twy') {
+    for (const s of A.paved) if (s.kind === 'twy' && !s.backtrack) {
       for (let t = 0; t <= s.L; t += 30) { const a = s.a1 + s.ux * t, c = s.c1 + s.uy * t; if (!A.paved.some(o => o.kind === 'rwy' && airportSegContains(o, a, c))) LS.add(X(a, c), 0.2, Z(a, c), TG, 0.55, 0); }
       for (let t = 0; t <= s.L; t += 45) for (const sg of [1, -1]) { const a = s.a1 + s.ux * t - s.uy * sg * s.hw, c = s.c1 + s.uy * t + s.ux * sg * s.hw; if (!A.paved.some(o => o !== s && airportSegContains(o, a, c))) LS.add(X(a, c), 0.35, Z(a, c), BL, 0.7, 0); }
     }
@@ -1168,13 +1189,15 @@ const AirportScenery = {
     const boxes = [];
     for (const t of A.terminals) boxes.push({ a: t.a, c: t.c, la: t.la, lc: t.lc, h: t.h, col: [0.82, 0.85, 0.88] });
     const rnd = makeRng(A.icao.charCodeAt(3) * 77);
-    for (let i = 0; i < 7; i++) boxes.push({ a: b[0] + 500 + i * 330, c: b[3] - 140 - rnd() * 60, la: 120 + rnd() * 120, lc: 70 + rnd() * 40, h: 14 + rnd() * 12, col: [0.7 + rnd() * 0.2, 0.7 + rnd() * 0.15, 0.68 + rnd() * 0.15] });   // cargo / hangars on the far side
+    if (A.hangars) for (const h of A.hangars) boxes.push({ a: h.a, c: h.c, la: h.la, lc: h.lc, h: h.h, col: [0.7 + rnd() * 0.2, 0.7 + rnd() * 0.15, 0.68 + rnd() * 0.15] });   // F2: procedural airports
+    else for (let i = 0; i < 7; i++) boxes.push({ a: b[0] + 500 + i * 330, c: b[3] - 140 - rnd() * 60, la: 120 + rnd() * 120, lc: 70 + rnd() * 40, h: 14 + rnd() * 12, col: [0.7 + rnd() * 0.2, 0.7 + rnd() * 0.15, 0.68 + rnd() * 0.15] });   // cargo / hangars on the far side
     const bx = boxes;
-    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this.bMat, bx.length + A.gates.length), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), col = new THREE.Color();
+    const bridges = A.gates.filter(g => g.bridge !== false);
+    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this.bMat, bx.length + bridges.length), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), col = new THREE.Color();
     Q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(Z(1, 0), X(1, 0)));
     bx.forEach((o, i) => { M4.compose(new THREE.Vector3(X(o.a, o.c), o.h / 2, Z(o.a, o.c)), Q, new THREE.Vector3(o.la, o.h, o.lc)); inst.setMatrixAt(i, M4); inst.setColorAt(i, col.setRGB(o.col[0], o.col[1], o.col[2])); });
     // jet bridges: a small box from the terminal toward every stand
-    A.gates.forEach((g, i) => { const toT = g.c > 600 ? 1 : (g.c > 0 ? -1 : 1), len = 38; M4.compose(new THREE.Vector3(X(g.a + 9, g.c + toT * 30), 5.2, Z(g.a + 9, g.c + toT * 30)), Q, new THREE.Vector3(4, 3.2, len)); inst.setMatrixAt(bx.length + i, M4); inst.setColorAt(bx.length + i, col.setRGB(0.75, 0.77, 0.8)); });
+    bridges.forEach((g, i) => { const toT = g.tdir || (g.c > 600 ? 1 : (g.c > 0 ? -1 : 1)), len = 38; M4.compose(new THREE.Vector3(X(g.a + 9, g.c + toT * 30), 5.2, Z(g.a + 9, g.c + toT * 30)), Q, new THREE.Vector3(4, 3.2, len)); inst.setMatrixAt(bx.length + i, M4); inst.setColorAt(bx.length + i, col.setRGB(0.75, 0.77, 0.8)); });
     inst.castShadow = true; inst.receiveShadow = true; inst.frustumCulled = false; grp.add(inst);
     // stand markings
     // control tower
@@ -2748,7 +2771,7 @@ const Main = {
     Env.U.uTime.value = this.vtime % 3600;         // visual clock: waves and flashers ignore time acceleration and replays
     if (this.frameN % 3 === 0 || Game.state === 'menu') Env.update(Game.state === 'menu' ? Game.opts.hours : Game.hours, cam.position.y, Cameras.fwd);
     Env.frame(cam, [Game.mdl.root.position.x, Game.mdl.root.position.y, Game.mdl.root.position.z], f.cfg.geom.b * 0.95 + 25);
-    Sea.frame(cam); Clouds.frame(camE, camN, cam.position.y, dt); AirportScenery.frame();
+    Sea.frame(cam); Clouds.frame(camE, camN, cam.position.y, dt); AirportScenery.frame(); if (Game.fdm) AirportScenery.update(Game.fdm.e, Game.fdm.n);
     if (this.frameN % 20 === 0) Scenery.cull(camE, camN);
     Terrain.update(camE, camN, cam.position.y, Game.timeAccel > 2 ? 7 : 4);
     const S = Game.snapshot(); if (Cameras.mode === 'cockpit') Cockpit.frame(S, dt);
