@@ -1098,9 +1098,13 @@ de Copernicus GLO-30 a tot el mapa, a la graella G de 250 m.
 - TA-9. Les comprovacions del #31 (senda amb 300 ft de marge, H16, MEA
   d H17) es mantenen sobre el terreny real. Decisio del projecte, despres de
   veure la taula de caps:
-  - Tolerancia de 20 m als primers 1.300 m del llindar: el terreny hi pot
-    quedar fins a 20 m per sobre de l elevacio de l aeroport (NEAR_THR_M,
-    NEAR_THR_TOL_M a route.js, glidePathMargin). La resta, igual.
+  - Tolerancia de 20 m a tot el tram on la senda es a menys de 300 ft sobre
+    la pista, sense forat: el terreny hi pot quedar fins a 20 m per sobre de
+    l elevacio de l aeroport (NEAR_THR_TOL_M a route.js, glidePathMargin).
+    El tram es calcula per a cada cap amb el seu angle (nearThresholdM:
+    300 ft / tan(angle) des de l origen de la senda, ILS.GS_S m enlla del
+    llindar; 1.324,8 m a 3 graus, 1.032 m a 3,6) i acaba exactament on
+    comenca la regla dels 300 ft. La resta, igual.
   - Senda per cap: angle a les dades de l aproximacio (APPROACH_DATA a
     airports.js, glideAngle a ils.js), 3 graus per defecte. LESU 03 a 3,6
     graus. El pilot automatic de core/ (sense canvis) llegeix ILS.GS, que
@@ -1117,15 +1121,18 @@ Com s ha aplicat:
 - Cims, maxim a 1,5 km: Puigmal 2.881 m (real 2.913), Turo de l Home
   1.658 m (1.706), Montserrat 1.153 m (1.236; la mitjana de 250 m retalla les
   agulles).
-- La tolerancia de 20 m s aplica, literalment, fins als 1.300 m. La senda
-  queda 300 ft per sobre de l elevacio a uns 1.325 m del llindar, i entre
-  els dos punts el limit torna a ser l elevacio de l aeroport: set caps hi
-  fallen per poc. Caps sense aproximacio directa: LEBL 20 (-4,7 m), LEPA
-  06L (-0,1 m) i 24L (-2,7 m), LERS 07 (-0,7 m), LEMH 19 (-0,6 m), LELL 13
-  (-18,9 m), LEDA 31 (-15,2 m), tots a 1.325 m, i LESU 21 (124 m per
-  sobre de la senda a 9,6 km, el FF i el tram IF -> FF tampoc). Una prova
-  (test/terrain-real.test.js) comprova que tots els de la llista fallen i
-  tots els altres compleixen.
+- Caps sense aproximacio directa: LEBL 20 (-4,7 m), LEPA 06L (-0,1 m) i
+  24L (-2,7 m), LERS 07 (-0,7 m), LEMH 19 (-0,6 m), LELL 13 (-18,9 m) i
+  LEDA 31 (-15,2 m), tots a 1.325 m del llindar, i LESU 21 (124 m per sobre
+  de la senda a 9,6 km, el FF i el tram IF -> FF tampoc). Els set primers
+  fallen al primer punt de la regla dels 300 ft, 0,2 m despres del final de
+  la tolerancia: alla la senda es just a 300 ft de la pista i el limit es
+  l elevacio de l aeroport (+1 cm), mentre que el terreny hi queda uns
+  metres per sobre (el model de superficie). El forat que hi havia amb una
+  tolerancia fixa de 1.300 m no n era la causa: es el pas de 20 m a 0 en
+  acabar la tolerancia. Una prova (test/terrain-real.test.js) comprova que
+  tots els de la llista fallen i tots els altres compleixen, i que el tram
+  de tolerancia de cada cap acaba on la senda passa a 300 ft.
 - Rutes amb les regles del #31: Prat -> Reus, LERS 25 directa al FF (MEA
   2.900 ft), sense vent i amb vent del sud-oest; Prat -> la Seu, LESU 03
   directa al FF (MEA 6.100 ft), sense vent i amb vent del sud-oest (amb 12

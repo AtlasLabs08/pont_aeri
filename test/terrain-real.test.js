@@ -16,7 +16,9 @@
  *   continua sent un turo.
  * - Normals (TA-6): slopeAt es continu a traves de les cel.les.
  * - Photo (TA-7): on el seu pes es 1, mana la seva alcada.
- * - Aproximacions (TA-9): glidePathMargin fins a 10 km i fins a 10 nm + 500 m
+ * - Aproximacions (TA-9): el tram de tolerancia de cada cap (nearThresholdM)
+ *   acaba on la senda passa a 300 ft de la pista; glidePathMargin fins a 10 km
+ *   i fins a 10 nm + 500 m
  *   a tots els caps amb aproximacio directa; els que en son sense, no la
  *   compleixen (la llista d APPROACH_DATA no queda vella).
  *
@@ -28,7 +30,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { World, AIRPORTS, AIRPORT_ORDER, APPROACH_DATA, URBAN_SMOOTH, TERRAIN_FILE, decodeTerrain, packTerrain, unpackTerrain,
-  glidePathMargin, setRunwayDifficulty, setPhoto, airportPavedAt, ll } from '../src/world/index.js';
+  glidePathMargin, nearThresholdM, glideAngle, ILS, GS_CLEAR_FT, setRunwayDifficulty, setPhoto, airportPavedAt, ll } from '../src/world/index.js';
 import { NM, SURF } from '../src/core/index.js';
 import { loadWorld } from './helpers/terrain.js';
 
@@ -153,6 +155,13 @@ describe('TA-9: aproximacions sobre el terreny real', () => {
       const r = glidePathMargin(AIRPORTS[id], en, sMax);
       assert.ok(r.marginM >= 0, `${id} ${en.id} fins a ${sMax} m: ${r.marginM.toFixed(1)} m a ${r.s} m`);
     }
+  });
+  test('el tram de tolerancia acaba exactament on comenca la regla dels 300 ft, a cada cap i amb el seu angle', () => {
+    for (const id of AIRPORT_ORDER) for (const en of AIRPORTS[id].allEnds) {
+      const s = nearThresholdM(en), above = (s + ILS.GS_S) * Math.tan(glideAngle(en));
+      assert.ok(Math.abs(above - GS_CLEAR_FT * 0.3048) < 1e-9, `${id} ${en.id}: la senda hi es a ${above} m de la pista`);
+    }
+    assert.ok(Math.abs(nearThresholdM(AIRPORTS.LESU.allEnds.find(e => e.id === '03')) - (91.44 / Math.tan(3.6 * Math.PI / 180) - 420)) < 1e-9);
   });
   test('els caps sense aproximacio directa (APPROACH_DATA) no la compleixen, i cap aeroport no es queda sense cap', () => {
     for (const id of Object.keys(APPROACH_DATA)) {

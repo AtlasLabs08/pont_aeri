@@ -3,8 +3,8 @@
  * docs/DECISIONS.md, 2026-10-01). Funcions pures: el terreny entra com a
  * funcio groundAt(e, n) (per defecte World.groundAt).
  *
- * EXPORTA: IF_NM LEG_CLEAR_FT LEG_SIDE_NM GS_CLEAR_FT NEAR_THR_M NEAR_THR_TOL_M
- *          approachFix legFlyable legMeaFt glidePathMargin planRoute planArrival
+ * EXPORTA: IF_NM LEG_CLEAR_FT LEG_SIDE_NM GS_CLEAR_FT NEAR_THR_TOL_M
+ *          approachFix legFlyable legMeaFt nearThresholdM glidePathMargin planRoute planArrival
  *
  * IMPORTA: ../core/constants.js, ./ils.js, ./terrain.js
  *
@@ -19,15 +19,21 @@
  *   legMeaFt(p0, p1, groundAt) -> ft   H17a: altitud minima del tram (MEA):
  *     el punt mes alt del terreny a LEG_SIDE_NM a cada costat del tram, mes
  *     LEG_CLEAR_FT, arrodonit cap amunt a 100 ft.
+ *   nearThresholdM(en) -> m   tram del llindar on la senda del cap es a menys
+ *     de GS_CLEAR_FT sobre la pista: GS_CLEAR_FT / tan(glideAngle) des de
+ *     l origen de la senda (ILS.GS_S m enlla del llindar), es a dir
+ *     GS_CLEAR_FT / tan(angle) - ILS.GS_S des del llindar (1.325 m a 3 graus,
+ *     1.032 m a 3,6).
  *   glidePathMargin(A, en, sMax, groundAt) -> { marginM, s }   comprovacio de
  *     la senda del cap (H6 del #31 sobre el terreny real, TA-9): des del
- *     llindar fins a sMax m, cada 25 m i a 0 i +-150 m de l eix, el terreny ha
- *     de quedar GS_CLEAR_FT per sota de la senda (glideAngle) i mai per sobre
- *     de l elevacio de l aeroport; als primers NEAR_THR_M, fins a
- *     NEAR_THR_TOL_M per sobre de l elevacio (decisio del projecte: el model de
- *     superficie hi te arbres i edificis). marginM < 0: no es compleix, al
- *     punt s. Un cap que no la compleix fins a 10 nm + 500 m queda sense
- *     aproximacio directa (APPROACH_DATA, airports.js).
+ *     llindar fins a sMax m, cada 25 m i a 0 i +-150 m de l eix. Fins a
+ *     nearThresholdM(en), el terreny pot quedar fins a NEAR_THR_TOL_M per
+ *     sobre de l elevacio de l aeroport (decisio del projecte: el model de
+ *     superficie hi te arbres i edificis); a partir d alla, GS_CLEAR_FT per
+ *     sota de la senda (glideAngle). Sense forat entre les dues regles.
+ *     marginM < 0: no es compleix, al punt s. Un cap que no la compleix fins
+ *     a 10 nm + 500 m queda sense aproximacio directa (APPROACH_DATA,
+ *     airports.js).
  *   planRoute(origin, cruiseFt, A, en, groundAt, ceilingFt) -> { fixes, usesIF,
  *     flyable, meaFt, cruiseFt, tooHigh }   origin = { e, n } (final de la
  *     pista de sortida). El primer tram (origen -> FF, o origen -> IF) es vola a
@@ -55,7 +61,7 @@ import { ILS, arrivalEnd, tailwindKt, glideAngle } from './ils.js';
 import { World } from './terrain.js';
 
 export const IF_NM = 20;
-export const GS_CLEAR_FT = 300, NEAR_THR_M = 1300, NEAR_THR_TOL_M = 20;
+export const GS_CLEAR_FT = 300, NEAR_THR_TOL_M = 20;
 export const LEG_CLEAR_FT = 1000;
 export const LEG_SIDE_NM = 1;
 const FT = 0.3048, STEP_M = 200, MEA_STEP_M = 100, MEA_SIDE_N = 16;    // MEA: cada 100 m al llarg del tram, 33 punts de costat a costat
@@ -88,11 +94,13 @@ export function legMeaFt(p0, p1, groundAt) {
   return Math.ceil((top / FT + LEG_CLEAR_FT) / 100) * 100;
 }
 
+export function nearThresholdM(en) { return GS_CLEAR_FT * FT / Math.tan(glideAngle(en)) - ILS.GS_S; }
+
 export function glidePathMargin(A, en, sMax, groundAt) {
-  const g = ground(groundAt), E = A.elev, tg = Math.tan(glideAngle(en));
+  const g = ground(groundAt), E = A.elev, tg = Math.tan(glideAngle(en)), near = nearThresholdM(en);
   let marginM = Infinity, at = 0;
   for (let s = 0; s <= sMax; s += 25) {
-    const lim = s <= NEAR_THR_M ? E + NEAR_THR_TOL_M : Math.max(E, E + (s + ILS.GS_S) * tg - GS_CLEAR_FT * FT);
+    const lim = s <= near ? E + NEAR_THR_TOL_M : E + (s + ILS.GS_S) * tg - GS_CLEAR_FT * FT;
     for (const t of [-150, 0, 150]) {
       const w = A.toWorld(en.thr[0] - en.dir[0] * s - en.dir[1] * t, en.thr[1] - en.dir[1] * s + en.dir[0] * t), m = lim - g(w[0], w[1]);
       if (m < marginM) { marginM = m; at = s; }
