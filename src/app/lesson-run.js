@@ -68,7 +68,7 @@
  *     viu complerts (llicons 1-4 i 6), temps de D5 complert (llico 5) o,
  *     a la llico 5, desviacio d altitud per sobre del llindar del criteri
  *     altDeviationMaxFt: suspen a l instant, sense esperar els 120 s
- *     (decisio d en Marc, docs/DECISIONS.md 28/09/2026).
+ *     (decisio del projecte, docs/DECISIONS.md 28/09/2026).
  *   run.failReason() -> { key, params } | null   per que l intent ja no pot
  *     aprovar: la desviacio d altitud de la llico 5 (amb els peus de
  *     desviacio) o, a la llico 8, haver sortit de l ILS entre topAglFt i

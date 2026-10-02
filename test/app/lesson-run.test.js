@@ -478,15 +478,15 @@ describe('llico circuit: guia per fases, a banda i banda de la pista', () => {
 
 describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina condicio falta', () => {
   const T = LESSONS.find(l => l.id === 'circuit').finalStabilized;
-  // el que va veure en Marc: tren, flaps, velocitat, sink i rumb bons, estabilitzat per sobre dels
+  // el que va veure el propietari del projecte: tren, flaps, velocitat, sink i rumb bons, estabilitzat per sobre dels
   // 500 ft (l instructor deia "estabilitza't abans dels 500 ft") a 2 nm del llindar
-  const marc = () => snap({ aglFt: T.aglFt + 200, distThrNm: 2, rwyHdgDeg: 66, hdgDeg: 66, gearDown: true,
+  const finalOk = () => snap({ aglFt: T.aglFt + 200, distThrNm: 2, rwyHdgDeg: 66, hdgDeg: 66, gearDown: true,
     flapsLanding: true, vrefKt: 97, iasKt: 102, vsFpm: -550 });
   const byId = run => Object.fromEntries(run.objectives().map(o => [o.id, o]));
 
   test('comptador a 0 amb tot en verd: alguna fila ho ha d explicar', () => {
     const run = new LessonRun('circuit');
-    for (let i = 0; i < 20; i++) run.sample(marc());
+    for (let i = 0; i < 20; i++) run.sample(finalOk());
     const rows = run.objectives();
     const streak = rows.find(o => o.id === 'stabilizedOnFinal');
     assert.equal(streak.params.value, 0);
@@ -502,7 +502,7 @@ describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina cond
   for (const [id, over] of breaks) {
     test(id + ' ' + JSON.stringify(over) + ': el comptador no avanca i nomes aquesta fila falla', () => {
       const run = new LessonRun('circuit');
-      for (let i = 0; i < 5; i++) run.sample({ ...marc(), aglFt: T.aglFt - 50, ...over });
+      for (let i = 0; i < 5; i++) run.sample({ ...finalOk(), aglFt: T.aglFt - 50, ...over });
       const rows = run.objectives();
       assert.equal(rows.find(o => o.id === 'stabilizedOnFinal').params.value, 0);
       assert.deepEqual(rows.filter(o => o.id !== 'stabilizedOnFinal' && !o.ok).map(o => o.id), [id]);
@@ -511,7 +511,7 @@ describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina cond
 
   test('per sota de 500 ft i a menys de 3 nm el comptador avanca i la llista ho diu', () => {
     const run = new LessonRun('circuit');
-    for (let i = 0; i < 4; i++) run.sample({ ...marc(), aglFt: T.aglFt - 50, distThrNm: 1.46 });
+    for (let i = 0; i < 4; i++) run.sample({ ...finalOk(), aglFt: T.aglFt - 50, distThrNm: 1.46 });
     const by = byId(run);
     assert.equal(by.stabilizedOnFinal.params.value, 4);
     assert.deepEqual(by.distance.params, { value: 1.5, target: T.maxDistNm });
@@ -526,7 +526,7 @@ describe('llico 6: si el comptador dels 10 s no avanca, la llista diu quina cond
 
   test('a final, l instructor diu les condicions del comptador, amb els numeros de lessons.js', () => {
     const run = new LessonRun('circuit');
-    run.sample({ ...marc(), asgAlongM: -3000, asgLatM: 0, asgHdgDeg: 66 });
+    run.sample({ ...finalOk(), asgAlongM: -3000, asgLatM: 0, asgHdgDeg: 66 });
     const msg = run.instructorMessage();
     assert.equal(msg.key, 'school.circuit.final');
     assert.deepEqual(msg.params, { ft: T.aglFt, nm: T.maxDistNm, s: T.sustainedS });
