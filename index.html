@@ -150,7 +150,7 @@ import {
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
   currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on,
-  recorderMeta, setArrivalPlanner, finishExtras, airportAt, AIRLINE_STOP_KT, airlineClosing
+  recorderMeta, setArrivalPlanner, finishExtras, airportAt, AIRLINE_STOP_KT, airlineClosing, reportButtons
 } from './src/app/index.js';
 import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
@@ -2954,7 +2954,8 @@ const UI = {
     back.addEventListener('click', () => { this.el.menu.hidden = true; showMainMenu(); });
     this.el.menu.prepend(back); this.$('pauseQuality').addEventListener('change', e => { applyQuality(e.target.value); Terrain.reset(); });
     this.$('crashRestart').addEventListener('click', () => this.restart()); this.$('crashMenu').addEventListener('click', () => this.toMenu());
-    this.$('reportClose').addEventListener('click', () => { this.el.report.hidden = true; }); this.$('reportRestart').addEventListener('click', () => this.restart()); this.$('reportMenu').addEventListener('click', () => this.toMenu());
+    // revisio del PR #36: en un vol d Airline, Continue tanca el vol (el mateix cami que sortir despres de tocar terra) i porta al debrief
+    this.$('reportClose').addEventListener('click', () => { this.el.report.hidden = true; if (Game.airline) this.toMenu(); }); this.$('reportRestart').addEventListener('click', () => this.restart()); this.$('reportMenu').addEventListener('click', () => this.toMenu());
     this.$('helpClose').addEventListener('click', () => this.toggleHelp());
     Sound.loadPrefs(); const volTxt = () => { const v = Math.round(Sound.vol * 100); this.$('volVal').textContent = v === 0 ? 'off' : v + '%'; };
     this.$('optVol').value = Math.round(Sound.vol * 100); volTxt();
@@ -3030,7 +3031,9 @@ const UI = {
     h += row('Speed / attitude', Math.round(R.ias) + ' kt', 'pitch ' + R.pitch.toFixed(1) + '\u00b0, bank ' + Math.abs(R.roll).toFixed(1) + '\u00b0'); h += row('Bounces', R.bounces, Game.tailStrike ? 'tail strike!' : ''); h += row('Roll-out to 35 kt', Math.round(R.rollout) + ' m', '');
     h += '</table>';
     if (fl.mode === 'route') h += fl.done ? `<h3>Flight summary: ${fl.from.city} to ${fl.to.city}</h3><table>${row('Flight time', this.fmtTime(fl.t))}${row('Maximum altitude', Math.round(fl.maxAlt / 100) * 100 + ' ft')}${row('Landing score', sc.score + ' / 100')}${row('Fuel remaining', Math.round(Game.fdm.fuel) + ' kg')}</table>` : `<p class="comment">This is not ${fl.to.city} yet. The flight timer keeps running (${this.fmtTime(fl.t)}).</p>`;
-    this.$('reportTitle').textContent = fl.mode === 'route' && fl.done ? 'Welcome to ' + fl.to.city : 'Landing report'; this.$('reportBody').innerHTML = h; this.$('reportReplay').hidden = !(Game.replayData || Game.rec.length > 60); this.el.report.hidden = false; this.bestText();
+    this.$('reportTitle').textContent = fl.mode === 'route' && fl.done ? 'Welcome to ' + fl.to.city : 'Landing report'; this.$('reportBody').innerHTML = h; this.$('reportReplay').hidden = !(Game.replayData || Game.rec.length > 60);
+    { const B = reportButtons({ airline: !!Game.airline }); this.$('reportRestart').hidden = !B.includes('restart'); this.$('reportMenu').hidden = !B.includes('menu'); }   // a Airline, nomes Continue i Watch replay
+    this.el.report.hidden = false; this.bestText();
   },
   /** background run of the headless harness, one aircraft at a time */
   runHarness() { let i = 0; const next = () => { if (i >= AIRCRAFT_ORDER.length) return; if (Game.state === 'flying' && Main.fps < 40) { setTimeout(next, 3000); return; } this.harness.push(Harness.run(AIRCRAFT_ORDER[i++])); this.harnessHtml = null; setTimeout(next, 400); }; next(); },

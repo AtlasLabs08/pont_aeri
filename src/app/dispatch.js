@@ -6,7 +6,7 @@
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          turbulenceLevel minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
- *          AIRLINE_CONTACT_KM airlineClosing
+ *          AIRLINE_CONTACT_KM airlineClosing reportButtons
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief debriefModel recoverStaleOrders _resetDispatch
  *
@@ -61,6 +61,10 @@
  *   finishExtras(airline, blockSeconds, landedAt, stoppedOffPavement = false)
  *     -> argument de FlightRecorder.finish: { arrivalMin, landedAt,
  *     stoppedOffPavement } amb airline, o { arrivalMin: null } sense.
+ *   reportButtons({ airline }) -> botons de l informe d aterratge (revisio del
+ *     PR #36, decisio del projecte): en un vol d Airline nomes 'continue' (tanca
+ *     el vol amb airlineClosing i porta al debrief) i 'replay'; a Free Flight i
+ *     a l escola, tambe 'restart' i 'menu', com sempre.
  *   AIRLINE_CONTACT_KM = 5
  *   airlineClosing({ leaving, contact, stopped, onGround, pavedAt })
  *     -> { action, landedAt, stoppedOffPavement }   que fa un vol d Airline
@@ -369,6 +373,10 @@ export function finishExtras(airline, blockSeconds, landedAt, stoppedOffPavement
   return airline
     ? { arrivalMin: arrivalMinute(airline, blockSeconds), landedAt: landedAt ?? null, stoppedOffPavement: stoppedOffPavement === true }
     : { arrivalMin: null };
+}
+
+export function reportButtons({ airline }) {
+  return airline ? ['continue', 'replay'] : ['continue', 'replay', 'restart', 'menu'];
 }
 
 export function airlineClosing({ leaving, contact, stopped, onGround, pavedAt }) {
