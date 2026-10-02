@@ -24,7 +24,7 @@ export function debriefScreen(m, { onContinue }) {
     : kv(t('debrief.arrival'), m.arrivalDeltaMin === 0 ? t('debrief.onTime')
       : t(m.arrivalDeltaMin > 0 ? 'debrief.late' : 'debrief.early', { min: fmtNumber(Math.abs(m.arrivalDeltaMin)) }));
   return el('section', { class: 'pa-debrief' },
-    el('h2', {}, t('debrief.title', { from: m.route.from, to: m.route.landedAt ?? m.route.to })),
+    el('h2', {}, t('debrief.airline.title', { from: m.route.from, to: m.route.landedAt ?? m.route.to })),
     el('p', { class: 'pa-desc' }, t(m.contract ? 'debrief.subtitleContract' : 'debrief.subtitle')),
     m.divert ? el('div', { class: 'pa-dialog', role: 'alert' },
       el('p', { class: 'pa-msg pa-bad' }, t('debrief.divert', { icao: m.divert.landedAt, to: m.route.to,

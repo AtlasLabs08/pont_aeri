@@ -539,7 +539,7 @@ export default {
   'briefing.mass': 'Take-off mass',
   'briefing.fly': 'Fly',
   'briefing.back': 'Back to Dispatch',
-  'debrief.title': 'Debrief {from} → {to}',
+  'debrief.airline.title': 'Debrief {from} → {to}',
   'debrief.subtitle': 'Own flight: the profit and loss of the leg.',
   'debrief.subtitleContract': 'Contract flight: a fixed fee, nothing else to pay.',
   'debrief.divert': 'Diversion: you landed at {icao} instead of {to}. Revenue at {pct} % and reputation {rep}.',

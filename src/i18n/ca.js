@@ -537,7 +537,7 @@ export default {
   'briefing.mass': 'Massa d\'enlairament',
   'briefing.fly': 'Volar',
   'briefing.back': 'Tornar al Dispatch',
-  'debrief.title': 'Debrief {from} → {to}',
+  'debrief.airline.title': 'Debrief {from} → {to}',
   'debrief.subtitle': 'Vol propi: el compte de resultats del tram.',
   'debrief.subtitleContract': 'Vol de contracte: una tarifa fixa, sense res més a pagar.',
   'debrief.divert': 'Desviament: has aterrat a {icao} en lloc de {to}. Ingressos al {pct} % i reputació {rep}.',
