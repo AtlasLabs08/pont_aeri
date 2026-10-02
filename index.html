@@ -143,7 +143,7 @@ import {
 
 import { modelGeom, legTopY, legLength } from './src/core/model-geom.js';
 import { IS_DEV } from './src/platform/index.js';
-import { t, fmtNumber } from './src/i18n/index.js';
+import { t, t as i18nT, fmtNumber } from './src/i18n/index.js';      // i18nT: dins de drawPFD, on t es el temps
 import { LESSONS, CONTROL_KEYS, isLessonAvailable } from './src/career/index.js';
 import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
@@ -1601,7 +1601,9 @@ const Instruments = {
     c.fillStyle = '#111'; c.strokeStyle = K.amber; c.lineWidth = 3; for (const s of [-1, 1]) { c.beginPath(); c.rect(cx + s * 40, cy - 4, s * 56, 8); c.fill(); c.stroke(); c.beginPath(); c.rect(cx + s * 40 - (s > 0 ? 0 : 8), cy - 4, 8, 18); c.fill(); c.stroke(); } c.beginPath(); c.rect(cx - 4, cy - 4, 8, 8); c.fill(); c.stroke();
     this.approachPFD(c, S, cx, cy, PX);
     // radio altitude
-    if (o.aglFt < 2500) { this.font(c, 20, true); c.fillStyle = o.aglFt < 400 ? K.amber : K.green; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(Math.round(o.aglFt < 50 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 50 ? 1 : 10)), cx, cy + 100); }
+    // RA (alcada sobre el terra) en un requadre propi amb l etiqueta, al centre i en verd/ambre; l ALT (sobre el mar) es a la cinta, en blanc
+    if (o.aglFt < 2500) { const raCol = o.aglFt < 400 ? K.amber : K.green; c.strokeStyle = raCol; c.lineWidth = 2; c.strokeRect(cx - 62, cy + 86, 124, 28);
+      this.font(c, 20, true); c.fillStyle = raCol; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(i18nT('hud.raValue', { ft: Math.round(o.aglFt < 50 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 50 ? 1 : 10) }), cx, cy + 100); }
     // ---------------- speed tape ----------------
     const sx = 14, sw = 72, sy0 = cy - 150, sh = 300, SP = 3.4, ias = Math.max(o.ias, 30), v = f.vspeeds(), vm = this.vmax(f);
     c.fillStyle = K.tape; c.fillRect(sx, sy0, sw, sh); c.save(); c.beginPath(); c.rect(sx, sy0, sw + 26, sh); c.clip();
@@ -1634,6 +1636,7 @@ const Instruments = {
     c.restore();
     c.fillStyle = '#000'; c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.rect(ax + 6, cy - 17, aw + 4, 34); c.fill(); c.stroke();
     this.font(c, 22, true); c.fillStyle = K.white; c.textAlign = 'right'; c.fillText(Math.round(o.altFt / 10) * 10, ax + aw + 6, cy + 1);
+    this.font(c, 12, true); c.textAlign = 'left'; c.fillText(i18nT('hud.alt'), ax + 8, cy - 26); c.textAlign = 'right';
     this.font(c, 18, true); c.fillStyle = K.mag; c.fillText(ap.selAlt, ax + aw, sy0 - 12);
     this.font(c, 14); c.fillStyle = K.green; c.fillText('STD 1013', ax + aw, sy0 + sh + 16);
     // ---------------- vertical speed ----------------
@@ -2577,11 +2580,13 @@ const HUD = {
     font(17, true); c.textAlign = 'center';
     c.strokeRect(sxp - 34, B[1] - 13, 68, 26); c.fillText(String(Math.round(Math.max(o.ias, 30))), sxp, B[1] + 1);
     c.strokeRect(axp - 42, B[1] - 13, 84, 26); c.fillText(String(Math.round(o.altFt / 10) * 10), axp, B[1] + 1);
+    font(12, true); c.fillText(t('hud.alt'), axp, B[1] - 22);
     const tr = clamp((S.accelKt || 0) * 10, -40, 40); if (Math.abs(tr) > 2) { c.beginPath(); c.moveTo(sxp + 42, B[1]); c.lineTo(sxp + 42, B[1] - tr * 1.6); c.stroke(); }
     font(12); const tgt = ap.athr ? 'SPD ' + Math.round(ap.selSpd) : (f.flapPos > 0.5 && !f.wow ? 'REF ' + Math.round(v.vref) : '');
     if (tgt) c.fillText(tgt, sxp, B[1] + 28); c.fillText('GS ' + Math.round(o.gs), sxp, B[1] + 44);
     c.fillText('VS ' + (o.vsFpm >= 0 ? '+' : '') + Math.round(o.vsFpm / 10) * 10, axp, B[1] + 28);
-    if (o.aglFt < 2500 && !f.wow) { font(14, true); c.fillText('R ' + Math.round(o.aglFt < 100 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 100 ? 1 : 10), axp, B[1] + 46); }
+    // RA (alcada sobre el terra) sota la caixa de l ALT (sobre el mar), amb etiqueta i requadre propi
+    if (o.aglFt < 2500 && !f.wow) { font(14, true); c.strokeRect(axp - 42, B[1] + 35, 84, 22); c.fillText(t('hud.raValue', { ft: Math.round(o.aglFt < 100 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 100 ? 1 : 10) }), axp, B[1] + 46); }
     // heading readout and modes
     font(14, true); c.fillText(('00' + Math.round(wrap360(o.hdg)) % 360).slice(-3), B[0], top + 12);
     font(12, true); c.textAlign = 'left';
@@ -2598,7 +2603,7 @@ const HUD = {
       font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', rgt - 4, top + 12); }
     // flare cue
     if (!f.wow && o.aglFt < 100 && o.vsFpm < 0) { const flareFt = cfg.type === 'jet' ? (f.mass > 150000 ? 50 : 38) : 26;
-      font(22, true); c.textAlign = 'center'; c.fillText(String(Math.round(o.aglFt)), B[0], B[1] + hh * 0.72);
+      font(22, true); c.textAlign = 'center'; c.fillText(t('hud.raValue', { ft: Math.round(o.aglFt) }), B[0], B[1] + hh * 0.72);
       if (o.aglFt < flareFt && ((Main.vtime * 3) | 0) % 2 === 0) { font(16, true); c.fillText('FLARE', B[0], B[1] + hh * 0.52); } }
     c.restore();
   },

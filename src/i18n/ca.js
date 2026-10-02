@@ -448,5 +448,7 @@ export default {
   'credits.photo.attribution': '© Institut Cartogràfic i Geològic de Catalunya',
   'credits.airports.term': 'Aeroports',
   'credits.airports.text': 'Pistes, elevacions i posicions dels aeroports.',
-  'credits.airports.attribution': 'OurAirports (ourairports.com)'
+  'credits.airports.attribution': 'OurAirports (ourairports.com)',
+  'hud.alt': 'ALT',
+  'hud.raValue': 'RA {ft}'
 };
