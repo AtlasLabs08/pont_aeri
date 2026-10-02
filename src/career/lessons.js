@@ -5,6 +5,7 @@
  * app/debrief.js (la resta de camps, llegits en viu durant el vol).
  *
  * EXPORTA: SCHOOL_PASS CONTROL_KEYS LESSONS CHECK_RIDES
+ * IMPORTA: ../core/index.js (TAXI_LIMIT_KT, el limit del tip de taxi)
  *
  * INTERFICIE (no la canviis, school.js, el C3, el C5, el D3 i els tests en depenen):
  *   Criteri: { metric, op, value }. metric es un nom de METRICS (school.js);
@@ -95,6 +96,8 @@
  *     school.js no l interpreta.
  */
 
+import { TAXI_LIMIT_KT } from '../core/index.js';
+
 /** Marca del llindar de nota de l escola, resolt per school.js. */
 export const SCHOOL_PASS = 'schoolPass';
 
@@ -109,6 +112,8 @@ export const CONTROL_KEYS = {
   flaps: ['KeyF', 'KeyV'], gear: ['KeyG'], parkBrake: ['KeyP'],
   throttle: ['ShiftLeft', 'ShiftRight', 'NumpadAdd', 'NumpadSubtract'],
   reverse: ['KeyR'], spoiler: ['KeyK'],
+  // limitador de taxi (docs/DECISIONS.md, 02/10/2026): a terra retalla l empenta fins a TAXI_LIMIT_KT
+  taxiLimiter: ['Digit1'],
   cameraReset: ['Home'],
   // rodatge: Q i E fan girar la roda de morro a terra (Input.update: ctl.steer = yaw)
   steerLeft: ['KeyQ'], steerRight: ['KeyE'],
@@ -149,7 +154,8 @@ export const LESSONS = [
     criteria: [{ metric: 'reachedThreshold', op: 'eq', value: true }],
     taxi: { maxDistToThrM: 60, maxLatOffsetM: 25, maxGroundKt: 20, rerouteM: 40 },
     tips: [{ key: 'school.tip.taxi', keys: { left: 'steerLeft', right: 'steerRight', more: 'throttleUp',
-      less: 'throttleDown', brake: 'brake', park: 'parkBrake' } }] },
+      less: 'throttleDown', brake: 'brake', park: 'parkBrake' } },
+           { key: 'school.tip.taxiLimiter', keys: { limiter: 'taxiLimiter' }, params: { kt: TAXI_LIMIT_KT } }] },
   { id: 'takeoff', aircraftTypeId: 'commuter',
     titleKey: 'school.lesson.takeoff.title', goalKey: 'school.lesson.takeoff.goal',
     criteria: [{ metric: 'maxAltFt', op: 'gte', value: 3000 },
