@@ -436,5 +436,19 @@ export default {
   'guide.symbols.taxiTarget.term': 'Green ring',
   'guide.symbols.taxiTarget.text': 'School, taxi lesson: the target point and the route along the taxiways.',
   'loading.terrain': 'Loading the real relief of Catalonia and the Balearics',
-  'ap.gsCaptured': 'Glideslope captured: the autopilot is descending on the {deg}° path'
+  'ap.gsCaptured': 'Glideslope captured: the autopilot is descending on the {deg}° path',
+  'menu.credits': 'Credits',
+  'menu.credits.code': 'PA 004',
+  'menu.credits.desc': 'Data sources and attributions.',
+  'credits.title': 'Credits',
+  'credits.intro': 'Pont Aeri is built on open data. These are the sources and the attributions they require.',
+  'credits.terrain.term': 'Terrain',
+  'credits.terrain.text': 'Copernicus DEM GLO-30: the relief and the coastline of the whole map.',
+  'credits.terrain.attribution': '© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.',
+  'credits.photo.term': 'Barcelona photo scenery',
+  'credits.photo.text': 'Aerial photos and 5 m relief around El Prat, when the scenery pack is installed.',
+  'credits.photo.attribution': '© Institut Cartogràfic i Geològic de Catalunya',
+  'credits.airports.term': 'Airports',
+  'credits.airports.text': 'Runways, elevations and positions of the airports.',
+  'credits.airports.attribution': 'OurAirports (ourairports.com)'
 };

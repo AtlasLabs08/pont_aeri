@@ -109,6 +109,17 @@ describe('t', () => {
     assert.equal(ca['tier.standard'], 'Estàndard');
   });
 
+  test('TA-8: credits, en tots dos idiomes, amb l atribucio exacta de Copernicus i de l ICGC', () => {
+    for (const k of ['menu.credits', 'menu.credits.code', 'menu.credits.desc', 'credits.title', 'credits.intro', ...['terrain', 'photo', 'airports'].flatMap(id => ['term', 'text', 'attribution'].map(f => `credits.${id}.${f}`))]) {
+      assert.ok(Object.hasOwn(en, k), 'en: ' + k);
+      assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
+    }
+    const cop = '© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.';
+    assert.equal(en['credits.terrain.attribution'], cop); assert.equal(ca['credits.terrain.attribution'], cop);
+    assert.equal(en['credits.photo.attribution'], '© Institut Cartogràfic i Geològic de Catalunya');
+    assert.ok(en['credits.airports.attribution'].includes('OurAirports'));
+  });
+
   test('cada clau de BALANCE.landingBands existeix en tots dos idiomes', () => {
     for (const { key } of BALANCE.landingBands) {
       assert.ok(Object.hasOwn(en, key), 'en: ' + key);

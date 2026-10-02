@@ -4,11 +4,15 @@
  * NOU: tasca C5+D1 d ENGINEERING.md (docs/DECISIONS.md, 30/09/2026, E1-E9).
  *
  * EXPORTA: mainMenuScreen nameScreen schoolScreen graduationScreen
- *          opsScreen noticeScreen OPS_TABS
+ *          opsScreen noticeScreen creditsScreen OPS_TABS CREDITS
  *
  * INTERFICIE (no la canviis, airline-ui.js en depen):
- *   mainMenuScreen({ onFreeFlight, onAirline, onSettings? })   onSettings:
- *     fila d ajustos (X1 del D2+D5), el mateix panell que Esc dins d un vol
+ *   mainMenuScreen({ onFreeFlight, onAirline, onSettings?, onCredits? })
+ *     onSettings: fila d ajustos (X1 del D2+D5), el mateix panell que Esc
+ *     dins d un vol; onCredits: fila de credits (TA-8)
+ *   creditsScreen({ onBack })   fonts de dades i atribucions obligatories
+ *     (terreny real, docs/DECISIONS.md, 2026-10-02, TA-8): una entrada per
+ *     font de CREDITS, amb els textos de credits.<id>.* a i18n
  *   nameScreen({ onSubmit(name) -> missatge d error o null, onBack })
  *   schoolScreen(state, { onFly(lessonId), onGuide, onExport, onImport,
  *     onOps, onBack })   onOps nomes si el pilot es graduat
@@ -39,7 +43,7 @@ function clickRow(onClick, ...cells) {
   return el('div', { class: 'pa-row pa-click', role: 'button', tabindex: 0, onclick: act, onkeydown: act }, ...cells);
 }
 
-export function mainMenuScreen({ onFreeFlight, onAirline, onSettings }) {
+export function mainMenuScreen({ onFreeFlight, onAirline, onSettings, onCredits }) {
   return el('section', { 'aria-labelledby': 'paMenuTitle' },
     el('h1', { id: 'paMenuTitle' }, t('menu.title')),
     el('p', { class: 'pa-sub' }, t('menu.subtitle')),
@@ -53,7 +57,24 @@ export function mainMenuScreen({ onFreeFlight, onAirline, onSettings }) {
         el('span', { class: 'pa-status pa-warn' }, t('menu.status.boarding'))),
       onSettings ? clickRow(onSettings, el('span', { class: 'pa-code' }, t('menu.settings.code')),
         el('span', { class: 'pa-name' }, t('menu.settings'), el('span', { class: 'pa-desc' }, t('menu.settings.desc'))),
+        el('span', { class: 'pa-status pa-off' }, t('menu.status.ground'))) : null,
+      onCredits ? clickRow(onCredits, el('span', { class: 'pa-code' }, t('menu.credits.code')),
+        el('span', { class: 'pa-name' }, t('menu.credits'), el('span', { class: 'pa-desc' }, t('menu.credits.desc'))),
         el('span', { class: 'pa-status pa-off' }, t('menu.status.ground'))) : null));
+}
+
+/** fonts de dades amb atribucio obligatoria (TA-8); textos a i18n: credits.<id>.term, .text i .attribution */
+export const CREDITS = ['terrain', 'photo', 'airports'];
+
+export function creditsScreen({ onBack }) {
+  return el('section', { 'aria-labelledby': 'paCreditsTitle' },
+    el('h2', { id: 'paCreditsTitle' }, t('credits.title')),
+    el('p', { class: 'pa-dim' }, t('credits.intro')),
+    ...CREDITS.map(id => el('div', { class: 'pa-credit' },
+      el('h3', {}, t(`credits.${id}.term`)),
+      el('p', {}, t(`credits.${id}.text`)),
+      el('p', { class: 'pa-dim' }, t(`credits.${id}.attribution`)))),
+    el('div', { class: 'pa-btns' }, button(t('menu.back'), onBack, true)));
 }
 
 export function nameScreen({ onSubmit, onBack }) {
