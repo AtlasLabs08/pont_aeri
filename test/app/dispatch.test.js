@@ -10,16 +10,18 @@
 import { test, describe, before, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { careerWithCommuter } from '../fixtures/careers.js';
+import { careerWithCommuter, record } from '../fixtures/careers.js';
 import { BALANCE, MINUTES_PER_DAY, routeKm, plannedBlockMin, minFuelKg } from '../../src/career/index.js';
 import { FlightRecorder } from '../../src/core/index.js';
 import { AIRPORTS, setRunwayDifficulty, MAX_TAILWIND_KT } from '../../src/world/index.js';
-import { _resetBus } from '../../src/app/bus.js';
-import { setFlightLauncher, cancelFlight, _resetFlight } from '../../src/app/flight.js';
+import { on, _resetBus } from '../../src/app/bus.js';
+import { setFlightLauncher, launchFlight, cancelFlight, onFlightFinished, _resetFlight } from '../../src/app/flight.js';
+import { CAREER_KEY } from '../../src/app/save.js';
 import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airline.js';
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
-  airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, _resetDispatch
+  airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
+  recoverStaleOrders, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -173,5 +175,71 @@ describe('startOwnFlight', () => {
     assert.equal(activeAirlineFlight(), null);
     assert.equal(currentCareer().fleet[0].status, 'ready');
     assert.deepEqual(currentCareer().dispatch.queue, []);
+  });
+});
+
+describe('liquidacio en flight:finished (D3D4-8)', () => {
+  function flyOne(extra = {}) {
+    updateCareer(careerWithCommuter());
+    setFlightLauncher(() => {});
+    const p = planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 });
+    const r = startOwnFlight(p);
+    return { p, order: r.order, rec: record({ paxOnBoard: p.pax, fuelPlannedKg: p.tripFuelKg, ...extra }) };
+  }
+
+  test('liquida, desa, emet dispatch:resolved i deixa el debrief pendent', () => {
+    initDispatch(); initDispatch();
+    const resolved = [];
+    on('dispatch:resolved', e => resolved.push(e));
+    const { order, rec } = flyOne();
+    const cash0 = currentCareer().company.cash;
+    assert.equal(onFlightFinished(rec), true);
+    assert.equal(resolved.length, 1, 'una sola liquidacio encara que initDispatch es cridi dues vegades');
+    const st = resolved[0].settlement;
+    assert.equal(resolved[0].saved, true);
+    assert.equal(st.orderId, order.id);
+    assert.equal(currentCareer().company.cash, st.cashAfter);
+    assert.notEqual(st.cashAfter, cash0);
+    assert.equal(currentCareer().fleet[0].location, 'LERS');
+    assert.deepEqual(currentCareer().dispatch.queue, []);
+    assert.equal(JSON.parse(localStorage.getItem(CAREER_KEY)).company.cash, st.cashAfter);
+    assert.equal(pendingDebrief(), st);
+    clearDebrief();
+    assert.equal(pendingDebrief(), null);
+    assert.equal(activeAirlineFlight(), null);
+  });
+
+  test('rank:up quan l XP passa el llindar del rang seguent', () => {
+    initDispatch();
+    const ups = [];
+    on('rank:up', e => ups.push(e));
+    const { rec } = flyOne();
+    const s = currentCareer();
+    updateCareer({ ...s, pilot: { ...s.pilot, xp: BALANCE.ranks[1].xp - 1 } });
+    onFlightFinished(rec);
+    assert.deepEqual(ups, [{ rankBefore: 'student', rankAfter: BALANCE.ranks[1].key }]);
+  });
+
+  test('un vol que no es d Airline no es liquida', () => {
+    initDispatch();
+    updateCareer(careerWithCommuter());
+    const resolved = [];
+    on('dispatch:resolved', e => resolved.push(e));
+    setFlightLauncher(() => {});
+    launchFlight({});
+    onFlightFinished(record());
+    assert.equal(resolved.length, 0);
+    assert.equal(currentCareer().company.flightsFlown, 0);
+  });
+
+  test('recoverStaleOrders: ordres del pilot sense cap vol en marxa es cancel.len', () => {
+    updateCareer(careerWithCommuter());
+    setFlightLauncher(() => {});
+    startOwnFlight(planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 }));
+    assert.equal(recoverStaleOrders(), false, 'el vol encara es en marxa');
+    _resetFlight();
+    assert.equal(recoverStaleOrders(), true);
+    assert.deepEqual(currentCareer().dispatch.queue, []);
+    assert.equal(currentCareer().fleet[0].status, 'ready');
   });
 });

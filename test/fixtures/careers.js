@@ -19,3 +19,13 @@ export const plan = extra => ({
   weather: { origin: { severity: 0.1, hard: false, turbulence: 0.1 }, dest: { severity: 0.1, hard: false, turbulence: 0.1 } },
   contract: false, ...extra
 });
+
+/** FlightRecord sintetic d un Mi-9 LEBL -> LERS amb el pla de plan(): 31 min de bloc, 2 de retard. */
+export const record = extra => ({
+  aircraftTypeId: 'commuter', from: 'LEBL', to: 'LERS', blockSeconds: 31 * 60, airborneSeconds: 24 * 60,
+  fuelBurntKg: 150, fuelPlannedKg: 160, paxOnBoard: 15, maxAltFt: 6000, maxG: 1.3, maxBankDeg: 25, abruptInputs: 0,
+  timeAccelMax: 1, usedCruiseSkip: false, skippedCruiseFuelKg: 0, arrivalDeltaMin: 2,
+  touchdown: { fpm: -180, g: 1.2, bounces: 0, onRunway: true, rwy: 'LERS 25', tdzDist: 20, center: 1, crab: 0.5,
+    remaining: 1800, ias: 100, pitch: 3, roll: 0, score: 92, pts: { sink: 35, g: 15, zone: 20, center: 18, attitude: 10 } },
+  rolloutMetres: 700, tailStrike: false, crashCause: null, events: [], landedAt: 'LERS', ...extra
+});

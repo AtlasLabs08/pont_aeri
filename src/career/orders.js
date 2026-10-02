@@ -47,6 +47,9 @@
  *     rang; reputacio (reputationDelta, retallada a 0..100); flightsFlown + 1,
  *     lifetimeRevenue, routesFlown; ubicacio (landedAt; sense, el desti, o
  *     l origen si no ha aterrat); logbook (append) i l ordre surt de la cua.
+ *     El pla mana: fuelPlannedKg = order.tripFuelKg i arrivalDeltaMin el del
+ *     record; una ordre sense tripFuelKg o sense plannedArrivalMin no cobra
+ *     l estalvi de combustible ni la puntualitat (no es regalen).
  *     settlement: { orderId, mode, contract, result, instalments, cycleCost,
  *     damage, xp: { gained, before, after, rankBefore, rankAfter, change,
  *     next }, reputation: { before, after, delta }, wear: { before, after } o
@@ -124,4 +127,133 @@ export function reputationDelta({ record, diverted }) {
     d = (R.landing.find(b => score >= b.min) ?? R.landing[R.landing.length - 1]).delta;
   }
   return d + (diverted ? BALANCE.divert.reputation : 0);
+}
+
+export function settleFlight(state, orderId, record) {
+  const order = state.dispatch.queue.find(o => o.id === orderId);
+  if (!order) throw new Error('settleFlight: no hi ha cap ordre ' + orderId);
+  const contract = order.contract === true;
+  const mode = contract ? 'contract' : 'own';
+  const co = state.company;
+
+  // tirades reservades, en l ordre de SETTLE_DRAWS
+  const rng = { rngSeed: state.rngSeed, rngCounter: order.rngCounter };
+  const draws = {};
+  for (const k of SETTLE_DRAWS) draws[k] = draw(rng);
+
+  const crashed = record.crashCause != null;
+  const landedAt = record.landedAt ?? null;
+  const diverted = landedAt !== null && landedAt !== order.to;
+  const airframe = contract ? null : state.fleet.find(a => a.reg === order.reg);
+  if (!contract && !airframe) throw new Error('settleFlight: l avio ' + order.reg + ' no es a la flota');
+  const typeId = record.aircraftTypeId;
+  const tier = tierOf(airframe ? airframeTier(airframe) : null);
+  const weathers = order.weather ? [order.weather.origin, order.weather.dest] : [];
+  const divertMult = diverted ? BALANCE.divert.revenueMult : 1;
+
+  // sense pla (ordre sense plannedArrivalMin o sense tripFuelKg) no hi ha puntualitat ni estalvi que premiar
+  const rec = {
+    ...record,
+    arrivalDeltaMin: order.plannedArrivalMin != null ? record.arrivalDeltaMin : Infinity,
+    fuelPlannedKg: order.tripFuelKg != null ? order.tripFuelKg : 0
+  };
+
+  // 1. una sola crida a computeFlightResult
+  let result = computeFlightResult({
+    record: rec, mode, ticketPrice: order.ticketPrice, paxOnBoard: order.pax ?? record.paxOnBoard,
+    crewCount: co.crewCount ?? 0, rankPayMult: rankPayMult(state.pilot.rank),
+    weatherBonus: weatherBonusFor(weathers), exclusive: false, financePerFlight: 0,
+    revenueMult: tier.revenueMult * divertMult
+  });
+  if (contract && diverted) {
+    const pay = Math.round(result.revenue.contract * divertMult);
+    result = { ...result, revenue: { ...result.revenue, contract: pay }, net: pay };
+  }
+  const cashBefore = co.cash;
+  let cash = co.cash + result.net;
+
+  // 2. quotes dels prestecs (nomes vols propis: un contracte no gasta les quotes)
+  let instalments = 0, loans = co.loans;
+  if (!contract) {
+    loans = co.loans.map(l => {
+      const p = payInstalment(l);
+      instalments += p.paid;
+      return { ...p.loan, id: l.id };
+    });
+    cash -= instalments;
+  }
+
+  // 3. desgast amb el wearMult de la categoria
+  let af = airframe, cycleCost = 0;
+  if (!contract) {
+    const w = applyFlightWear(airframe, record, tier.wearMult);
+    af = w.airframe; cycleCost = w.cycleCost;
+    cash -= cycleCost;
+  }
+
+  // 4. danys
+  const damage = assessDamage({ record, airframeValue: af ? af.value : BALANCE.usedPrice[typeId], mode, crashSeverity: draws.crashSeverity });
+  cash -= damage.playerCost;
+  const day = dispatchDay(state);
+
+  // 5. XP i rang
+  const xpGained = flightXp({
+    landingXp: result.landing.xp,
+    turbulence: weathers.some(w => w && w.turbulence >= TURBULENT),
+    hardWeather: weathers.some(w => w && w.hard),
+    destination: landedAt ?? order.to
+  }) - damage.xpLoss;
+  const up = applyXp(state.pilot, xpGained);
+
+  // 6. reputacio
+  const repDelta = reputationDelta({ record, diverted });
+  const repAfter = Math.min(REPUTATION_MAX, Math.max(0, co.reputation + repDelta));
+
+  // 7. hores i cicles (applyFlightWear), vols de la companyia i rutes
+  const landed = !!record.touchdown && !crashed;
+  const arrivedAt = landedAt ?? (landed ? order.to : order.from);
+  const routes = state.network.routesFlown;
+  const key = routeKey(order.from, arrivedAt);
+  const routesFlown = landed && arrivedAt !== order.from && !routes.includes(key) ? [...routes, key] : routes;
+
+  // 8. ubicacio i estat de l avio
+  let fleet = state.fleet;
+  if (!contract) {
+    const grounded = damage.groundedDays > 0;
+    af = { ...af, location: arrivedAt, status: grounded ? 'maintenance' : 'ready',
+      groundedUntilMinute: grounded ? (day + damage.groundedDays) * MINUTES_PER_DAY : af.groundedUntilMinute };
+    fleet = state.fleet.map(a => a.reg === af.reg ? af : a);
+  }
+
+  // 9. logbook (append) i l ordre surt de la cua
+  cash = Math.round(cash);
+  const logEntry = {
+    orderId: order.id, mode, day, departMinute: order.departMinute,
+    arrivalMin: order.plannedArrivalMin != null ? order.plannedArrivalMin + record.arrivalDeltaMin : order.departMinute + Math.round(record.blockSeconds / 60),
+    reg: order.reg, typeId, from: order.from, to: order.to, landedAt,
+    blockMin: Math.round(record.blockSeconds / 60), score: record.touchdown ? record.touchdown.score : null,
+    pax: order.pax ?? record.paxOnBoard, net: result.net, cashDelta: cash - cashBefore, xp: xpGained
+  };
+  const revenue = result.revenue.tickets + result.revenue.contract + result.revenue.punctuality + result.revenue.fuelSaving;
+
+  const next = {
+    ...state,
+    pilot: { ...up.pilot, logbook: [...state.pilot.logbook, logEntry] },
+    company: { ...co, cash, loans, reputation: repAfter, flightsFlown: co.flightsFlown + 1, lifetimeRevenue: co.lifetimeRevenue + revenue },
+    fleet,
+    network: { ...state.network, routesFlown },
+    dispatch: { ...state.dispatch, queue: state.dispatch.queue.filter(o => o.id !== order.id) }
+  };
+  return {
+    state: next,
+    settlement: {
+      orderId: order.id, mode, contract, result, instalments, cycleCost, damage,
+      xp: { gained: xpGained, before: state.pilot.xp, after: up.pilot.xp, rankBefore: up.rankBefore, rankAfter: up.rankAfter,
+        change: up.change, next: nextRank(up.pilot.xp) },
+      reputation: { before: co.reputation, after: repAfter, delta: repDelta },
+      wear: contract ? null : { before: { ...airframe.condition }, after: { ...af.condition } },
+      diverted, landedAt, to: order.to, location: contract ? null : arrivedAt, groundedDays: contract ? 0 : damage.groundedDays,
+      cashBefore, cashAfter: cash, draws, logEntry
+    }
+  };
 }

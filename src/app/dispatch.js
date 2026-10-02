@@ -6,7 +6,8 @@
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
- *          startOwnFlight activeAirlineFlight _resetDispatch
+ *          startOwnFlight activeAirlineFlight initDispatch pendingDebrief
+ *          clearDebrief recoverStaleOrders _resetDispatch
  *
  * IMPORTA: career/ (flightplan.js, orders.js, demand.js, BALANCE...),
  *   world/ (AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather,
@@ -63,29 +64,72 @@
  *     el de planOwnFlight / createOrder. Si el vol s abandona (launchFlight
  *     resol null), l ordre es cancel.la i es desa.
  *   activeAirlineFlight() -> { orderId, airline } del vol en marxa, o null
+ *   initDispatch()   subscriu la liquidacio a 'flight:finished' (un sol cop;
+ *     airline-ui.js la crida en iniciar-se). Amb un vol d Airline en marxa:
+ *     settleFlight (career/orders.js, l ordre de D3D4-8), updateCareer (desa
+ *     i emet 'career:changed'), 'rank:up' { rankBefore, rankAfter } si el
+ *     rang puja, i 'dispatch:resolved' { settlement, saved }. Sense vol
+ *     d Airline en marxa no fa res.
+ *   pendingDebrief() -> l ultim settlement, fins a clearDebrief()
+ *   recoverStaleOrders() -> boolean   ordres del pilot que han quedat a la
+ *     cua sense cap vol en marxa (s ha tancat el joc a mig vol): es
+ *     cancel.len com un abandonament i es desa. true si n hi havia.
  *   _resetDispatch()   nomes per a proves
  */
 
 import {
   BALANCE, routeFor, dispatchDay, dispatchMonth, departMinuteOf, routeKm, recommendedPrice, priceBounds,
   plannedPax, plannedBlockMin, tripFuelKg, minFuelKg, maxFuelKg, inRange, takeoffMassKg, weatherBonusFor,
-  estimateOwnFlight, createOrder, cancelOrder, releaseGrounded, tierOf, airframeTier, MINUTES_PER_DAY, PILOT_CREW_ID
+  estimateOwnFlight, createOrder, cancelOrder, releaseGrounded, settleFlight, tierOf, airframeTier, MINUTES_PER_DAY, PILOT_CREW_ID
 } from '../career/index.js';
 import {
   AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather, arrivalEnd, tailwindKt, MAX_TAILWIND_KT, airportPavedAt
 } from '../world/index.js';
 import { AIRCRAFT, DEG } from '../core/index.js';
-import { launchFlight } from './flight.js';
+import { launchFlight, isFlightInProgress } from './flight.js';
+import { on, emit } from './bus.js';
 import { currentCareer, updateCareer } from './airline.js';
 
 export const HOURS_PER_DAY = 24;
 export const AIRLINE_STOP_KT = 1;
 const MINUTES_PER_HOUR = 60;
 
-let active = null;
+let active = null, listening = false, lastSettlement = null;
 
 export function activeAirlineFlight() { return active; }
-export function _resetDispatch() { active = null; planner = defaultPlanner; }
+export function _resetDispatch() { active = null; planner = defaultPlanner; listening = false; lastSettlement = null; }
+
+/** D3D4-8: liquidacio del vol d Airline en marxa. Els altres vols (Free Flight, llicons) no hi passen */
+function onFlightFinishedRecord(record) {
+  if (!active) return;
+  const { orderId } = active;
+  active = null;
+  const state = currentCareer();
+  if (!state || !state.dispatch.queue.some(o => o.id === orderId)) return;
+  const { state: next, settlement } = settleFlight(state, orderId, record);
+  lastSettlement = settlement;
+  const saved = updateCareer(next);
+  if (settlement.xp.change === 'up') emit('rank:up', { rankBefore: settlement.xp.rankBefore, rankAfter: settlement.xp.rankAfter });
+  emit('dispatch:resolved', { settlement, saved });
+}
+
+export function initDispatch() {
+  if (listening) return;
+  on('flight:finished', onFlightFinishedRecord);
+  listening = true;
+}
+
+export function pendingDebrief() { return lastSettlement; }
+export function clearDebrief() { lastSettlement = null; }
+
+export function recoverStaleOrders() {
+  const state = currentCareer();
+  if (!state || isFlightInProgress()) return false;
+  const stale = state.dispatch.queue.filter(o => o.crewId === PILOT_CREW_ID);
+  if (stale.length === 0) return false;
+  updateCareer(stale.reduce((s, o) => cancelOrder(s, o.id), state));
+  return true;
+}
 
 const nameOf = typeId => AIRCRAFT[typeId] ? AIRCRAFT[typeId].name : typeId;
 const clampInt = (x, lo, hi) => Math.min(hi, Math.max(lo, Math.round(x)));
