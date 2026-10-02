@@ -935,7 +935,6 @@ const Terrain = {
       const e = nd.e0 + i * step, n = nd.n0 + j * step, hi = (j + 1) * M + (i + 1);
       let h = H[hi];
       const ab = World._airportBlend(e, n); if (ab && !ab[3].photo) h -= 2.2 * smoothstep(0.80, 1.0, ab[0]);       // sink under the airport slab
-      else { const sp = World._shapeAt(e, n); if (sp && sp.d < 450) h -= 2.2 * (1 - smoothstep(370, 450, sp.d)); }      // F1: the same under the slab of a new airport (bounds + 260 m)
       pos[k * 3] = e - ce; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -(n - cn);
       const dx = J.DX[hi], dn = J.DN[hi], il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
       nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = dn * il;

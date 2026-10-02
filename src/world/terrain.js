@@ -2,11 +2,11 @@
  * d alcada del terreny.
  * ORIGEN: linies 1466-1638 de l'original.
  *
- * EXPORTA: World VALLEY valleyMarginM URBAN_SMOOTH
+ * EXPORTA: World URBAN_SMOOTH
  *
- * IMPORTA: ../core/constants.js, ../core/noise.js, ../core/flight-model.js
- *          (nomes SURF), ./geo.js, ./airports.js, ./ils.js (la senda),
- *          ./terrain-data.js (el fitxer de dades)
+ * IMPORTA: ../core/constants.js, ../core/noise.js (vnoise, la vora de les
+ *          ciutats), ../core/flight-model.js (nomes SURF), ./geo.js,
+ *          ./airports.js, ./terrain-data.js (el fitxer de dades)
  *
  * TERRENY REAL (fase A, docs/DECISIONS.md, 2026-10-02, TA-1 a TA-7):
  *   - World.G es la graella de 250 m del fitxer public/terrain/terrain-250.bin
@@ -27,26 +27,15 @@
  */
 
 import { DEG, clamp, lerp, smoothstep } from '../core/constants.js';
-import { vnoise, fbm, ridged } from '../core/noise.js';
+import { vnoise } from '../core/noise.js';
 import { SURF } from '../core/flight-model.js';
-import { ll, COAST, RIDGES, VALLEYS, URBAN, ROADS } from './geo.js';
+import { ll, COAST, URBAN, ROADS } from './geo.js';
 import { AIRPORTS, AIRPORT_ORDER, airportPavedAt } from './airports.js';
-import { ILS } from './ils.js';
 import { decodeTerrain } from './terrain-data.js';
 
 /* suavitzat de les zones URBAN (TA-5): pes complet fins a r = full, cap a r = edge (r = 1 a la vora de l el.lipse);
  * rebaixa com a molt maxCutM (l alcada d un edifici): els turons de debo (Montjuic) es queden */
 export const URBAN_SMOOTH = { full: 0.8, edge: 1.2, maxCutM: 25 };
-
-/* vall dels aeroports nous (H16): pendent de les vores, arrencada suau de la vora (m), eixamplament del fons per m,
-^ * ondulacio de l amplada (m) i la seva escala (m), relleu del fons (m, nomes rebaixa) i la seva escala (m), suavitat de la unio (m) */
-export const VALLEY = { wall: 0.08, knee: 1200, widen: 0.08, wobbleM: 600, wobbleScaleM: 9000, reliefM: 80, reliefScaleM: 6000, softM: 40 };
-/** marge del fons de la vall per sota de la senda de 3 graus a s m abans del llindar */
-export function valleyMarginM(s) { return s <= 4000 ? 130 : s >= 9000 ? 340 : lerp(130, 340, (s - 4000) / 5000); }
-const SHAPE_RANGE_M = 70000;                     // abast des de l origen: mes enlla, la vall (22 nm i el capcal) ja no talla res
-const smin = (x, y, k) => { const h = Math.max(k - Math.abs(x - y), 0) / k; return Math.min(x, y) - h * h * k / 4; };
-const smax = (x, y, k) => -smin(-x, -y, k);
-const ramp = (x, k) => x <= 0 ? 0 : x < k ? x * x / (2 * k) : x - k / 2;      // 0 i despres pendent 1, amb arrencada suau
 
 /* ---------------------------------------------------------------------------
  * Photo (escenari fotografic) es queda a index.html perque depen de THREE,
@@ -55,8 +44,8 @@ const ramp = (x, k) => x <= 0 ? 0 : x < k ? x * x / (2 * k) : x - k / 2;      //
  *
  * Injeccio de dependencia: index.html crida setPhoto(Photo) despres de
  * definir-lo. Sense escenari fotografic, el marcador de posicio amb on:false
- * dona exactament el comportament procedimental de sempre, que es el que
- * feia el codi original quan la carpeta scenery/ no hi era.
+ * dona el terreny de la graella, que es el que passa quan la carpeta
+ * scenery/ no hi es.
  * ------------------------------------------------------------------------- */
 let Photo = { on: false };
 export function setPhoto(p) { Photo = p; }
@@ -165,110 +154,6 @@ export const World = {
     const s = Photo.on ? lerp(this.G.cell / 2, 30, Photo.weight(e, n)) : this.G.cell / 2;
     return [(this.heightAt(e + s, n) - this.heightAt(e - s, n)) / (2 * s), (this.heightAt(e, n + s) - this.heightAt(e, n - s)) / (2 * s)];
   },
-  heightProc(e, n) {
-    const sd = this.sd(e, n);
-    if (sd <= 0) return Math.max(-400, sd * 0.3 - 0.5);
-    let h = this.heightRaw(e, n, sd);
-    const ab = this._airportBlend(e, n);
-    if (ab) h = lerp(h, ab[1], ab[0]);
-    else h = this._airportShape(e, n, h);
-    return h;
-  },
-  /** (e, n) respecte d un aeroport nou S: { S, a, c, d } amb d = distancia al rectangle (negativa a dins), o null fora de l abast */
-  _shapeLocal(S, e, n) {
-    const de = e - S.e, dn = n - S.n; if (Math.abs(de) > SHAPE_RANGE_M || Math.abs(dn) > SHAPE_RANGE_M) return null;
-    const a = de * S.ua[0] + dn * S.ua[1], c = de * S.uc[0] + dn * S.uc[1], b = S.bounds;
-    const da = Math.max(b[0] - a, a - b[1]), dc = Math.max(b[2] - c, c - b[3]);
-    const d = Math.max(da, dc) > 0 ? Math.hypot(Math.max(da, 0), Math.max(dc, 0)) : Math.max(da, dc);
-    return { S, a, c, d };
-  },
-  /** l aeroport nou amb el rectangle mes proper (dins de l abast), o null */
-  _shapeAt(e, n) {
-    let best = null;
-    for (const S of this.shapes || []) { const P = this._shapeLocal(S, e, n); if (P && (!best || P.d < best.d)) best = P; }
-    return best;
-  },
-  /** relleu h retallat per tots els aeroports nous a l abast, un rere l altre (cadascun nomes retalla) */
-  _airportShape(e, n, h) {
-    for (const S of this.shapes || []) { const P = this._shapeLocal(S, e, n); if (P) h = this._shapeOne(P, h, e, n); }
-    return h;
-  },
-  /** un aeroport nou: la vall al llarg de l eix i el reompliment de les depressions properes (vegeu la capcalera) */
-  _shapeOne(P, h, e, n) {
-    const { S, a, c, d } = P, E = S.elev, T = S.T, V = VALLEY;
-    if (d <= 0) return E;
-    let g = h;
-    if (T.valley) {
-      const tg = Math.tan(ILS.GS), L = T.valley.len;
-      // sostre de la vall sense l ondulacio de l amplada: si el relleu ja hi queda per sota amb marge, no cal res mes
-      const capAt = wob => { let cap = Infinity;
-        for (const en of S.ends) {
-          const ra = a - en.thr[0], rc = c - en.thr[1], s = -(ra * en.dir[0] + rc * en.dir[1]);     // s > 0: abans del llindar
-          if (s < -en.len) continue;                                                             // mes enlla de l altre llindar
-          const sp = Math.max(s, 0), sl = Math.min(sp, L), t = Math.abs(-ra * en.dir[1] + rc * en.dir[0]);
-          const F = E + Math.max(0, (sl + ILS.GS_S) * tg - valleyMarginM(sl)), W = S.w0 + V.widen * sl + wob;
-          // vora lateral i capcal amb el mateix pendent, combinats (el pendent no se suma a la cantonada)
-          cap = Math.min(cap, F + V.wall * Math.hypot(ramp(t - Math.max(W, S.w0), V.knee), sp - sl));
-        }
-        return cap; };
-      if (h > capAt(V.wobbleM) - V.reliefM - V.softM) {
-        const k = V.reliefScaleM, w = V.wobbleScaleM, cap = capAt(V.wobbleM * fbm(e / w + 31, n / w - 17, 2))
-          - V.reliefM * (0.5 + 0.5 * fbm(e / k + 7, n / k + 3, 3)) * smoothstep(2000, 5000, d);
-        g = smin(h, cap, V.softM);
-      }
-    }
-    // a prop del rectangle, les depressions es reomplen fins a l elevacio de l aeroport amb el pendent de les vores
-    // (smax pot passar k/4 per sobre del mes alt dels dos: el limit es baixa aquest tros perque no passi mai d E)
-    const lo = E - V.wall * ramp(d - T.flatR, V.knee);
-    return g < lo + V.softM ? Math.min(smax(g, lo - V.softM / 4, V.softM), Math.max(g, lo)) : g;
-  },
-  /** relleu natural sobre el mar, sense cap aeroport (sd > 0: distancia signada a la costa) */
-  heightRaw(e, n, sd) {
-    const island = n < -120000 || e > 130000;
-    const mallorca = island && e > 5000 && e < 135000 && n > -240000;
-    let base, hillAmp;
-    if (!island) { base = 1.5 + 50 * (1 - Math.exp(-sd / 4000)) + Math.min(sd, 70000) * 0.007; hillAmp = 25 + Math.min(sd, 40000) * 0.006; }
-    else if (mallorca) { base = 1.5 + 45 * (1 - Math.exp(-sd / 2500)) + Math.min(sd, 20000) * 0.003; hillAmp = 35; }
-    else { base = 1.5 + 60 * (1 - Math.exp(-sd / 1500)); hillAmp = 45; }
-    const hn = fbm(e / 7000, n / 7000, 4) * 0.5 + 0.5;
-    let relief = hn * hillAmp + (fbm(e / 900, n / 900, 3)) * hillAmp * 0.12;
-    // mountain ridges
-    let rg = 0;
-    for (const R of this.ridges) {
-      if (e < R.bb[0] || e > R.bb[1] || n < R.bb[2] || n > R.bb[3]) continue;
-      const p = R.pts; let best = 0;
-      for (let i = 0; i + 1 < p.length; i++) {
-        const ax = p[i][0], ay = p[i][1], dx = p[i + 1][0] - ax, dy = p[i + 1][1] - ay;
-        const t = clamp(((e - ax) * dx + (n - ay) * dy) / (dx * dx + dy * dy), 0, 1);
-        const qx = ax + dx * t - e, qy = ay + dy * t - n, w = lerp(p[i][3], p[i + 1][3], t), H = lerp(p[i][2], p[i + 1][2], t);
-        const v = H * Math.exp(-(qx * qx + qy * qy) / (w * w)); if (v > best) best = v;
-      }
-      if (best > 1) {
-        let mod = R.smooth ? 1 : 0.58 + 0.42 * ridged(e / 3800, n / 3800, 4) * 1.35;
-        if (R.rough) mod = lerp(mod, 0.45 + 0.75 * ridged(e / 650, n / 650, 3), 0.55 * R.rough);
-        best *= mod;
-      }
-      if (best > rg) rg = best;
-    }
-    // river valleys flatten the relief
-    let vf = 1;
-    for (const V of this.valleys) {
-      const p = V.pts;
-      for (let i = 0; i + 1 < p.length; i++) {
-        const ax = p[i][0], ay = p[i][1], dx = p[i + 1][0] - ax, dy = p[i + 1][1] - ay;
-        if (Math.abs(e - ax) > 20000 || Math.abs(n - ay) > 20000) continue;
-        const t = clamp(((e - ax) * dx + (n - ay) * dy) / (dx * dx + dy * dy), 0, 1), qx = ax + dx * t - e, qy = ay + dy * t - n;
-        vf = Math.min(vf, 1 - 0.9 * Math.exp(-(qx * qx + qy * qy) / (V.w * V.w)));
-      }
-    }
-    // the Llobregat delta is flat farmland
-    const dd = Math.hypot(e - this.delta[0], n - this.delta[1]); const dflat = dd < 12000 ? Math.exp(-Math.pow(dd / 6500, 4)) : 0;
-    const coast = smoothstep(0, 900, sd);
-    let h = base * (1 - 0.85 * dflat) + (relief * (1 - dflat) + rg) * vf * (0.25 + 0.75 * coast) * (rg > 50 ? smoothstep(0, 350, sd) * 0.9 + 0.1 : 1);
-    h = Math.max(h, 0.6 + Math.min(sd, 60) * 0.03);
-    return h;
-  },
-
   /** urban density 0..1 and the street-grid angle of the dominating town */
   urbanAt(e, n, h, out) {
     let best = 0, grid = 0, core = 0;
