@@ -16,4 +16,5 @@ export * from './rng.js';
 export * from './crew.js';
 export * from './lessons.js';
 export * from './school.js';
+export * from './flightplan.js';
 export { MINUTES_PER_DAY } from './util.js';
