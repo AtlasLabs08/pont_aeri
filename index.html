@@ -2145,7 +2145,7 @@ const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terra
   'Hard impact': 'hardImpact', 'Wing strike': 'wingStrike', 'Engine pod strike': 'engineStrike', 'Fuselage impact': 'fuselage' };
 
 const Game = {
-  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, airline: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
+  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, airline: null, airlineRestore: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
   opts: { aircraft: 'nb', airport: 'LEBL', dest: 'LEPA', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
   env: { windN: 0, windE: 0, gustN: 0, gustE: 0, gustD: 0, groundHeight: (n, e) => World.groundAt(e, n), surface: (n, e) => World.surfaceAt(e, n) },
   lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, landingWatch: new LandingWatch(), lastIas: 0, accelKt: 0, debug: false, help: false,
@@ -2425,7 +2425,11 @@ const Game = {
   /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola.
    * onFlightFinished no fa res si no hi ha cap vol llancat per app/flight.js (Free Flight): C2+C3. */
   /** D3D4-6: sortir d un vol d Airline (menu): el vol que no s ha tancat s abandona sense cost */
-  leaveAirlineFlight() { if (!this.recordDone && this.report && this.report.shown) this.closeAirlineFlight(); if (!this.recordDone) cancelFlight(); this.airline = null; },
+  leaveAirlineFlight() { if (!this.recordDone && this.report && this.report.shown) this.closeAirlineFlight(); if (!this.recordDone) cancelFlight(); this.airline = null; this.restoreFreeFlightOpts(); },
+  /** D3D4-6: torna a Game.opts els camps que el vol d Airline havia sobreescrit (avio, aeroports, pista, sortida, hora, vent, mode), com es fa amb els spawn* de les llicons */
+  restoreFreeFlightOpts() { const R = this.airlineRestore; if (!R) return; this.airlineRestore = null; const ac = this.opts.aircraft;
+    for (const [k, v] of Object.entries(R)) { if (v === undefined) delete this.opts[k]; else this.opts[k] = v; }
+    if (this.opts.aircraft !== ac) this.setAircraft(this.opts.aircraft); UI.modeText(); },
   /** D3D4-7: tanca el vol d Airline si l avio es sobre el paviment d un aeroport (landedAt); si no, no fa res.
    *  Si s ha aterrat i se surt al menu abans d aturar-se, tambe es tanca: el vol no es pot abandonar despres de la nota */
   closeAirlineFlight() { const f = this.fdm, at = f.wow ? airportAt(f.e, f.n) : null; if (!at) return; this.landedAt = at; this.finishRecord(); },
@@ -2838,7 +2842,10 @@ const Main = {
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); UI.modeText(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
     // D3D4-6: un vol d Airline porta opts.airline (combustible, massa, pla); no entra a Game.opts, queda a Game.airline
-    setFlightLauncher(opts => { const { airline = null, ...o } = opts; if (o.aircraft && o.aircraft !== Game.opts.aircraft) Game.setAircraft(o.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, o); Game.airline = airline; Game.spawn(); if (airline) UI.startAirlineFlight(); });
+    setFlightLauncher(opts => { const { airline = null, ...o } = opts; if (o.aircraft && o.aircraft !== Game.opts.aircraft) Game.setAircraft(o.aircraft); dropSpawnOpts(Game.opts);
+      // el vent, l hora, l avio i la ruta d Airline no es queden al menu de Free Flight: leaveAirlineFlight els torna com eren
+      if (airline && !Game.airlineRestore) Game.airlineRestore = Object.fromEntries(Object.keys(o).map(k => [k, Game.opts[k]]));
+      Object.assign(Game.opts, o); Game.airline = airline; Game.spawn(); if (airline) UI.startAirlineFlight(); });
     // D3D4-5: el briefing tria la pista d arribada amb el mateix pla que el joc (H16, H17)
     setArrivalPlanner(o => { const P = Game.routePlan({ ...Game.opts, ...o }).plan; return { en: P.en, tailwindKt: P.tailwindKt }; });
     // capa d Airline (ui/): menu principal, escola, graduacio i centre d operacions (C5+D1)
