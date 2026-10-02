@@ -6,6 +6,7 @@
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          turbulenceLevel minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
+ *          AIRLINE_CONTACT_KM airlineClosing
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief debriefModel recoverStaleOrders _resetDispatch
  *
@@ -57,9 +58,24 @@
  *     Flight, llicons), com fins ara: fuelPlannedKg = fuelKg, 0 i null.
  *   arrivalMinute(airline, blockSeconds, skippedSeconds = 0)
  *     = round(departMinute + (blockSeconds + skippedSeconds) / 60)
- *   finishExtras(airline, blockSeconds, landedAt) -> argument de
- *     FlightRecorder.finish: { arrivalMin, landedAt } amb airline, o
- *     { arrivalMin: null } sense.
+ *   finishExtras(airline, blockSeconds, landedAt, stoppedOffPavement = false)
+ *     -> argument de FlightRecorder.finish: { arrivalMin, landedAt,
+ *     stoppedOffPavement } amb airline, o { arrivalMin: null } sense.
+ *   AIRLINE_CONTACT_KM = 5
+ *   airlineClosing({ leaving, contact, stopped, onGround, pavedAt })
+ *     -> { action, landedAt, stoppedOffPavement }   que fa un vol d Airline
+ *     (revisio del PR #36, decisio del projecte). contact = { e, n } del
+ *     primer contacte amb terra, o null; stopped = a terra a menys
+ *     d AIRLINE_STOP_KT; pavedAt = airportAt de la posicio actual (null fora
+ *     de paviment o en vol); leaving = el pilot surt del vol.
+ *       Sense contacte: 'cancel' si surt (abandonament sense cost), 'none' si no.
+ *       Amb contacte, si no s ha aturat i no surt: 'none'.
+ *       Aturat sobre paviment (sense sortir): 'close' a pavedAt (D3D4-7).
+ *       Aturat fora de paviment, o surt: si el primer contacte es a menys
+ *       d AIRLINE_CONTACT_KM km de l aeroport mes proper (nearestAirport),
+ *       'close' a aquest aeroport, amb stoppedOffPavement = a terra fora de
+ *       paviment; si no, 'crash' (com els tancaments automatics d index.html,
+ *       'Terrain impact').
  *   setArrivalPlanner(fn)   index.html hi injecta el planificador del joc
  *     (Game.routePlan, H16-H17: descarta els caps sense ruta volable): fn(o)
  *     amb o = { aircraft, airport, dest, runway, windDir, windKt } -> { en,
@@ -107,7 +123,8 @@ import {
   estimateOwnFlight, contractOffers, createOrder, cancelOrder, releaseGrounded, settleFlight, tierOf, airframeTier, MINUTES_PER_DAY, PILOT_CREW_ID
 } from '../career/index.js';
 import {
-  AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather, arrivalEnd, tailwindKt, MAX_TAILWIND_KT, airportPavedAt
+  AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather, arrivalEnd, tailwindKt, MAX_TAILWIND_KT, airportPavedAt,
+  nearestAirport
 } from '../world/index.js';
 import { AIRCRAFT, DEG } from '../core/index.js';
 import { launchFlight, isFlightInProgress } from './flight.js';
@@ -116,6 +133,8 @@ import { currentCareer, updateCareer } from './airline.js';
 
 export const HOURS_PER_DAY = 24;
 export const AIRLINE_STOP_KT = 1;
+export const AIRLINE_CONTACT_KM = 5;
+const M_PER_KM = 1000;
 const MINUTES_PER_HOUR = 60;
 
 let active = null, listening = false, lastSettlement = null;
@@ -346,8 +365,21 @@ export function arrivalMinute(airline, blockSeconds, skippedSeconds = 0) {
   return Math.round(airline.departMinute + (blockSeconds + skippedSeconds) / 60);
 }
 
-export function finishExtras(airline, blockSeconds, landedAt) {
-  return airline ? { arrivalMin: arrivalMinute(airline, blockSeconds), landedAt: landedAt ?? null } : { arrivalMin: null };
+export function finishExtras(airline, blockSeconds, landedAt, stoppedOffPavement = false) {
+  return airline
+    ? { arrivalMin: arrivalMinute(airline, blockSeconds), landedAt: landedAt ?? null, stoppedOffPavement: stoppedOffPavement === true }
+    : { arrivalMin: null };
+}
+
+export function airlineClosing({ leaving, contact, stopped, onGround, pavedAt }) {
+  if (!contact) return { action: leaving ? 'cancel' : 'none', landedAt: null, stoppedOffPavement: false };
+  if (!stopped && !leaving) return { action: 'none', landedAt: null, stoppedOffPavement: false };
+  if (stopped && pavedAt && !leaving) return { action: 'close', landedAt: pavedAt, stoppedOffPavement: false };
+  const A = nearestAirport(contact.e, contact.n, AIRPORTS[AIRPORT_ORDER[0]]);
+  if (!A || Math.hypot(contact.e - A.e, contact.n - A.n) >= AIRLINE_CONTACT_KM * M_PER_KM) {
+    return { action: 'crash', landedAt: null, stoppedOffPavement: false };
+  }
+  return { action: 'close', landedAt: A.icao, stoppedOffPavement: !!onGround && !pavedAt };
 }
 
 export function airportAt(e, n) {

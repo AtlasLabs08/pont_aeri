@@ -454,6 +454,7 @@ export default {
   'hud.alt': 'ALT',
   'hud.raValue': 'RA {ft}',
   'airline.flight.loading': 'Preparing the flight',
+  'airline.crash.outside': 'The aircraft touched down 5 km or more from any airport.',
   'airline.flight.start': '{from} to {to}. Parking brake set: P releases it, H shows every control. The flight ends when you stop on the pavement of an airport.',
   'market.reason.negative': 'The balance is negative: you cannot buy until it is back above zero. Fly contracts to recover.',
   'topbar.lastFlight': 'Last flight {delta}',

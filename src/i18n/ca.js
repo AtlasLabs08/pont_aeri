@@ -452,6 +452,7 @@ export default {
   'hud.alt': 'ALT',
   'hud.raValue': 'RA {ft}',
   'airline.flight.loading': 'Preparant el vol',
+  'airline.crash.outside': 'L\'avió ha tocat terra a 5 km o més de qualsevol aeroport.',
   'airline.flight.start': 'De {from} a {to}. Fre d\'estacionament posat: la P el treu i la H mostra tots els comandaments. El vol s\'acaba quan t\'aturis sobre el paviment d\'un aeroport.',
   'market.reason.negative': 'El saldo és negatiu: no pots comprar fins que torni a ser positiu. Vola contractes per recuperar-te.',
   'topbar.lastFlight': 'Últim vol {delta}',
