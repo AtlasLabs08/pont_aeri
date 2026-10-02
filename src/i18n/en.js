@@ -434,5 +434,7 @@ export default {
   'guide.symbols.papi.term': 'PAPI',
   'guide.symbols.papi.text': 'Four lights beside the runway. Two white and two red: on the 3° path. More white: too high. More red: too low.',
   'guide.symbols.taxiTarget.term': 'Green ring',
-  'guide.symbols.taxiTarget.text': 'School, taxi lesson: the target point and the route along the taxiways.'
+  'guide.symbols.taxiTarget.text': 'School, taxi lesson: the target point and the route along the taxiways.',
+  'airline.flight.loading': 'Preparing the flight',
+  'airline.flight.start': '{from} to {to}. Parking brake set: P releases it, H shows every control. The flight ends when you stop on the pavement of an airport.'
 };

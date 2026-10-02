@@ -432,5 +432,7 @@ export default {
   'guide.symbols.papi.term': 'PAPI',
   'guide.symbols.papi.text': 'Quatre llums al costat de la pista. Dos de blancs i dos de vermells: a la senda de 3°. Més blancs: massa alt. Més vermells: massa baix.',
   'guide.symbols.taxiTarget.term': 'Anella verda',
-  'guide.symbols.taxiTarget.text': 'Escola, lliçó de rodatge: el punt objectiu i el camí per les calles de rodatge.'
+  'guide.symbols.taxiTarget.text': 'Escola, lliçó de rodatge: el punt objectiu i el camí per les calles de rodatge.',
+  'airline.flight.loading': 'Preparant el vol',
+  'airline.flight.start': 'De {from} a {to}. Fre d\'estacionament posat: la P el treu i la H mostra tots els comandaments. El vol s\'acaba quan t\'aturis sobre el paviment d\'un aeroport.'
 };

@@ -149,7 +149,8 @@ import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
-  currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on
+  currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on,
+  recorderMeta, setArrivalPlanner
 } from './src/app/index.js';
 import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
@@ -2138,7 +2139,7 @@ const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terra
   'Hard impact': 'hardImpact', 'Wing strike': 'wingStrike', 'Engine pod strike': 'engineStrike', 'Fuselage impact': 'fuselage' };
 
 const Game = {
-  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
+  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, airline: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
   opts: { aircraft: 'nb', airport: 'LEBL', dest: 'LEPA', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
   env: { windN: 0, windE: 0, gustN: 0, gustE: 0, gustD: 0, groundHeight: (n, e) => World.groundAt(e, n), surface: (n, e) => World.surfaceAt(e, n) },
   lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, landingWatch: new LandingWatch(), lastIas: 0, accelKt: 0, debug: false, help: false,
@@ -2202,7 +2203,8 @@ const Game = {
       if (O.start === 'gate') { const big = cfg.geom.b > 50, g = A.gates.find(q => (q.size === 'H') === big) || A.gates[0]; p = A.toWorld(g.a, g.c); hdg = wrap360(g.hdg); }
       else { p = A.toWorld(en.thr[0] + en.dir[0] * 70, en.thr[1] + en.dir[1] * 70); hdg = en.hdg; ctl.flaps = cfg.flapTO; }
       const v = f.vspeeds(), tr = trimAircraft(f, { cas: (v.v2 + 10) * KT, alt: 300, gamma: 4 * DEG, flaps: cfg.flapTO, gearDown: true });
-      f.reset({ onGround: true, n: p[1], e: p[0], hdg, groundH: A.elev, flaps: ctl.flaps }); ctl.trim = clamp(tr.trim, -1, 1); ctl.parkBrake = true;
+      // D3D4-6: un vol d Airline surt amb el combustible i la massa del pla (passatgers inclosos)
+      f.reset({ onGround: true, n: p[1], e: p[0], hdg, groundH: A.elev, flaps: ctl.flaps, ...(this.airline ? { fuel: this.airline.fuelKg, mass: this.airline.massKg } : {}) }); ctl.trim = clamp(tr.trim, -1, 1); ctl.parkBrake = true;
     }
     this.autoTrimmer = new AutoTrim(); this.nav = null; this.navN = 0; this._apWas = false; Sound.reset();
     this.ap = new Autopilot(f); this.ap.selAlt = O.mode === 'route' ? this.arrPlan.plan.cruiseFt : 5000; this.ap.selSpd = cfg.type === 'jet' ? 250 : 190; this.ap.selHdg = Math.round(en.hdg);
@@ -2221,7 +2223,8 @@ const Game = {
     setOrigin(Math.round(f.e / 500) * 500, Math.round(f.n / 500) * 500);
     Cameras.mode = O.start === 'final' ? 'cockpit' : 'chase'; Cameras.chaseYaw = f.out.psi; Cameras.orbYaw = 2.4; Cameras.orbPitch = 0.18; Cameras.dist = 1; this.acc = 0; this.lastIas = f.out.ias;
     // start() torna timeAccelMax a 1: no cal setTimeAccel pel timeAccel = 1 d'aquesta funcio
-    Recorder.start({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelPlannedKg: f.fuel, paxOnBoard: 0, plannedArrivalMin: null });
+    // D3D4-6: amb Game.airline, els valors reals del pla (app/dispatch.js, recorderMeta); sense, com abans
+    Recorder.start(recorderMeta({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelKg: f.fuel, airline: this.airline }));
     this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
   },
   /** destinacio del vol cronometrat (F1, H9): opts.dest si es un altre aeroport; si no, LEPA des de LEBL i LEBL des de la resta */
@@ -2413,6 +2416,8 @@ const Game = {
   crashNow(title, detail) { if (this.state !== 'flying' || this.crash) return; Sound.crash(); this.crash = { title, detail }; this.state = 'crashed'; Recorder.crash(CRASH_CAUSE_BY_TITLE[title] || title); if (currentLesson()) currentLesson().crash(); this.finishRecord(); UI.showCrash(title, detail); },
   /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola.
    * onFlightFinished no fa res si no hi ha cap vol llancat per app/flight.js (Free Flight): C2+C3. */
+  /** D3D4-6: sortir d un vol d Airline (menu): el vol que no s ha tancat s abandona sense cost */
+  leaveAirlineFlight() { if (!this.recordDone) cancelFlight(); this.airline = null; },
   finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish({ arrivalMin: null }); if (IS_DEV) console.log('[FlightRecord]', record); onFlightFinished(record); },
   /** Recorder.event(type) quan un avis existent passa d'apagat a ences */
   warnEvent(type, on) { if (on && !this.warnWas[type]) Recorder.event(type); this.warnWas[type] = on; },
@@ -2817,7 +2822,10 @@ const Main = {
     Scenery.init(); prog(0.55, 'Painting runways and switching on the lights'); await tick();
     AirportScenery.init(); prog(0.65, 'Rolling out the fleet'); await tick();
     Game.setAircraft(Game.opts.aircraft); Game.spawn(); UI.modeText(); Input.init(document.getElementById('view')); window.addEventListener('resize', onResize);
-    setFlightLauncher(opts => { if (opts.aircraft && opts.aircraft !== Game.opts.aircraft) Game.setAircraft(opts.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, opts); Game.spawn(); });
+    // D3D4-6: un vol d Airline porta opts.airline (combustible, massa, pla); no entra a Game.opts, queda a Game.airline
+    setFlightLauncher(opts => { const { airline = null, ...o } = opts; if (o.aircraft && o.aircraft !== Game.opts.aircraft) Game.setAircraft(o.aircraft); dropSpawnOpts(Game.opts); Object.assign(Game.opts, o); Game.airline = airline; Game.spawn(); if (airline) UI.startAirlineFlight(); });
+    // D3D4-5: el briefing tria la pista d arribada amb el mateix pla que el joc (H16, H17)
+    setArrivalPlanner(o => { const P = Game.routePlan({ ...Game.opts, ...o }).plan; return { en: P.en, tailwindKt: P.tailwindKt }; });
     // capa d Airline (ui/): menu principal, escola, graduacio i centre d operacions (C5+D1)
     initAirlineUi({
       launchLesson: id => launchLesson(id, false),
@@ -2945,12 +2953,15 @@ const UI = {
     this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy, alt }) + (P.tailwindKt > MAX_TAILWIND_KT ? ' ' + t('freeFlight.tailwind', { kt: tw }) : '') : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
-  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
+  async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.airline = null; Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
-  restart() { this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
-  toMenu() { const lesson = lastLessonId() !== null; this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; this.hideDebrief(); if (isAirlineUiOpen()) hideAirlineUi(); abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit';
+  restart() { if (Game.airline) { this.toMenu(); return; } this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
+  toMenu() { const lesson = lastLessonId() !== null, airline = !!Game.airline; if (airline) Game.leaveAirlineFlight(); this.el.pause.hidden = true; this.el.mixer.hidden = true; this.el.crash.hidden = true; this.el.report.hidden = true; this.el.help.hidden = true; this.hideDebrief(); if (isAirlineUiOpen()) hideAirlineUi(); abandonLesson(); Game.state = 'menu'; Game.spawn(); Cameras.mode = 'orbit';
     // una llico torna a Airline (escola, o la graduacio si ja toca); Free Flight, al seu menu
-    if (lesson) showAirlineHome(); else this.showMenu(true); },
+    if (lesson || airline) showAirlineHome(); else this.showMenu(true); },
+  /** D3D4-6: arrencada d un vol d Airline, despres que el launcher hagi fet Game.spawn() (espill de startFlight) */
+  async startAirlineFlight() { if (isAirlineUiOpen()) hideAirlineUi(); Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, t('airline.flight.loading')); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
+    this.toast(t('airline.flight.start', { from: Game.flight.from.icao, to: Game.flight.to.icao }), 7); },
   pause(on) { if (!on && isAirlineUiOpen()) hideAirlineUi(); if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
   /** Settings des del menu principal (X1): obre el panell de pausa (grafics, so, mesclador, controls, guia) sense Resume,
