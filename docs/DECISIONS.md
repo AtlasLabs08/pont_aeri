@@ -1062,3 +1062,154 @@ Com s ha aplicat:
   dues proves d H11 de manera esperada: amb 30 kt de cua el cap amb ILS ja no
   es tria, i LERS amb 20 kt de 070 aterra al 07. Avis: freeFlight.tailwind
   ("Tailwind 12 kt on landing.").
+
+## 2026-10-02 - D3+D4: dispatch, briefing i debrief
+
+Decisions del projecte per al D3 (Dispatch i briefing) i el D4 (debrief i
+compte de resultats), amb els vols de contracte com a xarxa de seguretat.
+
+- D3D4-1. Pestanya Dispatch (substitueix "Aviat"), dues opcions. a) Vol propi:
+  un avio de la flota amb status 'ready' (surt de la seva Airframe.location),
+  un desti (aeroports d AIRPORT_ORDER diferents de l origen i dins de l abast
+  de l avio), l hora de sortida (0-23) i el preu del bitllet (lliscador entre
+  0,5x i 2x del preu recomanat, de les funcions de demanda). Es veuen en
+  directe els passatgers previstos i els ingressos estimats. b) Vol de
+  contracte (D3D4-9).
+- D3D4-2. Passatgers: demand.js amb la ruta, el preu, l hora, la reputacio i
+  la meteo, limitats als seients. Si cal atzar, del rngCounter de l ordre.
+- D3D4-3. Dia i mes fins al rellotge (E1): dia = company.flightsFlown; mes =
+  1 + (floor(dia / 30) mod 12). departMinute = dia * MINUTES_PER_DAY + hora *
+  60. clock.minute no es toca.
+- D3D4-4. Briefing: ruta i pista d arribada (H11 amb el vent), meteo a
+  l origen i al desti amb weatherFor (mes, hora, dia de D3D4-3), passatgers,
+  preu, combustible i hora d arribada prevista. Combustible minim = trajecte +
+  reserva + contingencia (consum de l avio i constants a BALANCE); el jugador
+  el pot augmentar fins a la capacitat del diposit, mai baixar del minim. Mes
+  combustible = mes massa i mes cost.
+- D3D4-5. Vent de cua: si la pista d arribada triada te mes de 10 kt de cua
+  (H17c), el briefing ho avisa i proposa l aeroport alternatiu mes proper amb
+  una pista utilitzable sense aquest problema. El jugador decideix.
+- D3D4-6. Llancament: el launcher rep reg, from, to, sortida des de porta,
+  fuelKg, paxOnBoard, la massa amb la carrega (kg per passatger a BALANCE),
+  la meteo (toGameWeather) i plannedArrivalMin. Recorder.start rep els valors
+  reals del pla i el tancament passa arrivalMin (sortida + durada del vol,
+  comptant el temps del salt de creuer si n hi ha). Free Flight i les llicons,
+  igual que abans.
+- D3D4-7. Desviament: el vol s acaba quan l avio s atura sobre paviment de
+  qualsevol aeroport despres d haver volat. Camp nou opcional landedAt (ICAO)
+  al FlightRecord; to continua sent el desti planificat. Si landedAt != to:
+  ingressos x un factor de desviament (BALANCE), penalitzacio de reputacio
+  (BALANCE) i l avio queda a landedAt, des d on sortira el proper vol.
+- D3D4-8. Liquidacio (funcio d app/ que escolta flight:finished): una sola
+  crida a computeFlightResult (mode 'own', ticketPrice, paxOnBoard, crewCount,
+  rankPayMult, weatherBonus de la meteo del briefing, exclusive si hi ha
+  font, financePerFlight, revenueMult de la categoria), i despres, en aquest
+  ordre: cash, quotes dels prestecs (redueixen el capital pendent),
+  applyFlightWear amb el wearMult de la categoria, assessDamage si cal, XP i
+  rang (emet 'rank:up' si puja), reputacio, hores i cicles, ubicacio, logbook
+  (append), saveCareer i emit 'dispatch:resolved'. Les tirades de draw(state)
+  per vol tenen un ordre fix, documentat i provat.
+- D3D4-9. Vols de contracte: tres ofertes al Dispatch (ruta i tipus d avio
+  que el pilot pot pilotar), d un flux derivat de (rngSeed, dia), sense tocar
+  rngCounter. Es vola amb l avio de l altra companyia (no gasta la flota ni
+  les quotes) i es cobra amb computeFlightResult en mode 'contract'. Sempre
+  disponibles, tambe amb saldo negatiu.
+- D3D4-10. Saldo negatiu: es permet. Amb el saldo en negatiu no es pot
+  comprar, contractar ni pagar habilitacions (missatge clar a la UI). Les
+  quotes es continuen cobrant, sense interessos extra. La barra superior
+  mostra el saldo en vermell i un avis curt.
+- D3D4-11. Esquema (regla de la seccio 8: camps nous opcionals, sense pujar
+  schemaVersion): DispatchOrder amb pax, fuelKg, plannedArrivalMin,
+  arrivalRunway, alternate, weather (copia del que es va mostrar) i contract
+  (boolean); Company.crewCount (enter, per defecte 0; la pestanya de
+  tripulacio es el D6). validate els comprova. Una ordre existeix mentre el
+  vol es pendent; en liquidar-se surt de la cua i queda al logbook.
+- D3D4-12. Debrief (despres de l informe d aterratge): compte de resultats
+  amb els ingressos (bitllets, puntualitat, estalvi de combustible), els
+  costos (combustible, tripulacio, taxes, manteniment per cicle,
+  financament) i el net; XP guanyada i progres de rang; desgast; danys si
+  n hi ha; reputacio; desviament si n hi ha. Tots els numeros surten del
+  resultat de computeFlightResult i de la liquidacio, mai de la UI.
+
+Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
+
+- Fitxers nous: career/flightplan.js (pla de vol, pur), career/orders.js
+  (createOrder, cancelOrder, releaseGrounded, reputationDelta, settleFlight),
+  career/contracts.js, app/dispatch.js, ui/dispatch.js, ui/briefing.js i
+  ui/debrief.js. La liquidacio es una funcio pura de career/ (settleFlight)
+  que fa tots els passos de D3D4-8 en aquest ordre; app/ l aplica en
+  'flight:finished', desa (updateCareer, que emet 'career:changed'), emet
+  'rank:up' si el rang puja i despres 'dispatch:resolved'.
+- Tirades (D3D4-8): SETTLE_DRAWS = ['crashSeverity']. createOrder les reserva
+  (order.rngCounter i la partida avanca el comptador); settleFlight les tira
+  totes, sempre, sobre { rngSeed, rngCounter: order.rngCounter }. Els
+  passatgers no necessiten atzar (demandPax arrodoneix avall). Mateixa
+  partida i mateix record, mateix resultat (prova).
+- Pla de vol (D3D4-4): BALANCE.flightPlan, velocitat i consum mitja de bloc
+  per tipus, mesurats amb el model de vol de core/ al creuer del vol
+  cronometrat (trim a 11.000 ft / 190 kt els turbohelixs i 15.000 ft / 250 kt
+  els jets, mes pujada i rodatge); reserva de 30 min i contingencia del 5 %;
+  95 kg per passatger. FlightRecord.fuelPlannedKg es el combustible previst
+  del trajecte, no el carregat: si fos el carregat, la reserva sempre
+  donaria el bonus d estalvi. El maxim es el diposit o el que deixa la MTOW.
+- Sense pla no es regala res: si l ordre no te plannedArrivalMin o
+  tripFuelKg, settleFlight no paga ni la puntualitat ni l estalvi.
+- Meteo i simulador: Game nomes te un vent per a tot el vol. El vol d Airline
+  es vola amb el vent del desti a l hora d arribada (toGameWeather), que es
+  el que decideix l aterratge i la pista d arribada; el briefing ho diu. La
+  meteo de l origen es mostra i compta per a la demanda i el bonus.
+- Pista d arribada del briefing: el mateix pla que el joc (Game.routePlan,
+  H16-H17), injectat a app/ amb setArrivalPlanner (patro de setPhoto). Sense
+  aquesta injeccio (Node), arrivalEnd. Amb arrivalEnd sol, el vent de cua de
+  mes de 10 kt no pot passar mai (sempre hi ha l altre cap); nomes passa quan
+  el terreny descarta un cap, com LESU 21 (H17).
+- weatherBonus (D3D4-8): DESIGN.md, la meteo dura suma entre +0,15 i +0,60 a
+  m_ruta; lineal de HARD_SEVERITY a 1, la pitjor de l origen i el desti.
+  exclusive: no hi ha cap font de competidors, sempre false. financePerFlight:
+  0. Les quotes dels prestecs es paguen a part (fora de K i r, com al
+  harness): si entressin aqui es pagarien dues vegades. El lloguer (G1, la
+  unica font que hi correspondria) no era a l encarrec: queda pendent.
+- Reputacio: BALANCE.reputationChange (tram de la nota, accident) i
+  divert.reputation; retallada a 0-100. Els mateixos punts als vols propis i
+  als de contracte (DESIGN.md: la reputacio pesa igual).
+- XP: flightXp amb turbulencia (toGameWeather(w).turb) i meteo dura de
+  qualsevol dels dos aeroports, dificultat de l aeroport on s aterra; menys
+  l xpLoss de l accident.
+- Danys: assessDamage amb crashSeverity de SETTLE_DRAWS. Amb dies a terra,
+  status 'maintenance' i groundedUntilMinute = (dia + dies) * 1440: fins al
+  rellotge, un dia = un vol (releaseGrounded en el model del Dispatch i en
+  crear l ordre). Un contracte no paga danys (playerCost 0).
+- Ubicacio: landedAt; sense (record sintetic), el desti si ha aterrat, o
+  l origen si no ha aterrat (accident).
+- Desviament: el factor de desviament entra pel revenueMult de
+  computeFlightResult (bitllets i puntualitat); al mode contract, que no fa
+  servir revenueMult, s aplica a la tarifa i al net despres de la crida.
+- Tancament (D3D4-7): index.html, en un vol d Airline, no tanca el vol a
+  l informe d aterratge (com el mode route) sino quan l avio s atura
+  (gs < AIRLINE_STOP_KT = 1 kt) sobre el paviment d un aeroport (airportAt,
+  amb airportPavedAt). Si el jugador surt al menu despres de l aterratge i
+  abans d aturar-se, el vol tambe es tanca (no es pot fugir d una mala nota).
+  Si surt abans d aterrar, el vol s abandona: l ordre es cancel.la i no es
+  paga res (cancelFlight). Les ordres que queden a la cua sense cap vol en
+  marxa (s ha tancat el joc a mig vol) es cancel.len en obrir el centre
+  d operacions.
+- landedAt es a RECORD_KEYS (el recorder el posa sempre, null per defecte) i
+  a OPTIONAL_RECORD_KEYS: onFlightFinished no l exigeix a un record.
+- Launcher (D3D4-6): opts.airline no entra a Game.opts (seccio 1: Airline no
+  hi afegeix camps); queda a Game.airline. La sortida es de la porta amb el
+  cap de mes vent de cara; Game.spawn fa servir f.reset({ fuel, mass }), que
+  ja existia. Free Flight i les llicons no passen airline: res no canvia.
+- Contractes: tipus que el pilot pot volar, rutes d AIRPORT_ORDER fins a
+  600 km dins de l abast, sortida de 6 a 21 h, ocupacio del 60 al 95 %,
+  matricula EC-C.. de l altra companyia. La reg no es de la flota: validate
+  no la busca si contract es true. Es vola des de l origen de l oferta (la
+  posicio del pilot no es modela).
+- Saldo negatiu (D3D4-10): buyAircraft, hireCrew i purchaseRating ja el
+  refusen pel cash; app/market.js el diu amb reason 'negative'. Encara no hi
+  ha pantalla de tripulacio ni d habilitacions (D6).
+- Camps afegits a l esquema, a mes dels de D3D4-11: DispatchOrder.typeId (cal
+  als contractes, l avio no es de la flota) i tripFuelKg (el combustible
+  previst del trajecte, el que va a fuelPlannedKg); LogEntry definit a
+  types.js i a la seccio 5.
+- El harness economic no canvia: npm run balance -- --seeds 50 dona la
+  mateixa sortida que abans (els valors nous de BALANCE no hi entren).
