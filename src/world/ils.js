@@ -2,6 +2,7 @@
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
  * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd tailwindKt MAX_TAILWIND_KT flightApproach finalFix FINAL_FIX_NM
+ *          GS_DEG glideAngle
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -50,7 +51,18 @@
  *     triat, arrivalEnd, sense sintonitzar (l auto-sintonia de sempre).
  *   finalFix(A, en) -> { e, n, a, c, name, h }   punt d aproximacio final
  *     (H14): FINAL_FIX_NM abans del llindar d en, sobre l eix allargat; nom
- *     'FF' + designacio ('FF21'); h = alcada de la senda de 3 graus en m MSL.
+ *     'FF' + designacio ('FF21'); h = alcada de la senda del cap en m MSL.
+ *
+ * Senda per cap (terreny real, fase A, docs/DECISIONS.md, 2026-10-02, TA-9):
+ *   glideAngle(en) -> angle de la senda del cap en radiants: en.gsDeg
+ *     (airports.js, APPROACH_DATA) o GS_DEG (3 graus) per defecte. geom() i
+ *     nav() en donen g.gs, i hPath i gsDev el fan servir.
+ *   ILS.GS -> angle de la senda de l ultima aproximacio calculada per nav() o
+ *     triada per update(). El pilot automatic de core/ el llegeix d aqui: com
+ *     que index.html i el harness criden nav() just abans de l autopilot,
+ *     sempre es el del cap que vola.
+ *   arrivalEnd (H11) no tria mai un cap amb en.direct === false (sense
+ *     aproximacio directa) si n hi ha un altre.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -69,9 +81,9 @@ export const MAX_TAILWIND_KT = 10;
 export function tailwindKt(en, windDir, windKt) { return windKt > 0 ? -windKt * Math.cos((windDir - en.hdg) * DEG) : 0; }
 
 export function arrivalEnd(A, windDir, windKt) {
-  const ok = A.allEnds.filter(en => tailwindKt(en, windDir, windKt) <= MAX_TAILWIND_KT + 1e-9), ends = ok.length ? ok : A.allEnds;
+  const direct = A.allEnds.filter(en => en.direct !== false), all = direct.length ? direct : A.allEnds;
+  const ok = all.filter(en => tailwindKt(en, windDir, windKt) <= MAX_TAILWIND_KT + 1e-9), ends = ok.length ? ok : all;
   const ils = ends.filter(en => en.ils !== false);
-  if (ils.length === 1) return ils[0];
   if (ils.length === 1) return ils[0];
   const pool = ils.length ? ils : ends, calm = !(windKt > 0);
   const score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
@@ -88,25 +100,31 @@ export function flightApproach({ mode, start, airport, dest, runway, windDir, wi
 export const FINAL_FIX_NM = 10;
 export function finalFix(A, en) {
   const d = FINAL_FIX_NM * NM, a = en.thr[0] - en.dir[0] * d, c = en.thr[1] - en.dir[1] * d, w = A.toWorld(a, c);
-  return { e: w[0], n: w[1], a, c, name: 'FF' + en.id, h: A.elev + (d + ILS.GS_S) * Math.tan(ILS.GS) };
+  return { e: w[0], n: w[1], a, c, name: 'FF' + en.id, h: A.elev + (d + ILS.GS_S) * Math.tan(glideAngle(en)) };
 }
 
+export const GS_DEG = 3;
+export function glideAngle(en) { return (en && en.gsDeg || GS_DEG) * DEG; }
+
 export const ILS = {
-  GS: 3 * DEG, GS_S: 420, LOC_BEYOND: 300, LOC_DOT: 1.25 * DEG, GS_DOT: 0.35 * DEG, RANGE: 25 * NM,
+  _gs: GS_DEG * DEG,
+  get GS() { return this._gs; },
+  GS_S: 420, LOC_BEYOND: 300, LOC_DOT: 1.25 * DEG, GS_DOT: 0.35 * DEG, RANGE: 25 * NM,
   /** raw geometry of a position (e, n, wheel height above mean sea level) relative to one runway end */
   geom(A, en, e, n, hWheel) {
     const l = A.toLocal(e, n), dx = l[0] - en.thr[0], dy = l[1] - en.thr[1];
     const s = dx * en.dir[0] + dy * en.dir[1];              // along the landing direction, negative before the threshold
     const t = -dx * en.dir[1] + dy * en.dir[0];              // lateral, positive = LEFT of the centreline
     const dA = en.rw.len + this.LOC_BEYOND - s, dG = this.GS_S - s, hW = hWheel - A.elev;
-    return { s, t, dA, dG, hW, locAng: Math.atan2(t, Math.max(dA, 1)), gsAng: Math.atan2(hW, Math.max(dG, 1)), hPath: Math.max(dG, 0) * Math.tan(this.GS), dist: Math.hypot(s, t) };
+    const gs = glideAngle(en);
+    return { s, t, dA, dG, hW, gs, locAng: Math.atan2(t, Math.max(dA, 1)), gsAng: Math.atan2(hW, Math.max(dG, 1)), hPath: Math.max(dG, 0) * Math.tan(gs), dist: Math.hypot(s, t) };
   },
   /** full receiver output for a chosen runway end */
   nav(A, en, f) {
     const o = f.out, g = this.geom(A, en, f.e, f.n, f.h - f.cfg.gear.zStatic);
     g.A = A; g.en = en; g.crs = en.hdg * DEG; g.kind = en.kind || 'ILS'; g.ident = g.kind + ' ' + en.id; g.apt = A.icao;
     g.locValid = g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
-    g.gsDev = g.gsAng - this.GS;
+    g.gsDev = g.gsAng - g.gs; this._gs = g.gs;
     g.gsValid = g.locValid && !f.wow && g.dG > 120 && g.dist < 16 * NM && Math.abs(g.locAng) < 10 * DEG && Math.abs(g.gsDev) < 6 * DEG;
     g.locDots = g.locAng / this.LOC_DOT; g.gsDots = g.gsDev / this.GS_DOT;
     g.dme = Math.hypot(g.s - (en.rw.len + this.LOC_BEYOND), g.t) / NM;     // DME co-located with the localizer
@@ -128,6 +146,7 @@ export const ILS = {
         if (score < bestScore) { bestScore = score; best = g; best.idx = i; }
       });
     }
+    this._gs = best ? best.gs : GS_DEG * DEG;
     return best;
   }
 };

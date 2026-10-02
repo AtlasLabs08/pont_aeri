@@ -55,6 +55,7 @@ src/core/             Simulador headless, sense window/document/THREE
 src/world/            Món headless
   geo.js  airports.js  terrain.js  ils.js  taxi.js  route.js  weather.js
   airport-data.js     generat per tools/airports-ourairports.mjs, no editar a mà
+  terrain-data.js     format del fitxer del terreny real (fase A)
   index.js
 src/career/           Lògica del mode Airline. Funcions pures, a Node sense mocks
   balance.js  types.js  state.js  rng.js  util.js
@@ -76,11 +77,12 @@ src/i18n/             t() i formatadors; textos a en.js (font) i ca.js
 src/platform/         L'únic lloc de src/ que toca APIs del navegador
   storage.js  env.js  entropy.js  index.js
 public/aircraft/      Imatges dels avions del Market (§15), servides tal com són
-tools/                airports-ourairports.mjs  balance.mjs  estabilitat.mjs
+public/terrain/       terrain-250.bin: terreny real a 250 m (tools/terrain-build.mjs)
+tools/                airports-ourairports.mjs  balance.mjs  estabilitat.mjs  terrain-build.mjs
 test/                 Totes les proves (§10)
   *.test.js           core, world, recorder, i18n, platform, ui-boundary…
   app/  career/       una prova per fitxer de app/ i de career/
-  fixtures/           dades de referència de les proves
+  helpers/            utilitats de les proves (terrain.js: carrega el terreny real)
   snapshot.json       instantània de la física, a precisió completa
 docs/  DESIGN.md  DECISIONS.md  BACKLOG.md
 MIGRACIO.md  vite.config.js  package.json  .node-version
@@ -678,8 +680,8 @@ export const Storage = {
 ## 10. Proves
 
 Tot amb `node:test`. `npm test` les corre totes. **Totes són a `test/`**
-(`test/app/` i `test/career/` hi tenen una prova per fitxer; `test/fixtures/`
-guarda dades de referència). Una prova nova va amb el seu fitxer; la taula només
+(`test/app/` i `test/career/` hi tenen una prova per fitxer; `test/helpers/`
+guarda utilitats compartides). Una prova nova va amb el seu fitxer; la taula només
 recull les que tenen una funció especial:
 
 | Fitxer | Què vigila |
@@ -690,13 +692,13 @@ recull les que tenen una funció especial:
 | `test/ui-boundary.test.js` | `ui/` només pinta i crida `app/`: no importa `render/` ni toca `Game` (es llegeix com a text) |
 | `test/platform.test.js` | `platform/` amb dobles injectats a `globalThis` |
 | `test/balance-harness.test.js` | el harness econòmic (`tools/balance.mjs`) és determinista |
-| `test/terrain-airports.test.js` | terreny dels aeroports nous; LEBL i LEPA idèntics a `test/fixtures/terrain-lebl-lepa.json` (**no es regenera**) |
+| `test/terrain-real.test.js` | terreny real (fase A, TA-1 a TA-9), proves de propietats: el fitxer es descodifica igual d'un `Uint8Array` i d'un `ArrayBuffer`, aeroports plans a `A.elev` sense excavacions, mar i terra on toca (també als deltes), cims dins del marge de 250 m, rebaixa urbana ≤ 25 m, normals contínues, Photo mana, senda de cada cap amb aproximació directa (`glidePathMargin`) i caps sense aproximació directa que de debò no la compleixen. Les proves que necessiten el terreny el carreguen amb `test/helpers/terrain.js` |
 | `test/smoke.test.js` | els mòduls carreguen i exporten el que toca; un `FlightModel` avança amb valors plausibles. **Actualitza'l** quan s'afegeixi un export que la resta del joc necessiti o canviï el nombre d'avions |
 
 ### Dades d'aeroports: `tools/airports-ourairports.mjs`
 
-`node tools/airports-ourairports.mjs [dir]`. No forma part de `npm test` i és
-l'únic lloc del projecte que fa peticions de xarxa: baixa `runways.csv` i
+`node tools/airports-ourairports.mjs [dir]`. No forma part de `npm test` i, amb
+`tools/terrain-build.mjs`, és l'únic lloc del projecte que fa peticions de xarxa: baixa `runways.csv` i
 `airports.csv` d'OurAirports (o els llegeix de `dir`) i reescriu
 `src/world/airport-data.js`, que es comiteja. El joc i les proves només
 llegeixen el fitxer generat. Regles a la capçalera de l'script i a
@@ -705,6 +707,21 @@ curts, terreny) és la taula `EXTRA` de l'script, les designacions que
 OurAirports té antigues (LEGE 02/20) són a `IDS_OVERRIDE`, i la mida surt de
 `BALANCE.airportSize`. Per afegir un aeroport: `ORDER` i `EXTRA`, i tornar-lo
 a córrer.
+
+### Terreny real: `tools/terrain-build.mjs`
+
+`node tools/terrain-build.mjs [dir]`. No forma part de `npm test`. Baixa de
+`copernicus-dem-30m.s3.amazonaws.com` (o llegeix de `dir`, i hi desa el que
+baixa) les tessel·les de Copernicus GLO-30 que cobreixen `World.G` (DEM i
+màscara d'aigua WBM) i reescriu `public/terrain/terrain-250.bin`, que es
+comiteja: alçada mitjana de cada cel·la de 250 m (sense els píxels de mar) i
+distància signada a la costa a partir de la WBM (mar = oceà). El remostreig és
+per lon/lat amb la projecció del joc (`ll`). El format és a la capçalera de
+`world/terrain-data.js`; el joc el carrega amb `World.load(bytes)` (fetch a
+`index.html`, `readFileSync` a les proves). Si es canvia `World.G` o la
+projecció, cal tornar-lo a córrer. Decisions a `docs/DECISIONS.md`
+(02/10/2026, TA-1 a TA-9); les aproximacions sobre el terreny real (senda per
+cap, caps sense aproximació directa) són a `APPROACH_DATA` d'`airports.js`.
 
 ### Estabilitat del tren i qualitats de vol: `tools/estabilitat.mjs`
 
@@ -868,7 +885,7 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | Id | Tasca | Estat |
 | --- | --- | --- |
 | F1 | Més aeroports (fases 1 i 2 del disseny) | **Fet** amb F2: LEGE, LERS, LEIB, LEMH, LELL, LEDA i LESU, de `world/airport-data.js` (generat per `tools/airports-ourairports.mjs`); aproximació a tots els caps (ILS o RNP), ruta fins al FF i regles de `world/route.js` (H1–H17) |
-| F1b | Fase 3: LEVC, LEAL, LECH, LFMP | **Pendent**. Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i la costa (`COAST.mainland` acaba a lat 39,95), i el relleu tracta com a illa tot el que és a n < −120000. Després, mateix pipeline: `ORDER` i `EXTRA` de l'script |
+| F1b | Fase 3: LEVC, LEAL, LECH, LFMP | **Pendent**. Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i tornar a córrer `tools/terrain-build.mjs` (el relleu i la costa ja són els reals, fase A); el dibuix de la costa del ND (`COAST.mainland`) acaba a lat 39,95. La senda de cada cap nou, sobre el terreny real (`glidePathMargin`, `APPROACH_DATA`). Després, mateix pipeline: `ORDER` i `EXTRA` de l'script |
 | F2 | Taxiways i portes procedimentals | **Fet** amb F1, tots menys LEBL i LEPA (`proceduralDef`, `makeAirport`, `taxiRoute`) |
 | F3 | `world/weather.js` amb llavor | **Fet** (contracte a §7), sense cablejar al joc: l'E1 hi passarà el rellotge |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet**. Ids `commuter` i `rj` |

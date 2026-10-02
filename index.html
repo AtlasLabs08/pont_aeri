@@ -57,7 +57,7 @@ input[type=range]{accent-color:var(--teal)}.val{grid-column:2;font-family:var(--
 @media (prefers-reduced-motion:reduce){#loadbar,#toast{transition:none}}
 </style></head><body>
 <canvas id="view"></canvas><canvas id="hudcv" aria-hidden="true"></canvas>
-<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. A fleet of airliners, a 200 km procedural Mediterranean, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
+<div id="loading"><h1>Pont Aeri</h1><p>Barcelona to Palma de Mallorca, flown by hand. A fleet of airliners, the real relief of Catalonia and the Balearics, real flight physics.</p><div id="loadtrack"><div id="loadbar"></div></div><div id="loadtxt">Loading three.js</div></div>
 
 <aside id="menu" hidden>
   <h1>Pont Aeri</h1><p class="sub">Flight release, Barcelona and Palma</p>
@@ -137,13 +137,13 @@ import {
 } from './src/core/index.js';
 
 import {
-  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
+  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, nearestAirport, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
   setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, tailwindKt, MAX_TAILWIND_KT, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { modelGeom, legTopY, legLength } from './src/core/model-geom.js';
 import { IS_DEV } from './src/platform/index.js';
-import { t } from './src/i18n/index.js';
+import { t, t as i18nT, fmtNumber } from './src/i18n/index.js';      // i18nT: dins de drawPFD, on t es el temps
 import { LESSONS, CONTROL_KEYS, isLessonAvailable } from './src/career/index.js';
 import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
@@ -907,16 +907,16 @@ const Terrain = {
   /** build one chunk a few rows at a time (keeps the frame rate steady) */
   startJob(nd) {
     const N = R3.q.grid, M = N + 3, step = nd.size / N;
-    // coarse chunks take their shading normals from a fixed 30 m stencil, so lighting does not change when the LOD refines
-    const fine = step > 45;
-    this.job = { nd, N, M, step, row: 0, H: new Float32Array(M * M), fine, DX: fine ? new Float32Array(M * M) : null, DN: fine ? new Float32Array(M * M) : null };
+    // every chunk takes its shading normals from World.slopeAt (a stencil as wide as the 250 m terrain cell, 30 m in the
+    // photo zone): smooth across cells, and the lighting does not change when the LOD refines
+    this.job = { nd, N, M, step, row: 0, H: new Float32Array(M * M), DX: new Float32Array(M * M), DN: new Float32Array(M * M) };
   },
   runJob(budgetMs) {
     const t0 = performance.now(), J = this.job, nd = J.nd;
     while (J.row < J.M) {
       const n = nd.n0 + (J.row - 1) * J.step;
       for (let i = 0; i < J.M; i++) { const e = nd.e0 + (i - 1) * J.step, k = J.row * J.M + i, h = J.H[k] = World.heightAt(e, n);
-        if (J.fine && h > -2 && i > 0 && i < J.M - 1 && J.row > 0 && J.row < J.M - 1) { J.DX[k] = (World.heightAt(e + 30, n) - World.heightAt(e - 30, n)) / 60; J.DN[k] = (World.heightAt(e, n + 30) - World.heightAt(e, n - 30)) / 60; } }
+        if (h > -2 && i > 0 && i < J.M - 1 && J.row > 0 && J.row < J.M - 1) { const sl = World.slopeAt(e, n); J.DX[k] = sl[0]; J.DN[k] = sl[1]; } }
       J.row++;
       if (performance.now() - t0 > budgetMs) return false;
     }
@@ -935,9 +935,8 @@ const Terrain = {
       const e = nd.e0 + i * step, n = nd.n0 + j * step, hi = (j + 1) * M + (i + 1);
       let h = H[hi];
       const ab = World._airportBlend(e, n); if (ab && !ab[3].photo) h -= 2.2 * smoothstep(0.80, 1.0, ab[0]);       // sink under the airport slab
-      else { const sp = World._shapeAt(e, n); if (sp && sp.d < 450) h -= 2.2 * (1 - smoothstep(370, 450, sp.d)); }      // F1: the same under the slab of a new airport (bounds + 260 m)
       pos[k * 3] = e - ce; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -(n - cn);
-      const dx = J.fine ? J.DX[hi] : (H[hi + 1] - H[hi - 1]) / (2 * step), dn = J.fine ? J.DN[hi] : (H[hi + M] - H[hi - M]) / (2 * step), il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
+      const dx = J.DX[hi], dn = J.DN[hi], il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
       nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = dn * il;
       wp[k * 3] = e; wp[k * 3 + 1] = H[hi]; wp[k * 3 + 2] = n;
       const u = H[hi] > 0.5 ? World.urbanAt(e, n, H[hi], uo) : 0;
@@ -1165,8 +1164,8 @@ const AirportScenery = {
           for (let t = -15; t <= 15; t += 3) if (Math.abs(t) > 2) { const p = P(-300, t); put(-300, t, WH, 1.5, 1, 0, yAt(p[0], p[1]) + 1.5); }
           for (let s = -30; s >= -270; s -= 30) for (const sg of [1, -1]) for (const t of [7.5, 9, 10.5]) { const p = P(s, sg * t); put(s, sg * t, RE, 1.2, 1, 0, yAt(p[0], p[1]) + 1.5); }
         }
-        // PAPI: four units left of the runway abeam the aiming point, 3 degree glide path
-        [3.5, 3.17, 2.83, 2.5].forEach((ang, i) => put(420, hw + 15 + i * 9, WH, 3.0, 2, ang, 0.8));
+        // PAPI: four units left of the runway abeam the aiming point, on the glide path of the end
+        [3.5, 3.17, 2.83, 2.5].forEach((ang, i) => put(420, hw + 15 + i * 9, WH, 3.0, 2, ang + glideAngle(en) * RAD - 3, 0.8));      // centrat a la senda del cap (TA-9)
         en.papi = P(420, 0);
       });
     }
@@ -1602,7 +1601,9 @@ const Instruments = {
     c.fillStyle = '#111'; c.strokeStyle = K.amber; c.lineWidth = 3; for (const s of [-1, 1]) { c.beginPath(); c.rect(cx + s * 40, cy - 4, s * 56, 8); c.fill(); c.stroke(); c.beginPath(); c.rect(cx + s * 40 - (s > 0 ? 0 : 8), cy - 4, 8, 18); c.fill(); c.stroke(); } c.beginPath(); c.rect(cx - 4, cy - 4, 8, 8); c.fill(); c.stroke();
     this.approachPFD(c, S, cx, cy, PX);
     // radio altitude
-    if (o.aglFt < 2500) { this.font(c, 20, true); c.fillStyle = o.aglFt < 400 ? K.amber : K.green; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(Math.round(o.aglFt < 50 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 50 ? 1 : 10)), cx, cy + 100); }
+    // RA (alcada sobre el terra) en un requadre propi amb l etiqueta, al centre i en verd/ambre; l ALT (sobre el mar) es a la cinta, en blanc
+    if (o.aglFt < 2500) { const raCol = o.aglFt < 400 ? K.amber : K.green; c.strokeStyle = raCol; c.lineWidth = 2; c.strokeRect(cx - 62, cy + 86, 124, 28);
+      this.font(c, 20, true); c.fillStyle = raCol; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(i18nT('hud.raValue', { ft: Math.round(o.aglFt < 50 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 50 ? 1 : 10) }), cx, cy + 100); }
     // ---------------- speed tape ----------------
     const sx = 14, sw = 72, sy0 = cy - 150, sh = 300, SP = 3.4, ias = Math.max(o.ias, 30), v = f.vspeeds(), vm = this.vmax(f);
     c.fillStyle = K.tape; c.fillRect(sx, sy0, sw, sh); c.save(); c.beginPath(); c.rect(sx, sy0, sw + 26, sh); c.clip();
@@ -1635,6 +1636,7 @@ const Instruments = {
     c.restore();
     c.fillStyle = '#000'; c.strokeStyle = K.white; c.lineWidth = 2; c.beginPath(); c.rect(ax + 6, cy - 17, aw + 4, 34); c.fill(); c.stroke();
     this.font(c, 22, true); c.fillStyle = K.white; c.textAlign = 'right'; c.fillText(Math.round(o.altFt / 10) * 10, ax + aw + 6, cy + 1);
+    this.font(c, 12, true); c.textAlign = 'left'; c.fillText(i18nT('hud.alt'), ax + 8, cy - 26); c.textAlign = 'right';
     this.font(c, 18, true); c.fillStyle = K.mag; c.fillText(ap.selAlt, ax + aw, sy0 - 12);
     this.font(c, 14); c.fillStyle = K.green; c.fillText('STD 1013', ax + aw, sy0 + sh + 16);
     // ---------------- vertical speed ----------------
@@ -1999,7 +2001,11 @@ const Cameras = {
       R3.cockpitCam.position.set(-0.53 + sx, sy, 0); R3.cockpitCam.quaternion.copy(qh);
       cam.fov = R3.cockpitCam.fov = this.fov;
     } else if (this.mode === 'tower') {
-      const A = World.airportNear(fdm.e, fdm.n, 60000) || Game.airport, tp = A.towerPos; cam.position.set(rx(tp[0]), A.towerH + 2, rz(tp[1])); cam.up.set(0, 1, 0); cam.lookAt(px, py, pz);
+      // la torre de l aeroport mes proper (airportNear torna el primer d AIRPORT_ORDER dins d un quadrat de 60 km, que pot ser un
+      // aeroport vei: llavors la camera mirava l avio des de 60 km i el relleu real li tapava)
+      const A = nearestAirport(fdm.e, fdm.n, Game.airport);
+      if (!A.towerPos) AirportScenery.place(A);
+      const tp = A.towerPos; cam.position.set(rx(tp[0]), A.towerH + 2, rz(tp[1])); cam.up.set(0, 1, 0); cam.lookAt(px, py, pz);
       const d = cam.position.distanceTo(mdl.root.position); cam.fov = clamp(2 * Math.atan(L * this.towerFov / 20 * 1.6 / d) * RAD, 1.2, 50);
     } else {
       const d = L * (this.mode === 'chase' ? 1.55 : 1.9) * this.dist; let yaw = this.orbYaw;
@@ -2179,7 +2185,7 @@ const Game = {
         if (O.spawnAglFt != null) {
           alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
         } else {
-          alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+          const gs = glideAngle(en); alt = A.elev + (d + ILS.GS_S) * Math.tan(gs) + cfg.gear.zStatic; gamma = -gs; flaps = cfg.flapLDG; gearDown = true;     // senda del cap (TA-9)
         }
       } else if (O.start === 'airborne') {
         // en vol, anivellat, uns spawnOffsetNm mar endins de l aeroport (mateix eix que 'final'),
@@ -2350,7 +2356,7 @@ const Game = {
   onApEvent(ev) {
     const on = this.ap.on;
     if (ev === 'LOC') this.msg('Localizer captured' + (on ? '' : ': follow the guidance circle'));
-    else if (ev === 'G/S') this.msg('Glideslope captured' + (on ? ': the autopilot is descending on the 3\u00b0 path' : ': keep the path vector in the guidance circle'), 3.5);
+    else if (ev === 'G/S') this.msg(on ? t('ap.gsCaptured', { deg: (d => fmtNumber(d, Number.isInteger(d) ? 0 : 1))(this.nav ? +(this.nav.gs * RAD).toFixed(1) : 3) }) : 'Glideslope captured: keep the path vector in the guidance circle', 3.5);      // senda del cap (TA-9)
     else if (ev === 'MINIMUMS') this.msg('100 ft: autopilot off. Flare and land by hand', 4);
     else if (ev === 'RETARD') this.msg('Autothrottle: levers to idle for the flare');
     else if (ev === 'LOC LOST' || ev === 'G/S LOST') this.msg(ev.replace('LOST', 'signal lost'), 3);
@@ -2551,7 +2557,7 @@ const HUD = {
     // flight path vector, -3 degree reference and guidance cue
     const vmag = Math.hypot(f.vn, f.ve, f.vd); let FP = null;
     if (!f.wow && vmag > 20) {
-      if (f.flapPos > 0.5 && o.aglFt < 4000) { const a = this.he(trk - 5 * DEG, -3 * DEG), b = this.he(trk + 5 * DEG, -3 * DEG); if (a && b) { c.setLineDash([14, 7]); c.lineWidth = 2; this.line(c, a, b); c.setLineDash([]); c.lineWidth = 1.6; font(11, true); c.textAlign = 'left'; c.fillText('-3', b[0] + u[0] * 8, b[1] + u[1] * 8); } }
+      if (f.flapPos > 0.5 && o.aglFt < 4000) { const gs = nav && nav.locValid ? nav.gs : 3 * DEG, a = this.he(trk - 5 * DEG, -gs), b = this.he(trk + 5 * DEG, -gs); if (a && b) { c.setLineDash([14, 7]); c.lineWidth = 2; this.line(c, a, b); c.setLineDash([]); c.lineWidth = 1.6; font(11, true); c.textAlign = 'left'; c.fillText('-' + +(gs * RAD).toFixed(1), b[0] + u[0] * 8, b[1] + u[1] * 8); } }      // senda del cap sintonitzat (TA-9)
       FP = this.dir(f.ve / vmag, -f.vd / vmag, -f.vn / vmag);
       if (FP) { const [x, y] = FP, r = 7; c.lineWidth = 2; c.beginPath(); c.arc(x, y, r, 0, 6.3);
         c.moveTo(x - u[0] * r, y - u[1] * r); c.lineTo(x - u[0] * 22, y - u[1] * 22); c.moveTo(x + u[0] * r, y + u[1] * r); c.lineTo(x + u[0] * 22, y + u[1] * 22);
@@ -2574,11 +2580,13 @@ const HUD = {
     font(17, true); c.textAlign = 'center';
     c.strokeRect(sxp - 34, B[1] - 13, 68, 26); c.fillText(String(Math.round(Math.max(o.ias, 30))), sxp, B[1] + 1);
     c.strokeRect(axp - 42, B[1] - 13, 84, 26); c.fillText(String(Math.round(o.altFt / 10) * 10), axp, B[1] + 1);
+    font(12, true); c.fillText(t('hud.alt'), axp, B[1] - 22);
     const tr = clamp((S.accelKt || 0) * 10, -40, 40); if (Math.abs(tr) > 2) { c.beginPath(); c.moveTo(sxp + 42, B[1]); c.lineTo(sxp + 42, B[1] - tr * 1.6); c.stroke(); }
     font(12); const tgt = ap.athr ? 'SPD ' + Math.round(ap.selSpd) : (f.flapPos > 0.5 && !f.wow ? 'REF ' + Math.round(v.vref) : '');
     if (tgt) c.fillText(tgt, sxp, B[1] + 28); c.fillText('GS ' + Math.round(o.gs), sxp, B[1] + 44);
     c.fillText('VS ' + (o.vsFpm >= 0 ? '+' : '') + Math.round(o.vsFpm / 10) * 10, axp, B[1] + 28);
-    if (o.aglFt < 2500 && !f.wow) { font(14, true); c.fillText('R ' + Math.round(o.aglFt < 100 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 100 ? 1 : 10), axp, B[1] + 46); }
+    // RA (alcada sobre el terra) sota la caixa de l ALT (sobre el mar), amb etiqueta i requadre propi
+    if (o.aglFt < 2500 && !f.wow) { font(14, true); c.strokeRect(axp - 42, B[1] + 35, 84, 22); c.fillText(t('hud.raValue', { ft: Math.round(o.aglFt < 100 ? o.aglFt : o.aglFt / 10) * (o.aglFt < 100 ? 1 : 10) }), axp, B[1] + 46); }
     // heading readout and modes
     font(14, true); c.fillText(('00' + Math.round(wrap360(o.hdg)) % 360).slice(-3), B[0], top + 12);
     font(12, true); c.textAlign = 'left';
@@ -2595,7 +2603,7 @@ const HUD = {
       font(12, true); c.textAlign = 'right'; c.fillText(nav.ident + '  ' + thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' NM', rgt - 4, top + 12); }
     // flare cue
     if (!f.wow && o.aglFt < 100 && o.vsFpm < 0) { const flareFt = cfg.type === 'jet' ? (f.mass > 150000 ? 50 : 38) : 26;
-      font(22, true); c.textAlign = 'center'; c.fillText(String(Math.round(o.aglFt)), B[0], B[1] + hh * 0.72);
+      font(22, true); c.textAlign = 'center'; c.fillText(t('hud.raValue', { ft: Math.round(o.aglFt) }), B[0], B[1] + hh * 0.72);
       if (o.aglFt < flareFt && ((Main.vtime * 3) | 0) % 2 === 0) { font(16, true); c.fillText('FLARE', B[0], B[1] + hh * 0.52); } }
     c.restore();
   },
@@ -2608,7 +2616,7 @@ const HUD = {
     c.textBaseline = 'middle'; font(13, true); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(nav.ident, x0 + 10, y0 + 16);
     c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
     // PAPI: four lights, white above their setting angle, red below
-    const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5];
+    const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5].map(a => a + nav.gs * RAD - 3);      // PAPI centrat a la senda del cap (TA-9)
     pa.forEach((a, i) => { const x = x0 + 50 + i * 26, y = y0 + 44, wht = el > a; c.beginPath(); c.arc(x, y, 8, 0, 6.3); c.fillStyle = wht ? '#fbfbf2' : '#ff3b30'; c.shadowColor = c.fillStyle; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; });
     // localizer and glideslope
     const cx = x0 + 82, cy = y0 + 100, D = 24; c.strokeStyle = '#e8f1f5'; c.lineWidth = 1.5;
@@ -2808,9 +2816,11 @@ const Main = {
     const prog = (p, t) => UI.loading(p, t), tick = () => new Promise(r => setTimeout(r, 15));
     const photo = await Photo.probe();               // a local photo scenery pack next to the page?
     if (photo) { try { Photo.applyAirport(); } catch (e) { console.warn('photo scenery: airport data', e); Photo.revert(); } }
-    UI.init(); prog(0.05, 'Building the coastline of Catalonia and the Balearics'); await tick();
+    UI.init(); prog(0.05, t('loading.terrain'));
+    const terrain = fetch(TERRAIN_FILE).then(r => { if (!r.ok) throw new Error('terrain file: HTTP ' + r.status); return r.arrayBuffer(); });      // en paral.lel amb el DEM de Photo
     if (photo && Photo.oldDef) { prog(0.08, 'Loading the real relief around Barcelona'); try { await Photo.loadDem(); } catch (e) { console.warn('photo scenery: relief', e); Photo.revert(); } }
-    World.build(); prog(0.3, 'Starting the renderer'); await tick();
+    await World.load(await terrain);
+    prog(0.3, 'Starting the renderer'); await tick();
     initRenderer(document.getElementById('view')); HUD.init(); Photo.initRender();
     if (Photo.on) { try { await Photo.loadTextures((i, L) => prog(0.31 + i * 0.03, 'Loading aerial photos of Barcelona (' + (i + 1) + ' of 3)')); } catch (e) { console.warn('photo scenery: images', e); } }
     Env.init(); Sea.init(); Terrain.init(); Clouds.init(); prog(0.4, 'Laying out Barcelona and Palma'); await tick();

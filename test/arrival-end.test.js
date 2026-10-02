@@ -60,16 +60,23 @@ describe('arrivalEnd', () => {
     assert.equal(A.allEnds.map(e => e.id).join(), before);
   });
 
-  test('aeroports reals: LERS 25, LEGE 20, LEDA 31 (un sol ILS, sense massa vent de cua); LELL i LESU segons el vent; LEBL sense vent, 07L (la mes llarga)', () => {
+  test('aeroports reals: LERS 25, LEGE 20 (un sol ILS, sense massa vent de cua); LELL segons el vent; LEBL sense vent, 07L (la mes llarga)', () => {
     assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 8).id, '25');
-    assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 20).id, '07', 'H17c: 20 kt de cua al 25');
     assert.equal(arrivalEnd(AIRPORTS.LEGE, 0, 0).id, '20');
-    assert.equal(arrivalEnd(AIRPORTS.LEDA, 130, 10).id, '31');
     assert.equal(arrivalEnd(AIRPORTS.LELL, 300, 10).id, '31');
-    assert.equal(arrivalEnd(AIRPORTS.LELL, 120, 10).id, '13');
-    assert.equal(arrivalEnd(AIRPORTS.LESU, 200, 10).id, '21');
     assert.equal(arrivalEnd(AIRPORTS.LEBL, 0, 0).id, '07L');
     assert.equal(arrivalEnd(AIRPORTS.LEBL, 250, 12).id, '25R');
+  });
+
+  test('TA-9: un cap sense aproximacio directa no es tria si n hi ha un altre, encara que tingui ILS o vent de cara', () => {
+    assert.equal(AIRPORTS.LESU.allEnds.find(en => en.id === '21').direct, false);
+    assert.equal(arrivalEnd(AIRPORTS.LESU, 200, 10).id, '03', 'LESU 21 sense aproximacio directa');
+    assert.equal(arrivalEnd(AIRPORTS.LERS, 70, 20).id, '25', 'LERS 07 sense aproximacio directa: el 25 encara que tingui 20 kt de cua');
+    assert.equal(arrivalEnd(AIRPORTS.LEDA, 130, 10).id, '13', 'LEDA 31 (l ILS) sense aproximacio directa');
+    assert.equal(arrivalEnd(AIRPORTS.LELL, 120, 10).id, '31', 'LELL 13 sense aproximacio directa');
+    assert.equal(arrivalEnd(AIRPORTS.LEBL, 200, 15).id, '25R', 'LEBL 20 sense aproximacio directa');
+    const only = { allEnds: [AIRPORTS.LESU.allEnds[1]] };
+    assert.equal(arrivalEnd(only, 0, 0).id, '21', 'si no n hi ha cap altre, el cap sense aproximacio directa');
   });
 });
 
@@ -80,7 +87,7 @@ describe('flightApproach (H11, H13)', () => {
     const r = flightApproach({ ...base, mode: 'route' });
     assert.equal(r.A, AIRPORTS.LERS); assert.equal(r.en.id, '25'); assert.equal(r.tuned, true);
     const s = flightApproach({ ...base, mode: 'route', dest: 'LESU', windDir: 200, windKt: 12 });
-    assert.equal(s.A, AIRPORTS.LESU); assert.equal(s.en.id, '21'); assert.equal(s.tuned, true);
+    assert.equal(s.A, AIRPORTS.LESU); assert.equal(s.en.id, '03'); assert.equal(s.tuned, true);     // el 21 no te aproximacio directa (TA-9)
   });
 
   test('mode route amb inici en final: mana la ruta (el desti)', () => {
@@ -98,7 +105,7 @@ describe('flightApproach (H11, H13)', () => {
   test('altres arrencades sense ruta: l aeroport triat, arrivalEnd, sense sintonitzar (auto-sintonia de sempre)', () => {
     for (const start of ['runway', 'gate']) {
       const r = flightApproach({ ...base, airport: 'LELL', start, windDir: 120, windKt: 10 });
-      assert.equal(r.A, AIRPORTS.LELL); assert.equal(r.en.id, '13'); assert.equal(r.tuned, false);
+      assert.equal(r.A, AIRPORTS.LELL); assert.equal(r.en.id, '31'); assert.equal(r.tuned, false);     // el 13 no te aproximacio directa (TA-9)
     }
   });
 });

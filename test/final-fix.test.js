@@ -1,20 +1,20 @@
 /* Proves de finalFix (world/ils.js): punt d aproximacio final del ND (H14,
  * docs/DECISIONS.md, 2026-10-01). A 10 nm del llindar, sobre l eix allargat,
- * amb el nom FF + designacio, i la senda de 3 graus hi passa per sobre del
- * terreny a tots els caps dels aeroports nous (300 ft, el marge d H6). I,
- * amb la vall d H16, el tram IF -> FF es volable a tots els caps nous.
+ * amb el nom FF + designacio, i la senda del cap hi passa per sobre del
+ * terreny real (300 ft, el marge d H6) i el tram IF -> FF es volable a tots
+ * els caps amb aproximacio directa dels 9 aeroports (TA-9, 2026-10-02).
  *
  * Correr:  npm test
  */
 
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { loadWorld } from './helpers/terrain.js';
 
-import { AIRPORTS, AIRPORT_ORDER, World, approachFix, legFlyable, IF_NM, ILS, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
+import { AIRPORTS, AIRPORT_ORDER, World, approachFix, legFlyable, IF_NM, ILS, glideAngle, setRunwayDifficulty, finalFix, FINAL_FIX_NM, thresholdDistNm } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
-const NEW = ['LEGE', 'LERS', 'LEIB', 'LEMH', 'LELL', 'LEDA', 'LESU'];
-before(() => { setRunwayDifficulty('normal'); World.build(); });
+before(async () => { setRunwayDifficulty('normal'); await loadWorld(); });
 
 describe('finalFix (H14)', () => {
   test('a 10 nm del llindar, sobre l eix allargat i abans del llindar, a tots els caps dels 9 aeroports', () => {
@@ -26,7 +26,7 @@ describe('finalFix (H14)', () => {
       assert.ok(dx * en.dir[0] + dy * en.dir[1] < -10 * NM + 1e-6, `${id} ${en.id}: no es abans del llindar`);
       // el receptor hi veu el FF sobre l eix i la senda
       const g = ILS.geom(A, en, F.e, F.n, F.h);
-      assert.ok(Math.abs(g.t) < 1e-6 && Math.abs(g.gsAng - ILS.GS) < 1e-9, `${id} ${en.id}: senda`);
+      assert.ok(Math.abs(g.t) < 1e-6 && Math.abs(g.gsAng - glideAngle(en)) < 1e-9, `${id} ${en.id}: senda`);
     }
   });
 
@@ -36,9 +36,9 @@ describe('finalFix (H14)', () => {
     assert.equal(finalFix(AIRPORTS.LEBL, AIRPORTS.LEBL.allEnds[0]).name, 'FF07L');
   });
 
-  for (const id of NEW) test(`${id}: la senda al FF passa 300 ft per sobre del terreny (al FF i a 500 m de cada costat)`, () => {
+  for (const id of AIRPORT_ORDER) test(`${id}: la senda al FF passa 300 ft per sobre del terreny (al FF i a 500 m de cada costat), als caps amb aproximacio directa`, () => {
     const A = AIRPORTS[id];
-    for (const en of A.allEnds) {
+    for (const en of A.allEnds.filter(x => x.direct)) {
       const F = finalFix(A, en);
       for (const t of [-500, 0, 500]) {
         const w = A.toWorld(F.a - en.dir[1] * t, F.c + en.dir[0] * t), h = World.heightAt(w[0], w[1]);
@@ -47,9 +47,9 @@ describe('finalFix (H14)', () => {
     }
   });
 
-  for (const id of NEW) test(`${id}: H16, el tram IF -> FF es volable (1.000 ft, 1 nm a cada costat) a tots dos caps`, () => {
+  for (const id of AIRPORT_ORDER) test(`${id}: H16, el tram IF -> FF es volable (1.000 ft, 1 nm a cada costat) als caps amb aproximacio directa`, () => {
     const A = AIRPORTS[id];
-    for (const en of A.allEnds) {
+    for (const en of A.allEnds.filter(x => x.direct)) {
       const I = approachFix(A, en, IF_NM, 'IF'), F = approachFix(A, en, 10, 'FF'), r = legFlyable(I, I.h, F, F.h);
       assert.ok(r.ok, `${id} ${en.id}: marge ${r.marginFt.toFixed(0)} ft`);
     }
