@@ -156,7 +156,7 @@ export const World = {
     if (sd <= 0) return Math.max(-400, sd * 0.3 - 0.5);
     let h = Math.max(this.demAt(e, n), 0.6 + Math.min(sd, 60) * 0.03);      // la terra sempre per sobre del pla del mar
     const ab = this._airportBlend(e, n);
-    if (ab) h = lerp(h, ab[1], ab[0]);
+    if (ab) h = ab[0] >= 1 ? ab[1] : lerp(h, ab[1], ab[0]);      // dins del rectangle, exactament A.elev
     return h;
   },
   /** pendent [dh/de, dh/dn] per a les normals (TA-6): diferencies centrades amb un estencil igual a la cel.la

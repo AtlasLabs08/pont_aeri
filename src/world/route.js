@@ -3,14 +3,15 @@
  * docs/DECISIONS.md, 2026-10-01). Funcions pures: el terreny entra com a
  * funcio groundAt(e, n) (per defecte World.groundAt).
  *
- * EXPORTA: IF_NM LEG_CLEAR_FT LEG_SIDE_NM approachFix legFlyable legMeaFt planRoute planArrival
+ * EXPORTA: IF_NM LEG_CLEAR_FT LEG_SIDE_NM GS_CLEAR_FT NEAR_THR_M NEAR_THR_TOL_M
+ *          approachFix legFlyable legMeaFt glidePathMargin planRoute planArrival
  *
  * IMPORTA: ../core/constants.js, ./ils.js, ./terrain.js
  *
  * INTERFICIE (no la canviis, index.html i test/route.test.js en depenen):
  *   approachFix(A, en, nm, prefix) -> { e, n, a, c, name, h, minFt }   punt a
  *     nm milles abans del llindar d en, sobre l eix allargat: h = alcada de la
- *     senda de 3 graus (allargada) en m MSL, minFt = altitud minima de pas en
+ *     senda del cap (glideAngle, allargada) en m MSL, minFt = altitud minima de pas en
  *     ft (h arrodonida cap amunt a 100 ft), name = prefix + designacio.
  *   legFlyable(p0, h0, p1, h1, groundAt) -> { ok, marginFt }   un tram es
  *     volable si la recta de l altitud h0 a p0 fins a h1 a p1 queda com a minim
@@ -18,6 +19,15 @@
  *   legMeaFt(p0, p1, groundAt) -> ft   H17a: altitud minima del tram (MEA):
  *     el punt mes alt del terreny a LEG_SIDE_NM a cada costat del tram, mes
  *     LEG_CLEAR_FT, arrodonit cap amunt a 100 ft.
+ *   glidePathMargin(A, en, sMax, groundAt) -> { marginM, s }   comprovacio de
+ *     la senda del cap (H6 del #31 sobre el terreny real, TA-9): des del
+ *     llindar fins a sMax m, cada 25 m i a 0 i +-150 m de l eix, el terreny ha
+ *     de quedar GS_CLEAR_FT per sota de la senda (glideAngle) i mai per sobre
+ *     de l elevacio de l aeroport; als primers NEAR_THR_M, fins a
+ *     NEAR_THR_TOL_M per sobre de l elevacio (decisio del projecte: el model de
+ *     superficie hi te arbres i edificis). marginM < 0: no es compleix, al
+ *     punt s. Un cap que no la compleix fins a 10 nm + 500 m queda sense
+ *     aproximacio directa (APPROACH_DATA, airports.js).
  *   planRoute(origin, cruiseFt, A, en, groundAt, ceilingFt) -> { fixes, usesIF,
  *     flyable, meaFt, cruiseFt, tooHigh }   origin = { e, n } (final de la
  *     pista de sortida). El primer tram (origen -> FF, o origen -> IF) es vola a
@@ -35,22 +45,24 @@
  *     caps amb mes de MAX_TAILWIND_KT de vent de cua si n hi ha d altres); si
  *     no te cap ruta volable, la descarta i torna a aplicar la mateixa regla
  *     als caps que queden. Si cap cap no ho es: fallback = true i el cap de mes
- *     vent de cara (sense vent, la pista mes llarga). rejected = ids dels caps
+ *     vent de cara (sense vent, la pista mes llarga), sense els caps sense
+ *     aproximacio directa (en.direct === false) si n hi ha d altres. rejected = ids dels caps
  *     descartats, per ordre; tailwindKt = vent de cua del cap triat.
  */
 
 import { DEG, NM } from '../core/constants.js';
-import { ILS, arrivalEnd, tailwindKt } from './ils.js';
+import { ILS, arrivalEnd, tailwindKt, glideAngle } from './ils.js';
 import { World } from './terrain.js';
 
 export const IF_NM = 20;
+export const GS_CLEAR_FT = 300, NEAR_THR_M = 1300, NEAR_THR_TOL_M = 20;
 export const LEG_CLEAR_FT = 1000;
 export const LEG_SIDE_NM = 1;
 const FT = 0.3048, STEP_M = 200, MEA_STEP_M = 100, MEA_SIDE_N = 16;    // MEA: cada 100 m al llarg del tram, 33 punts de costat a costat
 
 export function approachFix(A, en, nm, prefix) {
   const d = nm * NM, a = en.thr[0] - en.dir[0] * d, c = en.thr[1] - en.dir[1] * d, w = A.toWorld(a, c);
-  const h = A.elev + (d + ILS.GS_S) * Math.tan(ILS.GS);
+  const h = A.elev + (d + ILS.GS_S) * Math.tan(glideAngle(en));
   return { e: w[0], n: w[1], a, c, name: prefix + en.id, h, minFt: Math.ceil(h / FT / 100) * 100 };
 }
 
@@ -76,6 +88,19 @@ export function legMeaFt(p0, p1, groundAt) {
   return Math.ceil((top / FT + LEG_CLEAR_FT) / 100) * 100;
 }
 
+export function glidePathMargin(A, en, sMax, groundAt) {
+  const g = ground(groundAt), E = A.elev, tg = Math.tan(glideAngle(en));
+  let marginM = Infinity, at = 0;
+  for (let s = 0; s <= sMax; s += 25) {
+    const lim = s <= NEAR_THR_M ? E + NEAR_THR_TOL_M : Math.max(E, E + (s + ILS.GS_S) * tg - GS_CLEAR_FT * FT);
+    for (const t of [-150, 0, 150]) {
+      const w = A.toWorld(en.thr[0] - en.dir[0] * s - en.dir[1] * t, en.thr[1] - en.dir[1] * s + en.dir[0] * t), m = lim - g(w[0], w[1]);
+      if (m < marginM) { marginM = m; at = s; }
+    }
+  }
+  return { marginM, s: at };
+}
+
 export function planRoute(origin, cruiseFt, A, en, groundAt, ceilingFt = Infinity) {
   const FF = approachFix(A, en, 10, 'FF'), IF = approachFix(A, en, IF_NM, 'IF');
   const meaFF = legMeaFt(origin, FF, groundAt);
@@ -96,6 +121,7 @@ export function planArrival({ origin, cruiseFt, ceilingFt = Infinity, A, windDir
   }
   // cap no es volable: el de mes vent de cara (sense vent, la pista mes llarga), sense mirar l ILS
   const calm = !(windKt > 0), score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
-  const en = A.allEnds.reduce((best, x) => score(x) > score(best) + 1e-9 ? x : best);
+  const direct = A.allEnds.filter(x => x.direct !== false), pool = direct.length ? direct : A.allEnds;
+  const en = pool.reduce((best, x) => score(x) > score(best) + 1e-9 ? x : best);
   return done(en, planRoute(origin, cruiseFt, A, en, groundAt, ceilingFt), true);
 }
