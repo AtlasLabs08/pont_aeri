@@ -1,7 +1,9 @@
-/* Geografia: projeccio lat/lon, costa, serralades, valls, urbanitzacio, vies.
+/* Geografia: projeccio lat/lon, costa, urbanitzacio, vies. El relleu i la
+ * costa del joc surten del terreny real (world/terrain-data.js); COAST es
+ * nomes el dibuix de la costa al ND.
  * ORIGEN: linies 1272-1368 de l'original (SECTION 8).
  *
- * EXPORTA: GEO ll distanceKm bearingDeg COAST RIDGES VALLEYS URBAN ROADS
+ * EXPORTA: GEO ll distanceKm bearingDeg COAST URBAN ROADS
  *
  * IMPORTA: res de core. Son dades geografiques pures.
  */
@@ -43,35 +45,6 @@ export const COAST = {
   cabrera: [[2.92, 39.16], [2.95, 39.17], [2.98, 39.15], [2.96, 39.12], [2.93, 39.13]]
 };
 
-/* ---- mountain ridges: polylines of [lon, lat, crest height m, half-width km]; rough = jagged ---- */
-export const RIDGES = [
-  { name: 'Collserola', pts: [[2.00, 41.385, 300, 2.0], [2.06, 41.405, 420, 2.2], [2.12, 41.422, 512, 2.2], [2.17, 41.45, 400, 2.0], [2.20, 41.47, 300, 1.8]] },
-  { name: 'Montjuic', pts: [[2.158, 41.361, 173, 0.75], [2.169, 41.368, 165, 0.7]], smooth: 1 },
-  { name: 'Garraf', pts: [[1.72, 41.26, 350, 3.5], [1.82, 41.29, 560, 4.5], [1.92, 41.31, 520, 4.0], [1.97, 41.335, 380, 2.6]] },
-  { name: 'Marina-Montnegre', pts: [[2.23, 41.49, 420, 2.2], [2.33, 41.53, 480, 2.5], [2.45, 41.58, 520, 2.8], [2.58, 41.65, 740, 3.5], [2.72, 41.70, 500, 3]] },
-  { name: 'Montserrat', pts: [[1.78, 41.62, 900, 1.6], [1.835, 41.605, 1236, 1.7], [1.87, 41.59, 1000, 1.5]], rough: 1 },
-  { name: 'Sant Llorenc', pts: [[1.97, 41.63, 900, 3], [2.02, 41.645, 1100, 3], [2.10, 41.66, 800, 3]] },
-  { name: 'Montseny', pts: [[2.30, 41.75, 1100, 5], [2.43, 41.78, 1700, 6], [2.52, 41.80, 1300, 5]] },
-  { name: 'Guilleries', pts: [[2.45, 41.95, 1100, 8], [2.6, 42.1, 1000, 8]] },
-  { name: 'Prades', pts: [[0.95, 41.25, 1100, 7], [1.15, 41.33, 1000, 7], [1.45, 41.42, 850, 6], [1.65, 41.52, 800, 5]] },
-  { name: 'Ports', pts: [[0.30, 40.80, 1400, 9], [0.45, 40.95, 1100, 8]] },
-  { name: 'Pyrenees', pts: [[0.0, 42.60, 2900, 20], [0.7, 42.58, 3000, 20], [1.5, 42.50, 2900, 20], [2.2, 42.42, 2800, 18], [2.7, 42.42, 1800, 14], [3.05, 42.45, 1000, 8]] },
-  { name: 'Cadi', pts: [[1.2, 42.2, 2000, 12], [1.7, 42.28, 2500, 8], [2.0, 42.25, 2000, 10]] },
-  { name: 'Gavarres', pts: [[2.95, 41.85, 450, 5], [3.1, 41.92, 350, 4]] },
-  { name: 'Cap de Creus', pts: [[3.2, 42.3, 600, 4], [3.28, 42.31, 400, 3]] },
-  { name: 'Tramuntana', pts: [[2.40, 39.59, 450, 3.5], [2.49, 39.64, 1000, 4.5], [2.63, 39.72, 1060, 5], [2.795, 39.807, 1436, 5], [2.86, 39.80, 1360, 5],
-    [2.92, 39.84, 1100, 4.5], [3.0, 39.89, 600, 3.5], [3.15, 39.94, 330, 1.8]], rough: 0.5 },
-  { name: 'Llevant', pts: [[3.15, 39.40, 300, 3.5], [3.25, 39.55, 450, 3.5], [3.38, 39.70, 520, 3.5]] },
-  { name: 'Randa', pts: [[2.92, 39.525, 540, 2.0], [2.93, 39.53, 520, 2.0]] },
-  { name: 'Bellver', pts: [[2.619, 39.564, 125, 0.6], [2.621, 39.565, 125, 0.6]], smooth: 1 },
-  { name: 'Monte Toro', pts: [[4.11, 39.985, 358, 1.5], [4.12, 39.985, 340, 1.5]] },
-  { name: 'Ibiza', pts: [[1.22, 38.91, 475, 2.5], [1.35, 38.98, 350, 4], [1.5, 39.05, 400, 4]] }
-];
-/* river valleys carved through the relief: [lon,lat] polylines + half-width km */
-export const VALLEYS = [
-  { w: 1.9, pts: [[1.87, 41.57], [1.93, 41.475], [1.98, 41.42], [2.04, 41.345], [2.10, 41.31]] },   // Llobregat
-  { w: 1.2, pts: [[2.235, 41.42], [2.20, 41.47], [2.22, 41.53]] }                                   // Besos
-];
 /* urban areas: [lon, lat, semi-axis a km, semi-axis b km, rotation of a-axis (deg from north), density, grid angle] */
 export const URBAN = [
   { n: 'Barcelona', c: [2.168, 41.397], a: 7.2, b: 3.3, rot: 44.4, d: 1.0, grid: 44.4, core: 1 },

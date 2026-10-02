@@ -42,7 +42,7 @@ import {
   startFlight, pendingDebrief, clearDebrief, debriefModel
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
-import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen } from './screens.js';
+import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen, creditsScreen } from './screens.js';
 import { guideScreen } from './guide.js';
 import { fleetPanel } from './fleet.js';
 import { marketPanel } from './market.js';
@@ -102,7 +102,8 @@ export function showMainMenu() {
   mount(mainMenuScreen({
     onFreeFlight: () => { hideAirlineUi(); if (hooks.openFreeFlight) hooks.openFreeFlight(); },
     onAirline: enterAirline,
-    onSettings: hooks.openSettings ? () => { hideAirlineUi(); hooks.openSettings(); } : null
+    onSettings: hooks.openSettings ? () => { hideAirlineUi(); hooks.openSettings(); } : null,
+    onCredits: () => mount(creditsScreen({ onBack: showMainMenu }))
   }));
 }
 

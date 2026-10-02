@@ -1,7 +1,7 @@
 /* Aeroports: definicions, pistes, carrers de rodatge, portes.
  * ORIGEN: linies 1369-1465 de l'original.
  *
- * EXPORTA: RUNWAY_SCALE makeAirport setRunwayDifficulty
+ * EXPORTA: RUNWAY_SCALE APPROACH_DATA makeAirport setRunwayDifficulty
  *          airportPavedAt proceduralDef AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
  *
  * IMPORTA: ../core/constants.js, ./geo.js, ./airport-data.js
@@ -18,7 +18,11 @@
  *             als aeroports nous; sense def.ils, tots els caps en tenen (H3).
  *   en.kind   aproximacio del cap (H12): 'ILS' si en.ils, 'RNP' si no. Tots
  *             els caps en tenen una, amb la mateixa interficie (ILS.nav).
- *   def.terrain  { flatR, valley } nomes als aeroports nous (H6, H16).
+ *   en.gsDeg  angle de la senda del cap en graus, nomes on no es 3 (APPROACH_DATA).
+ *   en.direct false si el cap no te aproximacio directa (APPROACH_DATA): H11
+ *             (arrivalEnd) no el tria si n hi ha un altre. Tots els altres, true.
+ *   def.terrain  { flatR, valley } nomes als aeroports nous (H6, H16). El
+ *             terreny real (fase A) ja no el fa servir.
  *   twy.conn  true als trams de taxiway que entren a la pista (connectors).
  *   twy.backtrack  true al tram de rodatge sobre l eix de la pista (aeroports
  *             petits: es rodola per la pista). Es a la xarxa, no es pinta.
@@ -31,6 +35,17 @@ import { DEG, wrap360 } from '../core/constants.js';
 import { ll } from './geo.js';
 import { AIRPORT_DATA } from './airport-data.js';
 
+/* aproximacions sobre el terreny real (docs/DECISIONS.md, 2026-10-02, TA-9): senda per cap (graus) i caps sense
+ * aproximacio directa. Els caps que no hi son: 3 graus i aproximacio directa */
+export const APPROACH_DATA = {
+  LEBL: { noDirect: ['20'] },
+  LEPA: { noDirect: ['06L', '24L'] },
+  LERS: { noDirect: ['07'] },
+  LEMH: { noDirect: ['19'] },
+  LELL: { noDirect: ['13'] },
+  LEDA: { noDirect: ['31'] },
+  LESU: { gsDeg: { '03': 3.6 }, noDirect: ['21'] }
+};
 export const RUNWAY_SCALE = { easy: 1.45, normal: 1.0, hard: 0.6 };        // difficulty: very long / real / short runways
 const HARD_MIN_LEN_M = 2000;                                          // H7: per sota, la dificultat no escurca la pista
 export function makeAirport(def, lenK) {
@@ -64,7 +79,10 @@ export function makeAirport(def, lenK) {
   }
   for (const p of def.aprons) A.paved.push({ a1: p[0], c1: p[2], a2: p[1], c2: p[2], hw: p[3] / 2, kind: 'apron' });
   for (const s of A.paved) { const dx = s.a2 - s.a1, dy = s.c2 - s.c1; s.L = Math.hypot(dx, dy); s.ux = dx / s.L; s.uy = dy / s.L; }
-  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; en.ils = !def.ils || def.ils.includes(en.id); en.kind = en.ils ? 'ILS' : 'RNP'; A.allEnds.push(en); }));
+  const AP = APPROACH_DATA[def.icao] || {};
+  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; en.ils = !def.ils || def.ils.includes(en.id); en.kind = en.ils ? 'ILS' : 'RNP';
+    if (AP.gsDeg && AP.gsDeg[en.id]) en.gsDeg = AP.gsDeg[en.id];
+    en.direct = !(AP.noDirect && AP.noDirect.includes(en.id)); A.allEnds.push(en); }));
   return A;
 }
 /** is the local point (a,c) on pavement? returns the segment (or apron polygon) or null */
@@ -192,6 +210,10 @@ export const AIRPORT_DEFS = {
 };
 export const AIRPORT_ORDER = ['LEBL', 'LEPA', ...Object.keys(AIRPORT_DATA)];
 export const AIRPORTS = {};
+/** l aeroport mes proper a (e, n) per distancia, entre tots els d AIRPORT_ORDER (camera de torre); `fallback` es el punt de partida de la cerca */
+export function nearestAirport(e, n, fallback) {
+  return AIRPORT_ORDER.map(id => AIRPORTS[id]).reduce((b, x) => Math.hypot(e - x.e, n - x.n) < Math.hypot(e - b.e, n - b.n) ? x : b, fallback);
+}
 /** (re)build both airports for a difficulty level. Scenery is rebuilt by AirportScenery.rebuild(). */
 export function setRunwayDifficulty(level) { for (const id of AIRPORT_ORDER) { const old = AIRPORTS[id]; AIRPORTS[id] = makeAirport(AIRPORT_DEFS[id], RUNWAY_SCALE[level] || 1); AIRPORTS[id].oldGroup = old && old.group; } }
 setRunwayDifficulty('normal');

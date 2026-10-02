@@ -8,7 +8,7 @@
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, AIRPORT_DATA, RUNWAY_SCALE, ILS, setRunwayDifficulty, makeAirport,
+import { AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, AIRPORT_DATA, RUNWAY_SCALE, ILS, glideAngle, setRunwayDifficulty, makeAirport,
   airportPavedAt, taxiRoute, buildTaxiGraph, ll, proceduralDef } from '../src/world/index.js';
 import { NM } from '../src/core/index.js';
 
@@ -19,7 +19,7 @@ after(() => setRunwayDifficulty('normal'));
 /** fdm minim per a ILS.nav/update a dNm del llindar, sobre l eix i la senda */
 function onFinal(A, en, dNm) {
   const d = dNm * NM, p = A.toWorld(en.thr[0] - en.dir[0] * d, en.thr[1] - en.dir[1] * d);
-  return { e: p[0], n: p[1], h: A.elev + (d + ILS.GS_S) * Math.tan(ILS.GS) + 1, wow: false, out: { hdg: en.hdg }, cfg: { gear: { zStatic: 1 } } };
+  return { e: p[0], n: p[1], h: A.elev + (d + ILS.GS_S) * Math.tan(glideAngle(en)) + 1, wow: false, out: { hdg: en.hdg }, cfg: { gear: { zStatic: 1 } } };
 }
 const inside = (B, a, c) => a >= B[0] && a <= B[1] && c >= B[2] && c <= B[3];
 /** el punt (a, c) es sobre la franja pavimentada d una pista? */
