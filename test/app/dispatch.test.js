@@ -244,6 +244,38 @@ describe('liquidacio en flight:finished (D3D4-8)', () => {
   });
 });
 
+describe('launch: l ordre nomes existeix si el vol arrenca', () => {
+  test('launchFlight falla perque ja hi ha un vol en marxa: res desat, i quan acaba l altre vol no es liquida res', () => {
+    initDispatch();
+    updateCareer(careerWithCommuter());
+    setFlightLauncher(() => {});
+    const resolved = [];
+    on('dispatch:resolved', e => resolved.push(e));
+    const other = launchFlight({ aircraft: 'nb' });   // un altre vol (una llico, Free Flight per app/) en marxa
+    const before = structuredClone(currentCareer());
+    const r = startOwnFlight(planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 }));
+    assert.deepEqual(r, { ok: false, reason: 'launch' });
+    assert.equal(activeAirlineFlight(), null);
+    assert.deepEqual(currentCareer(), before, 'ni ordre, ni avio inFlight, ni rngCounter');
+    assert.deepEqual(JSON.parse(localStorage.getItem(CAREER_KEY)), before);
+    // acaba l altre vol
+    assert.equal(onFlightFinished(record()), true);
+    assert.equal(resolved.length, 0);
+    assert.equal(currentCareer().pilot.logbook.length, before.pilot.logbook.length);
+    assert.equal(currentCareer().company.cash, before.company.cash);
+    assert.deepEqual(currentCareer().dispatch.queue, []);
+    assert.equal(currentCareer().fleet[0].status, 'ready');
+    return other;
+  });
+
+  test('sense launcher: reason launch i res desat', () => {
+    updateCareer(careerWithCommuter());
+    const before = structuredClone(currentCareer());
+    assert.deepEqual(startOwnFlight(planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 })), { ok: false, reason: 'launch' });
+    assert.deepEqual(currentCareer(), before);
+  });
+});
+
 describe('contractes al Dispatch (D3D4-9)', () => {
   test('el model porta les ofertes; planContract i startContract volen l avio de l altra companyia', () => {
     initDispatch();
