@@ -29,7 +29,7 @@ function airframe(reg, extra) {
 function fullCareer() {
   const s = createCareer(OPTS);
   s.pilot.logbook.push({ from: 'LEBL', to: 'LEPA' });
-  s.pilot.ratings.push('tp');
+  s.pilot.ratings.push('turboprop');
   s.company.cash = 150000;
   s.company.bases.push('LEBL');
   s.company.loans.push({ id: 'L1' });
@@ -177,6 +177,55 @@ describe('validate', () => {
       const r = validate(s);
       assert.equal(r.ok, false, re.source);
       assert.match(r.errors.join('\n'), re);
+    }
+  });
+
+  test('pilot.rank ha de ser un rang de BALANCE.ranks', () => {
+    for (const r of BALANCE.ranks) {
+      const s = fullCareer(); s.pilot.rank = r.key;
+      assert.ok(validate(s).ok, r.key);
+    }
+    for (const bad of ['general', 'Student', '', 'rank']) {
+      const s = fullCareer(); s.pilot.rank = bad;
+      assert.match(errorsOf(s), /pilot\.rank/, bad);
+    }
+  });
+
+  test('pilot.ratings han de ser habilitacions de BALANCE.ratings', () => {
+    const s = fullCareer(); s.pilot.ratings = Object.keys(BALANCE.ratings);
+    assert.ok(validate(s).ok);
+    for (const bad of ['tp', 'jumbo', 'toString']) {
+      const t = fullCareer(); t.pilot.ratings = ['commuter', bad];
+      assert.match(errorsOf(t), /pilot\.ratings\[1\]/, bad);
+    }
+  });
+
+  test('DispatchOrder.reg ha d existir a la flota', () => {
+    const s = fullCareer(); s.dispatch.queue[0].reg = 'EC-ZZZ';
+    assert.match(errorsOf(s), /dispatch\.queue\[0\]\.reg: EC-ZZZ no existeix a la flota/);
+    const t = fullCareer(); t.fleet = [];
+    assert.match(errorsOf(t), /dispatch\.queue\[0\]\.reg/);
+  });
+
+  test('finance.loanId, si no es null, ha d existir a company.loans', () => {
+    const s = fullCareer(); s.fleet[0].finance.loanId = 'L1';
+    assert.ok(validate(s).ok);
+    const t = fullCareer(); t.fleet[0].finance.loanId = 'L9';
+    assert.match(errorsOf(t), /fleet\[0\]\.finance\.loanId: el prestec L9 no existeix/);
+    const u = fullCareer(); u.company.loans = []; u.fleet[0].finance.loanId = 'L1';
+    assert.match(errorsOf(u), /fleet\[0\]\.finance\.loanId/);
+  });
+
+  test('crewId no pot ser buit', () => {
+    for (const bad of ['', 3, null]) {
+      const s = fullCareer(); s.dispatch.queue[0].crewId = bad;
+      assert.match(errorsOf(s), /dispatch\.queue\[0\]\.crewId/, String(bad));
+    }
+  });
+
+  test('createCareer segueix sent valida amb qualsevol llavor', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      assert.deepEqual(validate(createCareer({ ...OPTS, seed })), { ok: true, errors: [] });
     }
   });
 

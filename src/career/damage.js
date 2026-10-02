@@ -33,14 +33,11 @@
  *     Llanca un Error si excessPct no es a BALANCE.insurance.excessOptions.
  */
 
+import { lerp } from '../core/index.js';
 import { BALANCE } from './balance.js';
+import { eur } from './util.js';
 
 const MODES = ['own', 'contract'];
-
-/** euros enters; converteix -0 en 0 */
-const eur = x => Math.round(x) || 0;
-
-const lerp = ([lo, hi], s) => lo + (hi - lo) * s;
 
 /** Fila de BALANCE.damage amb aquest id. */
 function damageRow(id) {
@@ -78,9 +75,9 @@ export function assessDamage({ record, airframeValue, mode, crashSeverity }) {
       throw new Error('assessDamage: amb accident cal crashSeverity dins de [0, 1]');
     }
     const C = BALANCE.crash;
-    items = [{ id: 'crash', cost: eur(lerp([C.minPct, C.maxPct], s) * airframeValue),
-      groundedDays: Math.round(lerp(C.groundedDays, s)) }];
-    xpLoss = Math.round(lerp(C.xpLoss, s));
+    items = [{ id: 'crash', cost: eur(lerp(C.minPct, C.maxPct, s) * airframeValue),
+      groundedDays: Math.round(lerp(C.groundedDays[0], C.groundedDays[1], s)) }];
+    xpLoss = Math.round(lerp(C.xpLoss[0], C.xpLoss[1], s));
   } else {
     items = contactDamageIds(record).map(id => {
       const row = damageRow(id);

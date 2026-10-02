@@ -4,7 +4,7 @@
  * NOU: tasca C5+D1 d ENGINEERING.md (docs/DECISIONS.md, 30/09/2026, E1-E9).
  *
  * EXPORTA: mainMenuScreen nameScreen schoolScreen graduationScreen
- *          opsScreen noticeScreen OPS_TABS
+ *          opsScreen noticeScreen
  *
  * INTERFICIE (no la canviis, airline-ui.js en depen):
  *   mainMenuScreen({ onFreeFlight, onAirline, onSettings? })   onSettings:
@@ -29,7 +29,7 @@ import { el } from './dom.js';
 import { topBar } from './top-bar.js';
 
 /** les set pestanyes de DESIGN.md, en ordre (E7) */
-export const OPS_TABS = ['dispatch', 'fleet', 'market', 'crew', 'pilot', 'finance', 'map'];
+const OPS_TABS = ['dispatch', 'fleet', 'market', 'crew', 'pilot', 'finance', 'map'];
 
 const button = (label, onClick, primary) => el('button', { type: 'button', class: primary ? 'pa-primary' : null, onclick: onClick }, label);
 

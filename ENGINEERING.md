@@ -1,8 +1,8 @@
 # Pont Aeri — Especificació d'enginyeria
 
 Document de referència per a qualsevol agent que escrigui codi en aquest
-repositori. Descriu el codi **tal com és avui** (26/09/2026, commit `d302e63`
-a `dev`) i l'ordre de feina per construir el mode Airline.
+repositori. Descriu el codi **tal com és avui** a `dev` i l'ordre de feina per
+construir el mode Airline.
 
 - El disseny de joc (economia, progressió, escola de vol, contingut) és a
   `docs/DESIGN.md`.
@@ -45,45 +45,67 @@ Llegeix aquesta secció abans de tocar res. Són obligatòries.
 ### Estructura
 
 ```
-index.html            2.627 línies. Seccions 8c–20: tot el que toca el navegador.
+index.html            Seccions 8c–20: tot el que toca el navegador.
                       Un <script type="module"> que importa de src/.
 src/core/             Simulador headless, sense window/document/THREE
-  constants.js  noise.js  atmosphere.js  aircraft-data.js
+  constants.js  noise.js  atmosphere.js  aircraft-data.js  model-geom.js
   flight-model.js  trim.js  autopilot.js  harness.js
   flight-recorder.js  landing-watch.js
   index.js            barrel: la resta del joc importa d'aquí
 src/world/            Món headless
-  geo.js  airports.js  terrain.js  ils.js  taxi.js  index.js
-  airport-data.js     generat per tools/airports-ourairports.mjs (F1), no editar a mà
-test/
-  smoke.test.js       els mòduls carreguen i exporten el que toca
-  harness.test.js     cada fila del harness dins del seu rang
-  snapshot.test.js    cada mètrica idèntica a snapshot.json (fins a 10 decimals)
-  snapshot.json       instantània de precisió completa, regenerada post-migració
-docs/  DECISIONS.md  BACKLOG.md
+  geo.js  airports.js  terrain.js  ils.js  taxi.js  route.js  weather.js
+  airport-data.js     generat per tools/airports-ourairports.mjs, no editar a mà
+  index.js
+src/career/           Lògica del mode Airline. Funcions pures, a Node sense mocks
+  balance.js  types.js  state.js  rng.js  util.js
+  landing.js  demand.js  economy.js  wear.js  damage.js
+  progression.js  crew.js  finance.js  market.js
+  lessons.js  school.js
+  index.js
+src/app/              Orquestració: partida, vol, escola, mercat. Parla amb ui/ pel bus
+  bus.js  flight.js  save.js  airline.js
+  lesson-run.js  lesson-session.js  debrief.js  guide.js
+  market.js  aircraft-images.js
+  index.js
+src/ui/               Pantalles del mode Airline. Només pinta i crida app/
+  dom.js  screens.js  top-bar.js  airline-ui.js
+  fleet.js  market.js  guide.js  silhouettes.js
+  index.js
+src/i18n/             t() i formatadors; textos a en.js (font) i ca.js
+  index.js  en.js  ca.js
+src/platform/         L'únic lloc de src/ que toca APIs del navegador
+  storage.js  env.js  entropy.js  index.js
+public/aircraft/      Imatges dels avions del Market (§15), servides tal com són
+tools/                airports-ourairports.mjs  balance.mjs  estabilitat.mjs
+test/                 Totes les proves (§10)
+  *.test.js           core, world, recorder, i18n, platform, ui-boundary…
+  app/  career/       una prova per fitxer de app/ i de career/
+  fixtures/           dades de referència de les proves
+  snapshot.json       instantània de la física, a precisió completa
+docs/  DESIGN.md  DECISIONS.md  BACKLOG.md
 MIGRACIO.md  vite.config.js  package.json  .node-version
 ```
 
 ### Què queda a `index.html`
 
-| Secció | Línies aprox. | Símbols |
-| --- | --- | --- |
-| 8c Escenari fotogràfic | 143–259 | `Photo` (injectat a `world/terrain.js` amb `setPhoto`) |
-| 9 Shaders | 260–617 | `SHADERS` |
-| 10 Render | 618–1021 | `QUALITY R3 anchor unanchor setOrigin updateOrigin mergeGeos xf noiseTexture initRenderer patchFog fogHook applyQuality onResize SKYCFG celestial SkyJS Env Sea Terrain` |
-| 11 Escenografia d'aeroport | 1022–1178 | `Clouds GLYPHS makeBuildingMaterial makeLightMaterial LightSet AirportScenery airportSegContains` |
-| 12 Ciutats | 1179–1285 | `Scenery` |
-| 13 Models d'avió | 1286–1488 | `MODEL_GEOM AircraftModel` |
-| 14 Instruments | 1489–1731 | `Instruments` |
-| 15 Cabina 3D | 1732–1833 | `Cockpit` |
-| 16 Entrada | 1834–1876 | `Input` |
-| 17 Càmeres | 1877–1918 | `Cameras` |
-| 18 Estat de joc | 1919–2115 | `Game` |
-| 18b HUD | 2116–2266 | `HUD` |
-| 18c So | 2267–2442 | `Sound Callouts` |
-| 19 Bucle | 2443–2491 | `Main` |
-| 20 Interfície | 2492–2621 | `Best UI` |
-| — Etiqueta DEV | final | `<script>` clàssic, `IS_DEV` |
+| Secció | Símbols |
+| --- | --- |
+| 8c Escenari fotogràfic | `Photo` (injectat a `world/terrain.js` amb `setPhoto`) |
+| 9 Shaders | `SHADERS` |
+| 10 Render | `QUALITY R3 anchor unanchor setOrigin updateOrigin mergeGeos xf noiseTexture initRenderer patchFog fogHook applyQuality onResize SKYCFG celestial SkyJS Env Sea Terrain` |
+| 11 Escenografia d'aeroport | `Clouds GLYPHS makeBuildingMaterial makeLightMaterial LightSet AirportScenery airportSegContains` |
+| 12 Ciutats | `Scenery` |
+| 13 Models d'avió | `MODEL_GEOM AircraftModel` |
+| 14 Instruments | `Instruments` |
+| 15 Cabina 3D | `Cockpit` |
+| 16 Entrada | `Input` |
+| 17 Càmeres | `Cameras` |
+| 18 Estat de joc | `Game` |
+| 18b HUD | `HUD` |
+| 18c So | `Sound Callouts` |
+| 19 Bucle | `Main` |
+| 20 Interfície | `Best UI` |
+| — Etiqueta DEV | `<script>` clàssic, `IS_DEV` |
 
 `THREE` és global del CDN, r128. `package.json` ja té `three@^0.128.0` fixat
 per al dia que es faci `import * as THREE from 'three'`: **no el pugis de
@@ -172,6 +194,11 @@ src/
 | `test/`, `tools/` | tot menys `ui/` i `render/`. `platform/` només es prova amb dobles injectats a `globalThis` |
 
 `career/` ha de poder córrer sencer a Node sense cap mock del navegador.
+
+**Excepció acceptada** (decisió del projecte): `core/autopilot.js` i
+`core/harness.js` importen `world/ils.js` (només `ILS`, per a la guia de senda),
+tot i que la taula diu que `core/` només importa `core/`. No es mou codi.
+Qualsevol altre import de `core/` cap a `world/` és una violació.
 
 ### Com parlen Airline i el simulador
 
@@ -395,7 +422,13 @@ export const BALANCE = {
     tp:    { cls: 'turboprop',  seats: 70,  rating: 'turboprop'  },
     nb:    { cls: 'narrowbody', seats: 180, rating: 'narrowbody' },
     wb:    { cls: 'widebody',   seats: 300, rating: 'widebody'   },
-    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       }
+    jumbo: { cls: 'widebody',   seats: 400, rating: 'quad'       },
+    commuter:  { cls: 'commuter',   seats: 19,  rating: 'commuter'   },
+    rj:        { cls: 'narrowbody', seats: 100, rating: 'narrowbody' },
+    tpShort:   { cls: 'turboprop',  seats: 48,  rating: 'turboprop'  },
+    nbShort:   { cls: 'narrowbody', seats: 140, rating: 'narrowbody' },
+    nbStretch: { cls: 'narrowbody', seats: 220, rating: 'narrowbody' },
+    wbEr:      { cls: 'widebody',   seats: 290, rating: 'widebody'   }
   },
   usedPrice: {                              // B5: preu d ocasio de referencia per tipus
     commuter: 350000, tpShort: 1100000, tp: 1800000, rj: 4500000, nbShort: 6500000,
@@ -550,8 +583,9 @@ export function draw(state) {
 
 - `Math.random()` prohibit a `career/` i a `world/weather.js`.
   (`Game.updateGusts` en fa servir; és fora de l'abast i es deixa estar.)
-- La meteo es genera amb `hash2`, a partir de ruta i franja horària: ha de
-  sortir igual encara que el jugador tanqui i obri el joc.
+- La meteo es genera amb `hash2`, a partir de l'aeroport, el mes, l'hora, el
+  dia i la llavor (`weatherFor`, contracte de sota): ha de sortir igual encara
+  que el jugador tanqui i obri el joc.
 - Cada `DispatchOrder` desa el seu `rngCounter` en crear-se.
 
 ### Contracte de la meteo (`src/world/weather.js`, F3)
@@ -603,6 +637,11 @@ export const Storage = {
   llança: si no pot, retorna `null`.
 - Si `balanceVersion !== BALANCE.version`: avisar i oferir migrar o reiniciar.
 - Es desa en acabar cada vol i en tancar cada pantalla, mai per frame.
+- **Versions de l'esquema** (decisió del projecte): mentre Airline no sigui a
+  `main`, els camps nous opcionals de `CareerState` (com `market` o
+  `Airframe.tier`) no pugen `schemaVersion` ni porten migració; `validate` els
+  accepta absents. Quan Airline arribi a `main`, cada canvi d'esquema puja
+  `schemaVersion` i porta la seva migració a `career/state.js`.
 - Exportar i importar la partida en JSON: amb amics provant, és el que fa
   reproduïbles els bugs.
 
@@ -638,24 +677,21 @@ export const Storage = {
 
 ## 10. Proves
 
-Tot amb `node:test`, com les existents. `npm test` les corre totes.
+Tot amb `node:test`. `npm test` les corre totes. **Totes són a `test/`**
+(`test/app/` i `test/career/` hi tenen una prova per fitxer; `test/fixtures/`
+guarda dades de referència). Una prova nova va amb el seu fitxer; la taula només
+recull les que tenen una funció especial:
 
-| Fitxer | Què comprova |
+| Fitxer | Què vigila |
 | --- | --- |
-| `test/smoke.test.js` | exports de `core` i `world`. **Actualitza'l** quan s'afegeixi un export que la resta del joc necessiti, o quan canviï el nombre d'avions (F4). |
-| `test/harness.test.js` | rangs realistes per avió (bloc `expect`), també el tren (fre a tota potència; contacte a 400 fpm a la massa de prova, a la màxima d'aterratge i a la mínima; contacte a 800 fpm), el pas de ralentí a potència màxima en 10 s i el canvi gran de potència en 60 s respecte de l'equilibri final (`phugPitch`, `phugAlt`) |
-| `test/fisica.test.js` | el Mi-9 és el turbohèlix més dòcil en un canvi gran de potència (per sota del G-72 i del G-42) i l'amortidor d'extensió del tren té la mateixa ζ amb qualsevol massa |
-| `test/landing-watch.test.js` | `LandingWatch`: l'aterratge es registra amb qualsevol ordre de contacte i la xarxa de seguretat tanca l'informe |
-| `test/snapshot.test.js` | física idèntica. Vegeu la regla 2 de §0 |
-| `test/career/*.test.js` | NOU. Una prova per funció pública de `career/` |
-| `test/recorder.test.js` | NOU. `FlightRecorder` alimentat amb un `FlightModel` real |
-| `test/airport-data.test.js` | `world/airport-data.js` (F1): pistes, caps amb id i rumb, elevació, coordenades dins de la graella, mida i portes, ILS |
-| `test/airports.test.js` | aeroports nous (F1+F2): `AIRPORT_ORDER`, ILS per cap, camí de cada porta a cada cap a les tres dificultats, res fora de `bounds`, cap taxiway ni plataforma sobre la pista fora dels connectors, `RUNWAY_SCALE.hard` només a pistes de 2.000 m o més |
-| `test/arrival-end.test.js` | `arrivalEnd` i `flightApproach`: pista d'arribada dels vols de Free Flight (cap amb ILS, vent de cara, pista més llarga; ruta, inici en final, la resta) i si se'n sintonitza l'aproximació |
-| `test/rnp-autopilot.test.js` | el pilot automàtic acobla una RNP com un ILS, sobre caps reals (LESU 21, LELL 13, LERS 25) |
-| `test/final-fix.test.js` | `finalFix`: FF a 10 nm sobre l'eix de tots els caps, la senda al FF 300 ft per sobre del terreny i el tram IF -> FF volable a tots els caps nous |
-| `test/route.test.js` | `world/route.js` (H16, H17): punts d'aproximació i altituds mínimes, MEA, trams volables, ruta per l'IF, sostre de l'avió, vent de cua i caps no volables descartats |
-| `test/terrain-airports.test.js` | terreny dels aeroports nous: senda de 3° 300 ft per sobre del terreny fins a 10 km i fins a l'inici en final de Free Flight (10 nm), pendent de la vall ≤ 12 % i res més abrupte que el natural per sobre del 25 %; LEBL i LEPA idèntics a `test/fixtures/terrain-lebl-lepa.json` (**no es regenera**) |
+| `test/snapshot.test.js` | física idèntica a `snapshot.json`. Vegeu la regla 2 de §0 |
+| `test/harness.test.js` | rangs realistes per avió (bloc `expect`), el tren, el pas de ralentí i el canvi gran de potència |
+| `test/career/purity.test.js` | `career/` no fa servir `Math.random`, `Date`, `window`, `document` ni importa res de fora de `career/`, `core/` i `world/` |
+| `test/ui-boundary.test.js` | `ui/` només pinta i crida `app/`: no importa `render/` ni toca `Game` (es llegeix com a text) |
+| `test/platform.test.js` | `platform/` amb dobles injectats a `globalThis` |
+| `test/balance-harness.test.js` | el harness econòmic (`tools/balance.mjs`) és determinista |
+| `test/terrain-airports.test.js` | terreny dels aeroports nous; LEBL i LEPA idèntics a `test/fixtures/terrain-lebl-lepa.json` (**no es regenera**) |
+| `test/smoke.test.js` | els mòduls carreguen i exporten el que toca; un `FlightModel` avança amb valors plausibles. **Actualitza'l** quan s'afegeixi un export que la resta del joc necessiti o canviï el nombre d'avions |
 
 ### Dades d'aeroports: `tools/airports-ourairports.mjs`
 
@@ -760,6 +796,10 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 
 ## 12. Etapes
 
+Estat real de cada tasca. El detall de cada decisió és a `docs/DECISIONS.md`;
+aquí només hi ha què existeix i què falta. **Total de proves vigent: 1862 proves**
+(`npm test`); no s'apunten comptes per tasca perquè es queden vells.
+
 ### Ordre de feina (26/09)
 
 Les tasques s'agrupen en un sol PR i s'executen en aquest ordre: F4+F5, B5,
@@ -770,86 +810,84 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 
 ### Bloc A — Fonaments
 
-| Id | Tasca | Depèn de | Fet quan |
+| Id | Tasca | Depèn de | Estat |
 | --- | --- | --- | --- |
-| A1 | `src/i18n/`: `t`, formatadors, `en.js`, `ca.js` | — | **Fet.** Proves de `t`, reserva a `en` i formats |
-| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`) | — | **Fet.** `Storage` no llança mai |
-| A3 | `src/core/flight-recorder.js` + `test/recorder.test.js` | — | **Fet.** 16 proves, 240 en total |
-| A4 | Enganxar el recorder a `Game` a `index.html` | A3 | **Fet.** Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV`, un sol cop per vol: al primer aterratge amb nota, o en estavellar-se. `Touchdown.remaining` al recorder i `excursion` a `damage.js`. 6 proves noves (1 a `recorder.test.js`, 5 a `damage.test.js`), 509 en total |
-| A5 | `src/career/state.js` i `types.js` | A1 | **Fet.** Proves de creació, migració, validació, export i import, i de puresa de `career/`. 31 proves, 297 en total |
-
-A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
+| A1 | `src/i18n/`: `t`, formatadors, `en.js`, `ca.js` | — | **Fet** |
+| A2 | `src/platform/`: `storage.js`, `env.js` (`IS_DEV`), `entropy.js` | — | **Fet** |
+| A3 | `src/core/flight-recorder.js` | — | **Fet** |
+| A4 | Enganxar el recorder a `Game` a `index.html` | A3 | **Fet**. Un vol lliure imprimeix el `FlightRecord` a la consola si `IS_DEV`, un sol cop per vol |
+| A5 | `src/career/state.js` i `types.js` | A1 | **Fet** |
 
 ### Bloc B — Economia headless
 
-| Id | Tasca | Depèn de | Fet quan |
+| Id | Tasca | Depèn de | Estat |
 | --- | --- | --- | --- |
-| B1 | `balance.js` complet | A5 | **Fet.** `BALANCE` de §6 més `reputation.start`, congelat en profunditat. Proves de coherència. 11 proves, 308 en total |
-| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet.** Proves dels trams, de l'elasticitat i del compte de resultats. `distanceKm` nova a `world/geo.js`, `skippedCruiseFuelKg` al `FlightRecord`. 389 proves en total |
-| B3 | `wear.js`, `damage.js` | B2 | **Fet.** La factura de danys depen de l'fpm i la g del contacte (i del tail strike i de la pista), no de la nota: `assessDamage` no llegeix `score`. Una nota de 20 punts pot sortir sense factura si el contacte es suau. El cas de referencia, 850 fpm en un avio de 8.000.000 EUR, dona veryHard, 96.000 EUR i 3 dies. Inclou el cost per cicle del manteniment (`cycleCost` d'`applyFlightWear`). 55 proves noves (53 a `wear.test.js` i `damage.test.js`, 2 de `purity.test.js`), 444 en total |
-| B4 | `progression.js` | B2 | **Fet.** XP per vol, rangs, habilitacions de tipus i endorsements. Valors a `BALANCE.ratings`, `BALANCE.endorsements` i `fleetTypes[..].rating`. La baixada de rang per accident es proporcional: el rang surt sempre de l'XP. 59 proves noves (58 a `progression.test.js`, 1 de `purity.test.js`), 503 en total |
-| B5 | `tools/balance.mjs` i calibratge de `K` | B2–B4 | **Fet.** Harness econòmic (`npm run balance`, i `--seeds N` per a la mediana i el percentil 90 sobre N llavors), `career/finance.js`, `career/crew.js` i `career/rng.js` (`draw`). K 2,4; termini de 340 vols; rangs, `crash.xpLoss`, `demand.pRef` i `crewHireCost` calibrats (`docs/DECISIONS.md`, 27/09/2026). Compleix el criteri robust de §10 sobre 50 llavors: salts de 47, 42, 42 i 42 vols de mediana (55, 52, 50 i 56 al p90), primera tripulació al vol 9, 4,5 % de vols en negatiu, actes de 10,9, 10,6 i 12,5 h de mediana (12,8, 13,2 i 14,9 h al p90). 53 proves noves, 892 en total |
+| B1 | `balance.js` complet | A5 | **Fet** |
+| B2 | `landing.js`, `demand.js`, `economy.js` | B1 | **Fet** |
+| B3 | `wear.js`, `damage.js` | B2 | **Fet**. La factura de danys depèn de l'fpm i la g del contacte, no de la nota |
+| B4 | `progression.js` | B2 | **Fet** |
+| B5 | `tools/balance.mjs`, `finance.js`, `crew.js`, `rng.js` i calibratge de `K` | B2–B4 | **Fet**. Compleix el criteri de §10 sobre 50 llavors |
 
 **Cap línia d'interfície d'Airline abans que B5 passi.**
 
 ### Bloc C — Escola de vol
 
-| Id | Tasca | Depèn de | Fet quan |
+| Id | Tasca | Depèn de | Estat |
 | --- | --- | --- | --- |
-| C1 | `career/school.js`: lliçons com a dades, motor de criteris | A3, B4 | **Fet.** `career/lessons.js` (8 lliçons i 4 check-rides, només dades) i `career/school.js` (`METRICS`, `factsFromRecord`, `evaluate`, `isLessonAvailable`, `recordLessonAttempt`, `canGraduate`, `evaluateCheckRide`). Afegir una lliçó no toca codi. La gràcia de la lliçó 7 (nota ≥ 30) s'aplica a partir del tercer intent inclòs. Els check-rides només avaluen: l'habilitació es compra a `progression.js`. `fuelWithinPlan` compta el creuer saltat amb la penalització, com `economy.js`, i `recordLessonAttempt` només accepta lliçons disponibles. 77 proves noves (75 a `school.test.js`, 2 de `purity.test.js`), 969 en total |
-| C2 | `app/`: bus, `setFlightLauncher`, `onFlightFinished` | A2, A5 | **Fet.** `app/bus.js` (`on`, `off`, `emit`, `TOPICS` congelat), `app/flight.js` (`setFlightLauncher`, `launchFlight`, `onFlightFinished`, `cancelFlight`, `isFlightInProgress`) i `app/save.js` (`loadCareer`, `saveCareer`, `backupCareer`, `discardCareer`, clau `pontAeri.career.v1`). Un vol llançat des d'`app` torna el seu `FlightRecord`. 33 proves noves (9 a `bus.test.js`, 10 a `flight.test.js`, 14 a `save.test.js`), mes 1 a `smoke.test.js`, 1003 en total |
-| C3 | Executor de lliçons a `index.html`: instructor al HUD, criteris en viu | C1, C2, A4 | **Fet.** `app/lesson-run.js` (`LessonRun`, `lessonGoalParams`, `attemptMessage`, `keyLabel`, `messageText`, `circuitGuidance`), headless i provable a Node: manté els fets en viu (sempre inclou `crashed`), decideix quan tanca l'intent (crash, criteris en viu de les lliçons 1-4 i 6, els 120 s de D5 o, a la 5, la desviació d'altitud en superar el llindar; les lliçons 7 i 8 només tanquen amb `finish(record)`, quan `Game` calcula la nota), quin missatge toca a l'instructor i la llista d'objectius del HUD (`objectives()`). `app/lesson-session.js` (`startLesson`, `currentLesson`, `currentLessonId`, `lastLessonId`, `abandonLesson`) lliga cada `LessonRun` amb el seu vol: la promesa d'un vol només tanca la seva llico, i Restart torna a llançar la darrera. `maxAltFt` de la lliçó 4 és MSL arrodonida a 10 ft, com l'altímetre del HUD (D4 canviada el 29/09): `LessonRun` la calcula en viu i substitueix la del `FlightRecord` en combinar els fets. Nova mètrica `headingChangeDeg` a `METRICS` (school.js) per a D5. A `index.html`: panell DEV (D1) que llança cada lliçó amb `launchFlight`, `setFlightLauncher` cablejat per primera vegada, `onFlightFinished` cridat des de `finishRecord`, `cancelFlight` en abandonar o tornar al menú, i el text de l'instructor al HUD. Lliçons 2 i 3 des de `gate`, 1 i 4 des de `runway`, 5 des de `airborne` (nou, correcció del PR #22: en vol, anivellat, mar endins, tren amunt, flaps 0), 6 des de `downwind` (nou: al travers del llindar, rumb contrari al de la pista, tren amunt, flaps d'aproximació) i 7-8 des de `final` (7 a 3 nm sobre la senda; 8 a 12 nm, fora de l'eix i per sota de la senda, correcció del 29/09). `airborne` i `downwind` reaprofiteixen el mateix mecanisme d'inicialització en vol que `final` (`trimAircraft`), amb una altra posició/altitud/velocitat/configuració; els valors (ft, nm, flaps) són a `LESSONS[..].spawn` a `lessons.js`, `launchLesson()` els passa a `Game.spawn()` via `opts`. Cap dels dos modes nous és visible al menú de Free Flight. 92 proves noves (40 a `lesson-run.test.js`, 3 a `school.test.js` per `headingChangeDeg` i el nou criteri de la lliçó 5, mes les de C4), 1056 en total amb C4. Correccions del 28/09 després de la prova d'en Marc (`docs/DECISIONS.md`): Restart ja no mata la llico (la 5 no suspenia), la lliçó 2 compta el comandament en prémer la tecla, abans de cap comprovació (`controlKeys` a `lessons.js`), la 1 comença a la pista, la 3 ressalta en verd el capçal de la pista assignada, la 5 suspèn a l'instant en passar de 200 ft, la 6 guia per fases amb el costat del gir calculat (`guidance` a `lessons.js`, geometria respecte de la pista assignada: camps `asg*` de la instantània) i totes mostren al HUD una llista d'objectius generada dels criteris. 47 proves noves (41 a `lesson-run.test.js`, 6 a `lesson-session.test.js`), 1103 en total. Correccions del 29/09 per tancar les lliçons 1 a 5 (`docs/DECISIONS.md`): tecla `Home` per tornar la càmera a l'angle per defecte, a totes les càmeres i a Free Flight (`CONTROL_KEYS.cameraReset` a `lessons.js`, el mapa de tecles que la lliçó 2 fa servir com a `controlKeys`); explicacions de l'instructor com a dades (`tips` a `lessons.js`, `LessonRun.tips()`, tecles sempre de `CONTROL_KEYS`): girar la càmera amb el clic dret a la 1, rodar (Q/E, potència, frens) a la 3, WASD i Q/E a la 4; a la 3, rodona verda fluorescent al punt objectiu i línia recta discontínua des de l'avió, en lloc del ressaltat del capçal; l'altura dels objectius de la 4 diu "ft AGL" (no anava amb retard: és AGL i l'altímetre és MSL); i totes les distàncies a l'aeroport (PFD, HUD, ND, caixa d'aproximació, vol cronometrat) mesuren fins al capçal de la pista de destinació amb `thresholdDistNm` i `destinationEnd` (`world/ils.js`), arreglant un error antic de Free Flight (la cabina mostrava el DME, uns 2 nm més). 19 proves noves (12 a `lesson-run.test.js`, 7 a `threshold.test.js`), 1122 en total. Darrers canvis del 29/09 després de provar les 8 lliçons (`docs/DECISIONS.md`): doble clic amb el botó dret per tornar la càmera a l'angle per defecte (Home es manté com a alternativa, `Game.resetCamera`); a la 3, la línia verda segueix el camí més curt per les calles de rodatge (`world/taxi.js`: `buildTaxiGraph` fa el graf de la geometria de taxiways existent, sense redibuixar-la, i `taxiRoute` hi busca el camí amb A*; `LessonRun.taxiPath` el recalcula si l'avió se n'allunya més de `taxi.rerouteM`); la 4 compta MSL com l'altímetre (D4 canviada) i l'etiqueta diu "ft"; a la 6, la llista mostra totes les condicions de D6, també la distància al llindar i l'altura AGL (el comptador dels 10 s no avançava perquè aquestes dues no eren a la llista i l'instructor deia "abans dels 500 ft"); la 7 comença a 3 nm i la 8 a 12 nm, 2 nm fora de l'eix amb 25° d'intercepció i per sota de la senda, amb guia de la intercepció (`ilsGuidance`) i criteri nou `ilsFlown` (dins d'1 punt de les dues agulles entre 1.500 i 500 ft sobre la pista); el mode `final` accepta distància, offset, angle i altura per `opts` amb el mateix `trimAircraft`, i els camps `spawn*` ja no queden a `Game.opts` després d'una lliçó; el panell DEV cancel·la la lliçó en marxa (`cancelFlight`, sense intent) abans de llançar-ne una altra. 48 proves noves (28 a `lesson-run.test.js`, 2 a `lesson-session.test.js`, 1 a `school.test.js`, 17 a `test/taxi.test.js`), 1170 en total |
-| C4 | Ajudes de l'escola: barra d'arrodoniment, debrief automàtic | C3 | **Fet.** `app/debrief.js` (`debriefRows`, pur): 7 files (sink, g, zona, centrat, actitud, rebots, tail strike), OK a partir del 70 % dels punts màxims de cada component. Els punts màxims surten d'un camp `ptsMax` nou a `Game.scoreReport` (index.html): no hi havia cap altre lloc que els exposés (regla 8 de la secció 0), vegeu la descripció del PR. Barra d'arrodoniment (D7) i debrief automàtic (D8) només a la lliçó 7, marcats com a dades (`aids`) a `lessons.js`, mai com a condició al codi. Només visibles dins l'escola: Free Flight no en mostra res. 11 proves noves a `debrief.test.js`, 1054 en total amb C3 |
-| C5 | Pantalla d'escola i graduació | C3 | **Fet** amb D1. Graduar-se completa el `CareerState` que es crea en entrar per primer cop a Airline amb el nom del pilot (E1, `docs/DECISIONS.md` 30/09/2026): `graduate(state)` a `progression.js` afegeix `commuter`, suma `graduationXp` amb `applyXp`, posa `school.graduated`, un sol cop, i deixa la companyia al mateix punt de partida que `tools/balance.mjs` amb `startingCompany` (`finance.js`): `startingCash` (ja inclou el crèdit), el crèdit inicial amb `makeLoan`, la reputació inicial i la base `BALANCE.startingBase`. El harness crida el mateix `graduate` (`startState`) i `npm run balance --seeds 50` no canvia. Continuar amb un `balanceMismatch` fa `backupCareer()` abans de desar. L'escola viu a la partida i es desa després de cada intent i en tancar cada pantalla (`app/airline.js`). Pantalla d'escola, de graduació i guia de consulta (`app/guide.js`, tecles de `CONTROL_KEYS`). Aprovat per gràcia amb la nota a l'instructor i al debrief (E3). Lliçó 7 sense barra d'arrodoniment, amb el tip de la V/S (E4). 55 proves noves amb D1, 1557 en total |
+| C1 | `career/lessons.js` (dades) i `career/school.js` (motor de criteris) | A3, B4 | **Fet** |
+| C2 | `app/`: bus, `setFlightLauncher`, `onFlightFinished`, `save.js` | A2, A5 | **Fet** |
+| C3 | Executor de lliçons: `app/lesson-run.js`, `app/lesson-session.js`, instructor al HUD i criteris en viu a `index.html`, panell DEV | C1, C2, A4 | **Fet**, les vuit lliçons |
+| C4 | Ajudes de l'escola: barra d'arrodoniment (D7) i debrief automàtic (D8), `app/debrief.js` | C3 | **Fet**, només a la lliçó 7 |
+| C5 | Pantalla d'escola, graduació (`graduate` a `progression.js`) i guia de consulta | C3 | **Fet** amb D1 |
 
 ### Bloc D — Centre d'operacions
 
-| Id | Tasca | Depèn de |
-| --- | --- | --- |
-| D1 | Menú principal Free Flight / Airline, shell i barra superior. **Fet** amb C5: capa `src/ui/` (barrel `index.js`, només pinta i crida `app/`), menú de dues portes amb resposta als cinc estats de `loadCareer`, centre d'operacions amb les set pestanyes "Aviat", barra superior de `topBarModel` (E6), exportar i importar (E9) i panell DEV sobre la partida carregada (E10) | C5 |
-| D2 | Fleet. **Fet** amb D5 (`docs/DECISIONS.md` 30/09/2026, G1-G12): una fila per avió amb matrícula, model, categoria, any, hores, cicles, els 4 estats, ubicació, status, hores fins a l'A-check i el C-check, préstec (quota per vol i vols que queden, o al comptat) i venda amb confirmació (`sellQuote`/`sellAircraft` de `finance.js`: cotització amb `priceOf` menys `sellFee`, cancel·la el préstec de l'avió, bloquejada si no és `ready` o si cash + net < 0). `app/market.js` (`fleetModel`, `sellAirframe`) i `ui/fleet.js`. Extres: Settings al menú principal (el mateix panell de la pausa) i el valor de la Vref al tip de la lliçó 7 i a la guia (`aircraftSpeeds`, `FlightModel.vspeeds()`). 79 proves noves amb D5, 1636 en total | D1, B3 |
-| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol. **Nota del D2+D5:** en liquidar cada vol, passa a `computeFlightResult` el `revenueMult` de la categoria de l'avió (`tierOf(airframeTier(a)).revenueMult`) i a `applyFlightWear` el seu `wearMult`; tots dos són opcionals i valen 1 per defecte. El lloguer (G1) va amb D3+D4 | D2, B2 |
-| D4 | Briefing i debrief amb compte de resultats | D3, A4 |
-| D5 | Market: mercat d'ocasió amb historial. **Fet** amb D2: `career/market.js` (`priceOf`, `typeGroups`, `generateMarket` amb garanties per habilitació i pesos de `mix` i `tierWeights`, `refreshMarket` per `clock.minute`), `derivedRng` a `rng.js`, `purchaseRule`/`buyAircraft` a `finance.js` (al comptat o financat, només amb l'habilitació, amb el coixí de `reserveFlights`), categories d'avió (`Airframe.tier`: preu, edat i estat, `revenueMult` a `economy.js` i `wearMult` a `wear.js`). Harness amb la regla de compra, la mètrica de cash < 0, `--tier` i `--tiers` (criteris A i B de §10). `app/market.js` (`marketModel`, `buyListing`, `devNewMarket`), `ui/market.js` (anuncis per classe, filtre per categoria, efectes i desglossament de les dues modalitats) i botó DEV "new market". Sense lloguer (G1) | D2 |
-| D5b | Market en targetes. **Fet** (`docs/DECISIONS.md` 01/10/2026, K1-K5): ofertes al mercat (`generateMarket`, `listPrice`/`offerPct`), regla de venda K2 a `sellQuote`, graella de targetes responsive amb filtre Ofertes (`cardModel` a `app/market.js`, `ui/market.js`), mapa d'imatges `app/aircraft-images.js` + `public/aircraft/` i siluetes SVG per classe (`ui/silhouettes.js`) | D5 |
-| D6 | Pilot, Finance, Crew, Map | D1 |
-| D7 | Escena 3D del menú, reaprofitant càmera i escenografia | D1 |
+| Id | Tasca | Depèn de | Estat |
+| --- | --- | --- | --- |
+| D1 | Menú principal Free Flight / Airline, `src/ui/`, barra superior, exportar i importar, panell DEV | C5 | **Fet**. Les pestanyes sense contingut mostren "Available soon" |
+| D2 | Fleet | D1, B3 | **Fet** amb D5 (`app/market.js`, `ui/fleet.js`, venda amb `sellQuote`/`sellAircraft`) |
+| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol | D2, B2 | **Pendent**. En liquidar cada vol, ha de passar a `computeFlightResult` el `revenueMult` de la categoria de l'avió i a `applyFlightWear` el seu `wearMult`. El lloguer (G1) va amb D3+D4 |
+| D4 | Briefing i debrief amb compte de resultats | D3, A4 | **Pendent** |
+| D5 | Market: mercat d'ocasió amb categories | D2 | **Fet** (`career/market.js`, `purchaseRule`/`buyAircraft`, `ui/market.js`, `--tier` i `--tiers` al harness). Sense lloguer |
+| D5b | Market en targetes, ofertes i imatges | D5 | **Fet** (K1–K5) |
+| D6 | Pilot, Finance, Crew, Map | D1 | **Pendent** |
+| D7 | Escena 3D del menú, reaprofitant càmera i escenografia | D1 | **Pendent** (opcional) |
 
 ### Bloc E — Bucle complet
 
-| Id | Tasca | Depèn de | Nota |
+| Id | Tasca | Depèn de | Estat i nota |
 | --- | --- | --- | --- |
-| E1 | `career/clock.js` i posició de la flota | D4 | L'avió queda on aterra |
-| E2 | Manteniment, revisions i avaries en vol | B3, E1 | Les avaries són esdeveniments nous del `FlightModel`. Tira les avaries amb failureChance de wear.js i draw(state). Desgast extra de motors per TOGA prolongat: cal una dada nova al FlightRecord. |
-| E3 | Detector de creuer estable i ×32 | A4 | **Estén** `Game.cycleAccel`, no el substitueix. El bucle de `Game` limita a `16 * 12` passos per frame: a ×32 cal mesurar el temps de frame |
-| E4 | Salt de creuer | E3 | +8 % de combustible, condicions revelades en sortir. Omple skippedCruiseFuelKg amb cruiseSkip(fuelKg): el combustible que s'hauria cremat al tram saltat, sense penalitzacio. La penalitzacio del 8 % l'aplica economy.js. |
-| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | Resolució en aterrar, llavor desada. Cada vol despatxat aplica applyFlightWear. |
+| E1 | `career/clock.js` i posició de la flota | D4 | **Pendent**. L'avió queda on aterra. `clock.minute` només existeix com a camp de l'estat |
+| E2 | Manteniment, revisions i avaries en vol | B3, E1 | **Pendent**. Les avaries són esdeveniments nous del `FlightModel`; tira les avaries amb `failureChance` de `wear.js` i `draw(state)`. Desgast extra de motors per TOGA prolongat: cal una dada nova al `FlightRecord` |
+| E3 | Detector de creuer estable i ×32 | A4 | **Pendent**. Estén `Game.cycleAccel` (ara fins a ×16), no el substitueix; el bucle de `Game` limita a `16 * 12` passos per frame |
+| E4 | Salt de creuer | E3 | **Pendent**. El recorder (`cruiseSkip`) i `economy.js` (penalització del 8 %) ja ho preveuen |
+| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | **Pendent**. Resolució en aterrar, llavor desada; cada vol despatxat aplica `applyFlightWear`. El bus ja té els temes `rank:up` i `dispatch:resolved`, sense emissors |
 
 ### Bloc F — Contingut (paral·lel, delegable)
 
-| Id | Tasca | Nota |
+| Id | Tasca | Estat |
 | --- | --- | --- |
-| F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | **Fet** per a les fases 1 i 2 amb F2 (`docs/DECISIONS.md`, 01/10/2026, H1-H10); la fase 3 és F1b. LEGE, LERS, LEIB, LEMH, LELL, LEDA i LESU surten de `world/airport-data.js`, generat per `tools/airports-ourairports.mjs` amb les pistes reals d'OurAirports. ILS per cap (`en.ils`, només als caps marcats dels aeroports nous; LEBL i LEPA, tots). Terreny propi (`World._airportShape`): anell pla per aeroport, con del 20 % i passadís d'aproximació de 20 km amb el fons 120 m sota la senda; LEBL i LEPA idèntics. `RUNWAY_SCALE.hard` només a pistes de 2.000 m o més. Escenografia mandrosa (es construeix a menys de 60 km i s'allibera a més de 80 km) i caps sense ILS sense ALS ni marques de zona de toc. Free Flight amb destí lliure (`Game.opts.dest`, `selAlt` segons la distància, text amb distància, rumb i pista d'arribada, `bearingDeg` nova a `world/geo.js`); pista d'arribada de qualsevol vol de Free Flight amb `arrivalEnd` i `flightApproach` (`world/ils.js`: el cap amb ILS, o el de més vent de cara, o la pista més llarga; H11), aproximació a tots els caps (`en.kind` 'ILS' o 'RNP', mateixa interfície `ILS.nav`, el pilot automàtic l'acobla sense tocar `core/`; H12), sintonitzada des de l'enlairament en ruta i des de l'inici en final (H13), ruta del ND fins al FF (`finalFix`, 10 nm sobre l'eix) i el llindar, pista d'arribada i FF sempre al ND amb la distància i el temps fins al FF (H14), un estil per a cada cosa al ND i llegenda (H15), punt intermedi (IF a 20 nm), altituds mínimes i caps no volables descartats (`world/route.js`, H16), MEA per tram, sostre de l'avió i vent de cua màxim de 10 kt (H17). Terreny dels aeroports nous: una vall natural al llarg de l'eix (`VALLEY` a `world/terrain.js`, vores al 8 %, sense cràters ni formes circulars). 162 proves noves (19 a `airport-data.test.js`, 78 a `airports.test.js`, 23 a `terrain-airports.test.js`, 11 a `arrival-end.test.js`, 3 a `rnp-autopilot.test.js`, 16 a `final-fix.test.js`, 10 a `route.test.js`, 2 a `geo.test.js`), 1839 en total |
-| F2 | Taxiways i portes procedimentals | **Fet** amb F1, tots menys LEBL i LEPA: `proceduralDef` (`world/airports.js`) posa la plataforma al costat de l'ARP, amb terminal, torre, hangars i portes per mida (petit 3, mitjà 6, gran 10, de `BALANCE.airportSize` via l'script); `makeAirport` genera les taxiways de la pista ja escalada: petit, un connector i es rodola per la pista (tram `backtrack` a la xarxa, no es pinta); mitjà o més, paral·lela amb connectors als dos caps i al mig. `taxiRoute` troba camí de cada porta a cada cap |
-| F1b | Fase 3: LEVC, LEAL, LECH, LFMP | Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i la costa: `COAST.mainland` de `geo.js` acaba a lat 39,95, i el relleu (`World.heightRaw`, abans dins de `heightProc`) tracta com a illa tot el que és a n < −120000, on cauen València, Alacant i Castelló. Després, mateix pipeline: `ORDER` i `EXTRA` de `tools/airports-ourairports.mjs` |
-| F3 | `world/weather.js` amb llavor | **Fet.** `weatherFor` i `toGameWeather`, purs, sense cablejar al joc (contracte a §7). Patrons locals i estacionals com a taula de dades. 14 proves a `test/weather.test.js` i 1 de puresa a `purity.test.js`, 1656 en total |
-| F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
-| F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |
-| F6 | Geometria pròpia del Mi-9 (ala alta, fuselatge curt) i del X-90 (motors a cua); taula de flaps pròpia del M-300 (ara passa el harness molt just: 346 de 360 fpm i 1,44 d'1,45 g) i suports de góndola del X-90. A més, el X-90 és massa llarg i prim i té una ala massa gran: cal refer-ne les proporcions de jet regional | Sense dependències. **Fet a mitges (només geometria visual):** Mi-9 i X-90 amb geometria pròpia a `src/core/model-geom.js` (ratios sobre les mides de l'avió), pilons de góndola al fuselatge del X-90 i `test/model-geom.test.js`. **Pendent:** la taula de flaps del M-300 (física) |
+| F1 | Més aeroports (fases 1 i 2 del disseny) | **Fet** amb F2: LEGE, LERS, LEIB, LEMH, LELL, LEDA i LESU, de `world/airport-data.js` (generat per `tools/airports-ourairports.mjs`); aproximació a tots els caps (ILS o RNP), ruta fins al FF i regles de `world/route.js` (H1–H17) |
+| F1b | Fase 3: LEVC, LEAL, LECH, LFMP | **Pendent**. Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i la costa (`COAST.mainland` acaba a lat 39,95), i el relleu tracta com a illa tot el que és a n < −120000. Després, mateix pipeline: `ORDER` i `EXTRA` de l'script |
+| F2 | Taxiways i portes procedimentals | **Fet** amb F1, tots menys LEBL i LEPA (`proceduralDef`, `makeAirport`, `taxiRoute`) |
+| F3 | `world/weather.js` amb llavor | **Fet** (contracte a §7), sense cablejar al joc: l'E1 hi passarà el rellotge |
+| F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet**. Ids `commuter` i `rj` |
+| F5 | Variants G-42, M-100, M-300, L-900ER | **Fet**. Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr`. G-72F i T-4F, ajornats fins que hi hagi contractes de càrrega |
+| F6 | Geometria pròpia del Mi-9 i del X-90; taula de flaps pròpia del M-300; refer les proporcions del X-90 | **A mitges**: fet només el visual (`core/model-geom.js`, pilons del X-90). **Pendent**: la taula de flaps del M-300 (física, el harness passa justet) i les proporcions del X-90 (backlog) |
 
 ### Bloc M — Migració pendent (paral·lel, baixa prioritat)
 
 Mateixes regles que `MIGRACIO.md`: només moure, un fitxer per commit.
 
-| Id | Tasca | Nota |
+| Id | Tasca | Estat i nota |
 | --- | --- | --- |
-| M1 | `import * as THREE from 'three'` en comptes del CDN | Versió fixada a 0.128 |
-| M2 | Seccions 8c–13 a `src/render/` | Les proves no cobreixen el render: cal revisió visual |
-| M3 | Seccions 14–20 a `src/ui/` i `src/app/`; textos existents a i18n | `Game` surt d'`index.html` i desapareix `setFlightLauncher` |
+| M1 | `import * as THREE from 'three'` en comptes del CDN | **Pendent**. Versió fixada a 0.128 |
+| M2 | Seccions 8c–13 a `src/render/` | **Pendent**. Les proves no cobreixen el render: cal revisió visual |
+| M3 | Seccions 14–20 a `src/ui/` i `src/app/`; textos existents a i18n | **Pendent**. `Game` surt d'`index.html` i desapareix `setFlightLauncher` |
 
 Les proves no veuen el render. Per a M1–M3, cada PR ha d'incloure una llista
 de comprovació visual: vol de dia i de nit a LEBL i LEPA, les quatre càmeres,
-els quatre avions, aterratge amb informe.
+els avions, aterratge amb informe.
 
 ---
 

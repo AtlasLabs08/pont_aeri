@@ -194,6 +194,7 @@ export default {
   'graduation.cash': 'Saldo',
   'graduation.cashNote': 'El saldo inclou el crèdit inicial de {loan}.',
   'graduation.open': 'Obre el centre d\'operacions',
+  'rank.up': 'Ascendit a {rank}',
   'rank.student': 'Alumne',
   'rank.private': 'Pilot privat',
   'rank.commercial': 'Pilot comercial',

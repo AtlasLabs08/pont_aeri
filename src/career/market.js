@@ -3,7 +3,7 @@
  * Funcions pures: no modifiquen la partida que reben. Comprar i vendre son a
  * finance.js; aplicar-ho a la partida i desar-la es feina d app/.
  *
- * EXPORTA: DEFAULT_TIER GUARANTEED_TIERS MARKET_RNG_TAG tierOf airframeTier
+ * EXPORTA: DEFAULT_TIER GUARANTEED_TIERS tierOf airframeTier
  *          marketEpoch priceOf typeGroups generateMarket refreshMarket
  *
  * IMPORTA: BALANCE, derivedRng de ./rng.js.
@@ -62,18 +62,18 @@
  */
 
 import { BALANCE } from './balance.js';
+import { lookup } from './util.js';
 import { derivedRng } from './rng.js';
 
 export const DEFAULT_TIER = 'standard';
 export const GUARANTEED_TIERS = Object.freeze(['basic', 'standard']);
-export const MARKET_RNG_TAG = 'market';
+const MARKET_RNG_TAG = 'market';
 
 const CONDITION_KEYS = ['engines', 'gear', 'airframe', 'avionics'];
 const REG_PREFIX = 'EC-';
 const REG_LETTERS = 3;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const lerp = (a, b, s) => a + (b - a) * s;
 

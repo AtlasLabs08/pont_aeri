@@ -66,9 +66,14 @@ describe('t', () => {
   });
 
   test('clau que falta a ca: cau a en', () => {
-    assert.equal(Object.hasOwn(ca, 'rank.up'), false, 'la prova necessita una clau absent a ca');
-    setLang('ca');
-    assert.equal(t('rank.up', { rank: 'ATPL' }), 'Promoted to ATPL');
+    const saved = ca['rank.up'];
+    delete ca['rank.up'];                 // simula una clau que encara no s ha traduit
+    try {
+      setLang('ca');
+      assert.equal(t('rank.up', { rank: 'ATPL' }), 'Promoted to ATPL');
+    } finally {
+      ca['rank.up'] = saved;
+    }
   });
 
   test('clau que no hi es enlloc: retorna la clau', () => {
@@ -92,7 +97,7 @@ describe('t', () => {
   test('C5+D1: els textos de les pantalles noves estan traduits al catala', () => {
     const prefixes = ['menu.', 'airline.', 'school.status.', 'school.col.', 'school.attempts.', 'save.', 'graduation.',
       'rank.', 'rating.', 'topbar.', 'ops.', 'guide.'];
-    const keys = Object.keys(en).filter(k => prefixes.some(p => k.startsWith(p)) && k !== 'rank.up');
+    const keys = Object.keys(en).filter(k => prefixes.some(p => k.startsWith(p)));
     assert.ok(keys.length > 50);
     for (const k of keys) assert.ok(Object.hasOwn(ca, k), 'ca: ' + k);
   });

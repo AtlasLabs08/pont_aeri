@@ -43,6 +43,7 @@
  */
 
 import { BALANCE } from './balance.js';
+import { effectiveFuelKg } from './util.js';
 import { SCHOOL_PASS, LESSONS, CHECK_RIDES } from './lessons.js';
 
 export const METRICS = [
@@ -64,9 +65,7 @@ const OPS = {
 export function factsFromRecord(record) {
   const td = record.touchdown ?? null;
   const burnt = record.fuelBurntKg, planned = record.fuelPlannedKg;
-  const skipped = record.skippedCruiseFuelKg ?? 0;
-  // mateixa formula que el combustible efectiu de computeFlightResult (economy.js)
-  const effective = burnt + skipped * (1 + BALANCE.cruiseSkipFuelPenalty);
+  const effective = effectiveFuelKg(record);
   return {
     landed: td !== null,
     crashed: record.crashCause != null,

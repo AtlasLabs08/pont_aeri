@@ -2,6 +2,8 @@
 
 Una linia per decisio, amb data. Serveix per no rediscutir el mateix d aqui a quatre mesos.
 
+> A partir d ara els ids de decisio porten el prefix de la tasca (per exemple `D3D4-1`). Els ids antics no es renombren.
+
 ## 2026-09-22 — Ruleset de main amb 0 aprovacions
 
 Posat a 0 temporalment per poder treballar sol. PENDENT: pujar a 1 quan el company accepti la invitacio a l organitzacio.
@@ -33,7 +35,7 @@ BALANCE.version es queda a 1 fins que el mode Airline arribi a main. Mentre no h
 
 ## 2026-09-26 - Revisio del B2: el que queda fora d economy.js
 - El cost per cicle del manteniment no es a economy.js: el calcula wear.js a B3.
-- Als vols de contracte, el pagament es contractFeePerLeg[cls] * rankPayMult * m_aterratge. Decisio d'en Marc: la nota tambe compta quan l'avio no es teu.
+- Als vols de contracte, el pagament es contractFeePerLeg[cls] * rankPayMult * m_aterratge. Decisio del projecte: la nota tambe compta quan l'avio no es teu.
 - Un accident fixa el tram d'aterratge al de nota 0.
 
 ## 2026-09-26 - B3: desgast per dia d operacio
@@ -55,7 +57,7 @@ L'agent puja la seva branca (git push -u origin <branca>) i obre el PR contra de
 - L'endorsement de vent creuat fort (crosswind) no te rang minim: rank 'student' a BALANCE.endorsements.
 
 ## 2026-09-26 - Baixar de rang no treu habilitacions
-Un pilot que baixa de rang conserva les habilitacions i els endorsements que ja tenia. canFlyType no mira el rang. Decisio d'en Marc.
+Un pilot que baixa de rang conserva les habilitacions i els endorsements que ja tenia. canFlyType no mira el rang. Decisio del projecte.
 
 ## 2026-09-26 - A4: sortida de pista (excursion)
 Sortida de pista (excursion): rolloutMetres > touchdown.remaining.
@@ -85,31 +87,31 @@ Els rangs dels avions nous son al bloc expect de cada avio a aircraft-data.js, c
 F4+F5 canvien la fisica a proposit. snapshot.json es regenera amb node test/snapshot.test.js --update: nomes s'hi afegeixen les entrades dels sis avions nous, i els 108 valors de tp, nb, wb i jumbo son identics.
 
 ## 2026-09-26 - Noms propis i panell DEV fora d'i18n
-Decisio d'en Marc. Els noms propis (noms de companyia pintats a les lliurees, com Velanta Regional o Solquer, i noms dels models d'avio) no passen per i18n perque no es tradueixen. El panell DEV no es interficie de jugador i queda fora de l'abast d'i18n; a mes, core/ no pot importar d'i18n/ (seccio 3 d'ENGINEERING.md), i els noms que mostra el panell surten de Harness.run, a core/.
+Decisio del projecte. Els noms propis (noms de companyia pintats a les lliurees, com Velanta Regional o Solquer, i noms dels models d'avio) no passen per i18n perque no es tradueixen. El panell DEV no es interficie de jugador i queda fora de l'abast d'i18n; a mes, core/ no pot importar d'i18n/ (seccio 3 d'ENGINEERING.md), i els noms que mostra el panell surten de Harness.run, a core/.
 
 ## 2026-09-27 - B5: preus d'ocasio de referencia
-Proposats per en Marc. BALANCE.usedPrice, en euros: commuter 350.000, tpShort 1.100.000, tp 1.800.000, rj 4.500.000, nbShort 6.500.000, nb 8.000.000, nbStretch 10.000.000, wb 22.000.000, wbEr 25.000.000, jumbo 30.000.000.
+Proposats pel projecte. BALANCE.usedPrice, en euros: commuter 350.000, tpShort 1.100.000, tp 1.800.000, rj 4.500.000, nbShort 6.500.000, nb 8.000.000, nbStretch 10.000.000, wb 22.000.000, wbEr 25.000.000, jumbo 30.000.000.
 
 ## 2026-09-27 - B5: financament dels avions
 30 % d'entrada i la resta en quotes constants per vol, mai pel pas del temps. Interes per vol 0,004, el mateix que el credit inicial. Termini final: 340 vols (BALANCE.financing; era 260 abans del calibratge robust). Ho calcula career/finance.js.
 
 ## 2026-09-27 - B5: quotes dels prestecs fora de K*r
-Decisio d'en Marc. Les quotes dels prestecs es paguen del cash tal qual, fora de K*r: el preu d'un avio es en euros reals. Divergencia de docs/DESIGN.md, que posa el financament entre els costos del tram (C): computeFlightResult encara accepta financePerFlight, pero el harness no el fa servir.
+Decisio del projecte. Les quotes dels prestecs es paguen del cash tal qual, fora de K*r: el preu d'un avio es en euros reals. Divergencia de docs/DESIGN.md, que posa el financament entre els costos del tram (C): computeFlightResult encara accepta financePerFlight, pero el harness no el fa servir.
 
 ## 2026-09-27 - B5: termini del credit inicial
-Decisio d'en Marc. El credit inicial (250.000 EUR) te el mateix termini que el financament dels avions: BALANCE.startingLoan.termFlights = 260 (ara 340), un valor propi del startingLoan. Una prova de balance.test.js comprova que coincideixen.
+Decisio del projecte. El credit inicial (250.000 EUR) te el mateix termini que el financament dels avions: BALANCE.startingLoan.termFlights = 260 (ara 340), un valor propi del startingLoan. Una prova de balance.test.js comprova que coincideixen.
 
 ## 2026-09-27 - B5: rangs calibrats
-Decisio d'en Marc. Llindars d'XP calibrats amb el harness perque cada rang que demana una classe arribi a +-5 vols del moment en que hi ha diners per a l'entrada: private 650, commercial 1.250, atpl 1.950, captain 2.450, instructor 3.200 (uns 60 vols despres del jumbo). Amb la llavor per defecte: private al vol 51 (diners al 53), commercial al 93 (96), atpl al 144 (146), captain al 188 (193), instructor al 253 (jumbo + 60). (Valors substituits pel calibratge robust sobre 50 llavors, vegeu l'entrada corresponent.) Sense multiplicador d'XP per classe d'avio. Divergencia de docs/DESIGN.md: la taula de rangs deia 500, 2.000, 6.000, 15.000 i 35.000.
+Decisio del projecte. Llindars d'XP calibrats amb el harness perque cada rang que demana una classe arribi a +-5 vols del moment en que hi ha diners per a l'entrada: private 650, commercial 1.250, atpl 1.950, captain 2.450, instructor 3.200 (uns 60 vols despres del jumbo). Amb la llavor per defecte: private al vol 51 (diners al 53), commercial al 93 (96), atpl al 144 (146), captain al 188 (193), instructor al 253 (jumbo + 60). (Valors substituits pel calibratge robust sobre 50 llavors, vegeu l'entrada corresponent.) Sense multiplicador d'XP per classe d'avio. Divergencia de docs/DESIGN.md: la taula de rangs deia 500, 2.000, 6.000, 15.000 i 35.000.
 
 ## 2026-09-27 - B5: XP perduda per accident
-Decisio d'en Marc. BALANCE.crash.xpLoss passa de [200, 1500] a [35, 230]: l'accident mes lleu costa l'XP d'uns 3 vols mitjans i el mes greu la d'uns 20 (11,5 XP per vol mitja al harness). (Ara [30, 200], vegeu el calibratge robust sobre 50 llavors.)
+Decisio del projecte. BALANCE.crash.xpLoss passa de [200, 1500] a [35, 230]: l'accident mes lleu costa l'XP d'uns 3 vols mitjans i el mes greu la d'uns 20 (11,5 XP per vol mitja al harness). (Ara [30, 200], vegeu el calibratge robust sobre 50 llavors.)
 
 ## 2026-09-27 - B5: preu de referencia calibrat per classe
-Decisio d'en Marc. BALANCE.demand.pRef passa de 90 + 0,60 EUR/km a 260 + 0,09 EUR/km: puja les rutes curtes i evita que el llarg radi es dispari. Amb K = 2,6 els cinc tipus base queden dins del +-20 % de la Corba objectiu (net per vol sol / amb tripulacio completa): Mi-9 -19 % / -18 %, G-72 +19 % / +15 %, M-200 +18 % / +19 %, L-900 -11 % / -13 %, T-4 -16 % / -11 %. rotation.cap no s'ha tocat. (Ara 290 + 0,10 EUR/km amb K = 2,4, vegeu el calibratge robust sobre 50 llavors.)
+Decisio del projecte. BALANCE.demand.pRef passa de 90 + 0,60 EUR/km a 260 + 0,09 EUR/km: puja les rutes curtes i evita que el llarg radi es dispari. Amb K = 2,6 els cinc tipus base queden dins del +-20 % de la Corba objectiu (net per vol sol / amb tripulacio completa): Mi-9 -19 % / -18 %, G-72 +19 % / +15 %, M-200 +18 % / +19 %, L-900 -11 % / -13 %, T-4 -16 % / -11 %. rotation.cap no s'ha tocat. (Ara 290 + 0,10 EUR/km amb K = 2,4, vegeu el calibratge robust sobre 50 llavors.)
 
 ## 2026-09-27 - B5: cost de contractacio de tripulacio
-Decisio d'en Marc. BALANCE.crewHireCost, cost unic per tripulacio i classe: commuter 42.000, turboprop 60.000, narrowbody 180.000, widebody 200.000. El sou no hi es: ja es dins dels costos del tram multiplicats pel factor de rotacio. Ho calcula career/crew.js (maxCrew, hireCrew). Divergencia de docs/DESIGN.md, que no posava preu a contractar tripulacio. Amb la llavor per defecte la primera tripulacio arriba al vol 10. (Ara commuter 44.000 i narrowbody 100.000, vegeu el calibratge robust sobre 50 llavors.)
+Decisio del projecte. BALANCE.crewHireCost, cost unic per tripulacio i classe: commuter 42.000, turboprop 60.000, narrowbody 180.000, widebody 200.000. El sou no hi es: ja es dins dels costos del tram multiplicats pel factor de rotacio. Ho calcula career/crew.js (maxCrew, hireCrew). Divergencia de docs/DESIGN.md, que no posava preu a contractar tripulacio. Amb la llavor per defecte la primera tripulacio arriba al vol 10. (Ara commuter 44.000 i narrowbody 100.000, vegeu el calibratge robust sobre 50 llavors.)
 
 ## 2026-09-27 - B5: reserva del harness en contractar tripulacio
 El jugador simulat contracta una tripulacio per vol, nomes si no compra la classe seguent i si despres de pagar-la li queda cash per a 1,2 contractacions mes (HARNESS.crewReserve).
@@ -118,25 +120,25 @@ El jugador simulat contracta una tripulacio per vol, nomes si no compra la class
 Correccio: aquesta entrada deia que el calibratge complia a partir d'una sola llavor (la per defecte: K 2,6, termini de 260 vols, salts de 53, 43, 50 i 47 vols, 4,0 % de vols en negatiu, actes de 12,3, 10,9 i 14,9 h). Una sola llavor no ho demostra: amb la nota truncada de debo, la mateixa llavor ja no complia, i sobre 50 llavors tampoc. Els valors finals son els de l'entrada "B5: calibratge robust sobre 50 llavors": K 2,4 i termini de 340 vols.
 
 ## 2026-09-27 - B5: criteris nous de la seccio 10
-Decisio d'en Marc. Per a aquest calibratge, cada salt de classe entre 40 i 50 vols (en comptes de 25 a 35) i cap acte de mes de 16 h de joc (en comptes de 12). Com que la primera tripulacio ha d'arribar entre el vol 8 i el 12, nomes el primer salt (commuter -> turbohelix) pot arribar fins a 55 vols. Es mante menys del 12 % de vols en negatiu.
+Decisio del projecte. Per a aquest calibratge, cada salt de classe entre 40 i 50 vols (en comptes de 25 a 35) i cap acte de mes de 16 h de joc (en comptes de 12). Com que la primera tripulacio ha d'arribar entre el vol 8 i el 12, nomes el primer salt (commuter -> turbohelix) pot arribar fins a 55 vols. Es mante menys del 12 % de vols en negatiu.
 
 ## 2026-09-27 - B5: suposicions acceptades del harness
-Decisio d'en Marc. El harness no fa servir weatherBonus (0), no simula accidents ni asseguranca, deixa la reputacio a 50 i no mesura l'ultim acte, que queda obert. Vola els tipus base (Mi-9, G-72, M-200, L-900, T-4), cadascun en una rotacio d'aeroports fixa.
+Decisio del projecte. El harness no fa servir weatherBonus (0), no simula accidents ni asseguranca, deixa la reputacio a 50 i no mesura l'ultim acte, que queda obert. Vola els tipus base (Mi-9, G-72, M-200, L-900, T-4), cadascun en una rotacio d'aeroports fixa.
 
 ## 2026-09-27 - B5: cicles del dia d'operacio
-Els ~15 cicles del dia d'operacio de wear.js i el factor de rotacio maxim (2,7) no es corresponen. Decisio d'en Marc: no es toca ara; es revisa a l'E2.
+Els ~15 cicles del dia d'operacio de wear.js i el factor de rotacio maxim (2,7) no es corresponen. Decisio del projecte: no es toca ara; es revisa a l'E2.
 
 ## 2026-09-27 - B5: draw() a career/rng.js
 draw(state) de la seccio 7 d'ENGINEERING.md viu a src/career/rng.js, exportat pel barrel de career/. El harness economic en treu tot l'atzar.
 
 ## 2026-09-27 - B5: criteri robust de la seccio 10
-Decisio d'en Marc. El criteri del B5 es mesura sobre 50 llavors (npm run balance --seeds 50), no sobre una. Mediana: cada salt de classe entre 40 i 50 vols (el primer fins a 55), primera tripulacio entre el vol 8 i el 12, menys del 12 % de vols en negatiu, cap acte de mes de 16 h de joc. Percentil 90 (rang mes proper): cap salt de mes de 60 vols, cap acte de mes de 20 h. Els cinc tipus base dins del +-20 % de la Corba objectiu (amb tots els vols de les 50 llavors). Un salt o un acte que no arriba dins dels 200 vols compta com a infinit. Substitueix els criteris d'una sola llavor de l'entrada "B5: criteris nous de la seccio 10", que es mantenen com a llindars de la mediana.
+Decisio del projecte. El criteri del B5 es mesura sobre 50 llavors (npm run balance --seeds 50), no sobre una. Mediana: cada salt de classe entre 40 i 50 vols (el primer fins a 55), primera tripulacio entre el vol 8 i el 12, menys del 12 % de vols en negatiu, cap acte de mes de 16 h de joc. Percentil 90 (rang mes proper): cap salt de mes de 60 vols, cap acte de mes de 20 h. Els cinc tipus base dins del +-20 % de la Corba objectiu (amb tots els vols de les 50 llavors). Un salt o un acte que no arriba dins dels 200 vols compta com a infinit. Substitueix els criteris d'una sola llavor de l'entrada "B5: criteris nous de la seccio 10", que es mantenen com a llindars de la mediana.
 
 ## 2026-09-27 - B5: la nota del harness es una normal truncada
 La nota d'aterratge del jugador simulat es torna a tirar fins que cau a [0, 100] (normal truncada, com diu la seccio 10), en comptes de retallar-la. Amb el retall, els vols que sortien per sobre de 100 treien 100 (textbook, 55 XP) i l'XP mitjana per vol era 11,5; amb la truncada es 9,9.
 
 ## 2026-09-27 - B5: calibratge robust sobre 50 llavors
-Decisio d'en Marc: nomes es toquen rangs, crash.xpLoss, K, el termini dels prestecs, demand.pRef i crewHireCost. Valors finals:
+Decisio del projecte: nomes es toquen rangs, crash.xpLoss, K, el termini dels prestecs, demand.pRef i crewHireCost. Valors finals:
 - K 2,4 (era 2,6).
 - Termini del financament i del credit inicial: 340 vols (era 260).
 - demand.pRef: 290 + 0,10 EUR/km (era 260 + 0,09). LEBL-LEPA -> 310,20 EUR.
@@ -168,7 +170,7 @@ evaluateCheckRide(ratingId, facts) diu si s'ha passat i prou. Donar l'habilitaci
 
 ## 2026-09-27 - C3+C4: D1-D8, encarrec de l escola de vol
 
-Decisions d'en Marc per a C3 (executor de llicons) i C4 (ajudes de l escola).
+Decisions del projecte per a C3 (executor de llicons) i C4 (ajudes de l escola).
 
 - D1. Mentre no existeixi el C5, les llicons es llancen des del panell DEV
   (nomes IS_DEV). El panell DEV queda fora d'i18n (decisio ja existent, vegeu
@@ -200,7 +202,7 @@ Decisions d'en Marc per a C3 (executor de llicons) i C4 (ajudes de l escola).
   com a dades a lessons.js (aids: { flareBar: true, autoDebrief: true }), mai
   com a condicio al codi.
 
-Consequencia tecnica no discutida per en Marc, nomes registrada: Game.scoreReport
+Consequencia tecnica no discutida pel propietari del projecte, nomes registrada: Game.scoreReport
 (index.html) no exposava els punts maxims de cada component (sink, g, zone,
 center, attitude), nomes els aconseguits. app/debrief.js els necessita per
 decidir "OK" / "Needs improvement" (regla 8 de la seccio 0: no copiar-los a
@@ -208,9 +210,9 @@ ma). S'ha afegit un camp ptsMax al retorn de scoreReport amb els mateixos
 coeficients que ja hi havia a la formula (35, 15, 20, 20, 10): cap fisica
 nova, nomes exposar el que ja hi era. Vegeu la descripcio del PR.
 
-## 2026-09-28 - C3: correccions de l escola de vol despres de la prova d en Marc
+## 2026-09-28 - C3: correccions de l escola de vol despres de la prova al navegador
 
-En Marc ha provat les llicons al navegador (PR #22). Decisions:
+El propietari del projecte ha provat les llicons al navegador (PR #22). Decisions:
 
 - Llico 5 (maneuvers): en superar la desviacio d altitud del criteri
   altDeviationMaxFt (200 ft a lessons.js), l intent suspen a l instant, sense
@@ -245,7 +247,7 @@ contrari. La instantania de lesson-run.js te tres camps opcionals nous
 
 ## 2026-09-29 - C3: llicons 1 a 5 per donar-les per acabades
 
-En Marc ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
+El propietari del projecte ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
 
 - Tecla de reinici de camera: Home. Torna la camera a l angle (i la
   distancia i el zoom) per defecte, a totes les cameres exteriors, a la
@@ -276,7 +278,7 @@ En Marc ha provat les llicons 1 a 5 (PR #22) i demana aquests canvis:
 
 ## 2026-09-29 - C3: llicons 6 a 8 i darrers canvis per tancar C3+C4
 
-En Marc ha provat les 8 llicons (PR #22). Decisions:
+El propietari del projecte ha provat les 8 llicons (PR #22). Decisions:
 
 - Reinici de camera: un doble clic amb el boto dret torna la camera a l angle
   per defecte, igual que Home, que es mante com a alternativa. El navegador no
@@ -310,7 +312,7 @@ En Marc ha provat les 8 llicons (PR #22). Decisions:
   d intercepcio i l altura, amb el mateix trimAircraft (cap fisica nova); per
   defecte, Free Flight, no canvia.
 
-- D6, circuit a 1.000 ft (decisio d en Marc, correccio posterior del mateix
+- D6, circuit a 1.000 ft (decisio del projecte, correccio posterior del mateix
   dia): el tram de vent en cua de la llico 6 passa de 1.500 a 1.000 ft AGL
   (LESSONS['circuit'].spawn.aglFt), l altura habitual del circuit d avions
   petits, per poder arribar als 10 s estabilitzat baixant a un ritme normal.
@@ -345,7 +347,7 @@ Consequencies tecniques, nomes registrades:
 
 ## 2026-09-29 - Fisica: amortiment del tren, potencia del Mi-9 i estabilitat del X-90
 
-Tres problemes que en Marc ha trobat jugant. Mesures abans i despres amb
+Tres problemes que el propietari del projecte ha trobat jugant. Mesures abans i despres amb
 tools/estabilitat.mjs (taules a la descripcio del PR).
 
 - Criteri d amortiment del tren: gairebe critic. Un cop i com a molt un petit
@@ -392,7 +394,7 @@ tools/estabilitat.mjs (taules a la descripcio del PR).
   M-200. Geometria 3D sense tocar (F6).
 - Observacio, sense canvi: el X-90 fa un 40 % mes de velocitat de balanceig per
   unitat d aleto que el M-200 (envergadura curta). Es potencia de control, no
-  estabilitat; si en Marc el troba massa viu, es Clda.
+  estabilitat; si el propietari del projecte el troba massa viu, es Clda.
 
 ## 2026-09-29 - Fisica: Mi-9 docil en capcineig, tren amb massa real i informe d aterratge
 
@@ -457,8 +459,8 @@ Seguiment del PR #24. Mesures abans i despres amb tools/estabilitat.mjs
   buit quedava a uns 3,1). Files noves al harness: contacte a 400 fpm a la
   massa maxima d aterratge i a la minima, i contacte a 800 fpm (rebots [0, 0]
   i assentament [0, 2] s: amb GEAR_REBOUND_ZETA = 0 fallen).
-- Informe d aterratge (preventiu, no reproduit): despres de dos bots, en
-  Marc no va veure ni l informe ni la pantalla d accident. Dues vies possibles:
+- Informe d aterratge (preventiu, no reproduit): despres de dos bots, el
+  propietari del projecte no va veure ni l informe ni la pantalla d accident. Dues vies possibles:
   (1) el model nomes emet 'touchdown' si les principals toquen amb
   airTime > 2, i airTime torna a 0 despres de 0,5 s amb qualsevol roda a
   terra: si el morro toca primer i s hi queda, no hi ha informe; (2) una
@@ -475,7 +477,7 @@ Seguiment del PR #24. Mesures abans i despres amb tools/estabilitat.mjs
 
 ## 2026-09-30 - C5+D1: E1-E10, graduacio, menu principal i centre d operacions
 
-Decisions d en Marc per a C5 (pantalla d escola i graduacio) i D1 (menu
+Decisions del projecte per a C5 (pantalla d escola i graduacio) i D1 (menu
 principal Free Flight / Airline, shell del centre d operacions i barra
 superior).
 
@@ -549,7 +551,7 @@ substitueix i la clau antiga surt d en.js i ca.js.
 
 ## 2026-09-30 - C5: punt de partida en graduar-se, base i copia en continuar
 
-Decisions d en Marc despres de revisar el PR #27.
+Decisions del projecte despres de revisar el PR #27.
 
 - Saldo en graduar-se. graduate deixa la partida exactament al punt de
   partida de tools/balance.mjs. La logica es una sola funcio,
@@ -574,7 +576,7 @@ Decisions d en Marc despres de revisar el PR #27.
 
 ## 2026-09-30 - D2+D5: flota, mercat d'ocasio i categories
 
-Decisions d en Marc per a D2 (Fleet) i D5 (Market).
+Decisions del projecte per a D2 (Fleet) i D5 (Market).
 
 - G1. Lloguer fora d aquest PR: va amb el D3+D4, quan hi hagi cobrament per
   vol. A la pestanya Market no surt cap boto de lloguer.
@@ -639,7 +641,7 @@ standard 1 / 1, premium 1,08 / 0,90, deluxe 1,15 / 0,80. revenueMult es
 estrictament creixent i wearMult estrictament decreixent (prova a
 balance.test.js).
 
-Harness (decisions validades per en Marc despres de la primera passada):
+Harness (decisions validades pel projecte despres de la primera passada):
 
 - Mode per defecte com fins ara: el primer avio es paga al comptat i la
   resta financats, a usedPrice, estat 100 i multiplicadors 1. La regla de G6
@@ -709,7 +711,7 @@ world/weather.js (weatherFor, toGameWeather) fa servir nomes hash2: mateixa entr
 
 ## 2026-10-01 - F1+F2: aeroports
 
-Decisions d en Marc per a F1+F2 (aeroports de les fases 1 i 2, amb
+Decisions del projecte per a F1+F2 (aeroports de les fases 1 i 2, amb
 taxiways i portes procedimentals, i desti lliure a Free Flight).
 
 - H1. Abast: fases 1 i 2, que caben a la graella actual: LEGE, LERS, LEIB,
@@ -805,7 +807,7 @@ Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
 
 ## 2026-10-01 - F1: LEGE 02/20, taula d excepcions de designacio
 
-Decisio d en Marc despres de revisar el PR #31. OurAirports te la numeracio
+Decisio del projecte despres de revisar el PR #31. OurAirports te la numeracio
 antiga de LEGE (01/19); la pista real es 02/20 (AIP i diverses fonts) i l ILS
 es al 20, com deia H3.
 
@@ -820,7 +822,7 @@ es al 20, com deia H3.
 
 ## 2026-10-01 - F1: pista d arribada del vol cronometrat de Free Flight
 
-Decisio d en Marc dins del PR #31 (mode 'route' de Free Flight). No toca la
+Decisio del projecte dins del PR #31 (mode 'route' de Free Flight). No toca la
 fisica ni test/snapshot.json.
 
 - Pista d arribada: al desti, el cap de pista amb ILS; si n hi ha diversos o
@@ -845,7 +847,7 @@ fisica ni test/snapshot.json.
 
 ## 2026-10-01 - F1: H11-H15, la pista d arribada sempre al ND
 
-Decisions d en Marc despres de provar el PR #31 al navegador. Substitueixen
+Decisions del projecte despres de provar el PR #31 al navegador. Substitueixen
 l entrada anterior sobre la pista d arribada (en conserven el que encaixa).
 Volant cap a LESU, les muntanyes tapaven l aeroport i el ND no deia ni on era
 la pista ni per on enfilar-la; en mode ruta la linia magenta anava d aeroport
@@ -905,14 +907,14 @@ Com s ha aplicat:
   la 21 (vent del sud-oest). El tram directe fins al FF21 creua relleu natural
   de 2.700-2.800 m entre 13 i 8 nm abans del FF, per sobre d un descens de
   3 graus cap al FF; seguint la ruta tal com la defineix H14 no s hi pot
-  baixar. Proposta per a en Marc (no implementada perque canvia H14): un punt
+  baixar. Proposta per al propietari del projecte (no implementada perque canvia H14): un punt
   intermedi sobre l eix allargat mes enlla del FF (per exemple a 20 nm), o
   que H11 descarti un cap si el tram fins al seu FF no es pot volar des de
   l origen.
 
 ## 2026-10-01 - F1: H16, punt intermedi, caps no volables i terreny natural
 
-Decisio d en Marc per resoldre el Prat -> La Seu 21, i condicio sobre el
+Decisio del projecte per resoldre el Prat -> La Seu 21, i condicio sobre el
 terreny: res de crateres ni formes artificials.
 
 - H16. Altitud minima de cada punt: FF a l alcada de la senda de 3 graus a
@@ -970,7 +972,7 @@ Com s ha aplicat:
 
 ## 2026-10-01 - Market en targetes i ofertes
 
-Decisions d en Marc.
+Decisions del projecte.
 
 - K1. Ofertes. A cada llista del mercat, entre offers.count[0] i
   offers.count[1] anuncis (triats amb el mateix flux derivat de G4, sense
@@ -1015,7 +1017,7 @@ Detalls d implementacio (sense canviar cap contracte):
 
 ## 2026-10-01 - F1: H17, MEA per tram, sostre de l avio i vent de cua
 
-Decisio d en Marc: no es toca el terreny del Pirineu. En lloc d aixo,
+Decisio del projecte: no es toca el terreny del Pirineu. En lloc d aixo,
 altitud minima per tram, com les cartes reals.
 
 - H17a. Altitud minima de tram (MEA): el punt mes alt del terreny dins d 1 nm
@@ -1047,7 +1049,7 @@ Com s ha aplicat:
   te cap ruta volable (amb la vall d H16, el tram IF -> FF ho es a tots).
 - Prat -> La Seu amb vent del sud-oest: la 21, per l IF21. MEA del tram
   origen -> IF21: 11.100 ft (terreny mes alt 3.053 m, mostrejat cada 100 m al
-  llarg i 33 punts de costat a costat). En Marc esperava una MEA de mes de
+  llarg i 33 punts de costat a costat). El propietari del projecte esperava una MEA de mes de
   11.333 ft: aquell nombre sortia del terreny d abans de la vall d H16, que ha
   rebaixat la zona de l IF21. Amb el turbohelix (creuer de la taula 11.000
   ft) es vola a 11.100 ft i el ND mostra MEA 11100; amb el jet (15.000 ft) no

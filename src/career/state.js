@@ -115,11 +115,20 @@ function checkState(s, err) {
     need(err, 'pilot.name', p.name, isString);
     need(err, 'pilot.xp', p.xp, isFiniteNumber);
     need(err, 'pilot.rank', p.rank, isNonEmptyString);
+    if (isNonEmptyString(p.rank) && !BALANCE.ranks.some(r => r.key === p.rank)) {
+      err.push('pilot.rank: ' + p.rank + ' no existeix a BALANCE.ranks');
+    }
     need(err, 'pilot.ratings', p.ratings, isStringArray);
+    if (isStringArray(p.ratings)) {
+      p.ratings.forEach((r, i) => {
+        if (!Object.hasOwn(BALANCE.ratings, r)) err.push('pilot.ratings[' + i + ']: ' + r + ' no existeix a BALANCE.ratings');
+      });
+    }
     need(err, 'pilot.endorsements', p.endorsements, isStringArray);
     need(err, 'pilot.logbook', p.logbook, isObjectArray);
   }
 
+  const loanIds = new Set();
   const c = s.company;
   if (!isObject(c)) err.push('company: no es un objecte');
   else {
@@ -130,7 +139,7 @@ function checkState(s, err) {
     need(err, 'company.bases', c.bases, isIcaoArray);
     if (!Array.isArray(c.loans)) err.push('company.loans: no es una llista');
     else {
-      const ids = new Set();
+      const ids = loanIds;
       c.loans.forEach((l, i) => {
         const at = 'company.loans[' + i + ']';
         if (!isObject(l)) { err.push(at + ': no es un objecte'); return; }
@@ -146,11 +155,15 @@ function checkState(s, err) {
     need(err, 'company.lifetimeRevenue', c.lifetimeRevenue, Number.isInteger, 'ha de ser un enter d euros');
   }
 
+  const seen = new Set();
   if (!Array.isArray(s.fleet)) err.push('fleet: no es una llista');
   else {
-    const seen = new Set();
     s.fleet.forEach((a, i) => {
       checkAirframe(a, 'fleet[' + i + ']', err);
+      const loanId = isObject(a) && isObject(a.finance) ? a.finance.loanId : null;
+      if (isNonEmptyString(loanId) && !loanIds.has(loanId)) {
+        err.push('fleet[' + i + '].finance.loanId: el prestec ' + loanId + ' no existeix a company.loans');
+      }
       if (isObject(a) && isNonEmptyString(a.reg)) {
         if (seen.has(a.reg)) err.push('fleet[' + i + '].reg: matricula repetida ' + a.reg);
         seen.add(a.reg);
@@ -171,7 +184,7 @@ function checkState(s, err) {
   const d = s.dispatch;
   if (!isObject(d)) err.push('dispatch: no es un objecte');
   else if (!Array.isArray(d.queue)) err.push('dispatch.queue: no es una llista');
-  else d.queue.forEach((o, i) => checkOrder(o, 'dispatch.queue[' + i + ']', err));
+  else d.queue.forEach((o, i) => checkOrder(o, 'dispatch.queue[' + i + ']', err, seen));
 
   if (!isObject(s.clock)) err.push('clock: no es un objecte');
   else need(err, 'clock.minute', s.clock.minute, isNatural);
@@ -238,13 +251,14 @@ function checkAirframe(a, at, err) {
   if (a.tier !== undefined) need(err, at + '.tier', a.tier, isTier);
 }
 
-function checkOrder(o, at, err) {
+function checkOrder(o, at, err, regs) {
   if (!isObject(o)) { err.push(at + ': no es un objecte'); return; }
   need(err, at + '.id', o.id, isNonEmptyString);
   need(err, at + '.reg', o.reg, isNonEmptyString);
+  if (isNonEmptyString(o.reg) && !regs.has(o.reg)) err.push(at + '.reg: ' + o.reg + ' no existeix a la flota');
   need(err, at + '.from', o.from, isIcao);
   need(err, at + '.to', o.to, isIcao);
-  need(err, at + '.crewId', o.crewId, isString);
+  need(err, at + '.crewId', o.crewId, isNonEmptyString);
   need(err, at + '.departMinute', o.departMinute, isNatural);
   need(err, at + '.ticketPrice', o.ticketPrice, Number.isInteger, 'ha de ser un enter d euros');
   need(err, at + '.rngCounter', o.rngCounter, isNatural);

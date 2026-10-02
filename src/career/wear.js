@@ -39,15 +39,12 @@
  */
 
 import { BALANCE } from './balance.js';
+import { eur, lookup } from './util.js';
 
 const SECONDS_PER_HOUR = 3600;
 const CONDITION_MAX = 100;         // escala de condicio 0..100
 const CONDITION_DECIMALS = 10;     // arrodoniment a 1 decimal
 
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
-
-/** euros enters; converteix -0 en 0 */
-const eur = x => Math.round(x) || 0;
 
 /** retalla a [0, 100] i arrodoneix a 1 decimal */
 const cond = x => Math.round(Math.min(CONDITION_MAX, Math.max(0, x)) * CONDITION_DECIMALS) / CONDITION_DECIMALS;

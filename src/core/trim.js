@@ -2,7 +2,7 @@
  * estabilitzat.
  * ORIGEN: linies 865-905 de l'original (SECTION 5).
  *
- * EXPORTA: FDM_KEYS FLAT_ENV_AIR fdmSnapshot fdmRestore trimAircraft
+ * EXPORTA: FLAT_ENV_AIR fdmSnapshot fdmRestore trimAircraft
  *          (FLAT_ENV_AIR s exporta perque el harness el fa servir)
  *
  * IMPORTA: ./constants.js, ./atmosphere.js, ./flight-model.js
@@ -11,7 +11,7 @@
 import { DEG, clamp } from './constants.js';
 import { tasFromCas } from './atmosphere.js';
 import { SURF } from './flight-model.js';
-export const FDM_KEYS = ['n', 'e', 'h', 'vn', 've', 'vd', 'q0', 'q1', 'q2', 'q3', 'p', 'q', 'r', 'fuel', 'mass', 'time', 'elev', 'ail', 'rud',
+const FDM_KEYS = ['n', 'e', 'h', 'vn', 've', 'vd', 'q0', 'q1', 'q2', 'q3', 'p', 'q', 'r', 'fuel', 'mass', 'time', 'elev', 'ail', 'rud',
   'steer', 'flapPos', 'gearPos', 'spoilerPos', 'brakeAct', 'trim', 'revPos', 'airTime', 'groundTime', 'wow', 'mainWow', 'noseWow', 'stalled', 'distGround', 'groundSpoilerArmed', 'alphaDot', '_alphaPrev'];
 export function fdmSnapshot(f) { const s = {}; for (const k of FDM_KEYS) s[k] = f[k]; s.eng = f.eng.map(e => e.x); s.legs = f.legs.map(l => [l.so, l.comp]); s.td = f.touchdown; return s; }
 export function fdmRestore(f, s) { for (const k of FDM_KEYS) f[k] = s[k]; f.eng.forEach((e, i) => e.x = s.eng[i]); f.legs.forEach((l, i) => { l.so = s.legs[i][0]; l.comp = s.legs[i][1]; }); f.touchdown = s.td; f.events.length = 0; }
