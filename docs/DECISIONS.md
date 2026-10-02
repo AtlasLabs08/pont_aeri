@@ -1060,3 +1060,73 @@ Com s ha aplicat:
   dues proves d H11 de manera esperada: amb 30 kt de cua el cap amb ILS ja no
   es tria, i LERS amb 20 kt de 070 aterra al 07. Avis: freeFlight.tailwind
   ("Tailwind 12 kt on landing.").
+
+## 2026-10-02 - Terreny real, fase A
+
+Decisio del projecte: el relleu procedimental se substitueix pel relleu real
+de Copernicus GLO-30 a tot el mapa, a la graella G de 250 m.
+
+- TA-1. Font: Copernicus GLO-30. tools/terrain-build.mjs baixa les
+  tessel.les que cobreixen G (DEM i mascara d aigua WBM), remostreja per
+  lon/lat amb la projeccio del joc (ll de geo.js) i escriu
+  public/terrain/terrain-250.bin: alcada (Int16, m) i distancia signada a la
+  costa (Int16, m, retallada a +-30 km), comprimit. El fitxer i l script son
+  al repositori; el joc mai no fa cap peticio a un servei extern.
+- TA-2. Costa: la WBM de GLO-30 hi es i es bona als deltes del Llobregat i
+  de l Ebre (el Fangar, els Alfacs i la Banya hi surten). Mar = WBM 1
+  (oceà); els llacs i els rius son terra amb la seva alcada. COAST de geo.js
+  nomes es el dibuix de la costa al ND.
+- TA-3. Fora el relleu inventat: heightProc, heightRaw, el soroll del
+  relleu, RIDGES, VALLEYS, el pla del delta i _airportShape (les valls del
+  #31). Es queden URBAN i ROADS.
+- TA-4. Aeroports: plataforma plana a A.elev a tot el rectangle (bounds) i
+  transicio smoothstep de 700 m fins al terreny real (_airportBlend, ara a
+  tots els aeroports). Res de valls ni excavacions.
+- TA-5. GLO-30 es un model de superficie: a les zones URBAN, obertura de 3x3
+  cel.les i suavitzat de 3x3, que nomes rebaixa i com a molt 25 m (l alcada
+  d un edifici; una obertura pura deixava Montjuic a 105 m).
+- TA-6. Lectura: alcada bilineal; normals amb diferencies centrades d un
+  estencil igual a la cel.la (World.slopeAt, +-125 m), continues sobre la
+  bilineal. A la zona de Photo, 30 m.
+- TA-7. Photo continua igual: on hi ha el seu DEM de 5 m, mana el seu.
+- TA-8. Pantalla de credits al menu principal amb les atribucions de
+  Copernicus DEM, de l ICGC (escenari de LEBL) i d OurAirports. El text de
+  Copernicus es el de la decisio: la pagina de llicencia no era accessible
+  des de l entorn de treball.
+- TA-9. Les comprovacions del #31 (senda amb 300 ft de marge, H16, MEA
+  d H17) es mantenen sobre el terreny real. Decisio del projecte, despres de
+  veure la taula de caps:
+  - Tolerancia de 20 m als primers 1.300 m del llindar: el terreny hi pot
+    quedar fins a 20 m per sobre de l elevacio de l aeroport (NEAR_THR_M,
+    NEAR_THR_TOL_M a route.js, glidePathMargin). La resta, igual.
+  - Senda per cap: angle a les dades de l aproximacio (APPROACH_DATA a
+    airports.js, glideAngle a ils.js), 3 graus per defecte. LESU 03 a 3,6
+    graus. El pilot automatic de core/ (sense canvis) llegeix ILS.GS, que
+    nav() deixa a l angle del cap; l inici en final, el HUD i els PAPI
+    tambe.
+  - Un cap que no compleix la senda queda sense aproximacio directa
+    (en.direct = false): H11 no el tria si n hi ha un altre. Cap aeroport no
+    es queda sense cap.
+
+Com s ha aplicat:
+
+- 18 tessel.les (les de mar obert no existeixen al bucket); alcada de -5 a
+  3.289 m; fitxer d 1,42 MB.
+- Cims, maxim a 1,5 km: Puigmal 2.881 m (real 2.913), Turo de l Home
+  1.658 m (1.706), Montserrat 1.153 m (1.236; la mitjana de 250 m retalla les
+  agulles).
+- La tolerancia de 20 m s aplica, literalment, fins als 1.300 m. La senda
+  queda 300 ft per sobre de l elevacio a uns 1.325 m del llindar, i entre
+  els dos punts el limit torna a ser l elevacio de l aeroport: set caps hi
+  fallen per poc. Caps sense aproximacio directa: LEBL 20 (-4,7 m), LEPA
+  06L (-0,1 m) i 24L (-2,7 m), LERS 07 (-0,7 m), LEMH 19 (-0,6 m), LELL 13
+  (-18,9 m), LEDA 31 (-15,2 m), tots a 1.325 m, i LESU 21 (124 m per
+  sobre de la senda a 9,6 km, el FF i el tram IF -> FF tampoc). Una prova
+  (test/terrain-real.test.js) comprova que tots els de la llista fallen i
+  tots els altres compleixen.
+- Rutes amb les regles del #31: Prat -> Reus, LERS 25 directa al FF (MEA
+  2.900 ft), sense vent i amb vent del sud-oest; Prat -> la Seu, LESU 03
+  directa al FF (MEA 6.100 ft), sense vent i amb vent del sud-oest (amb 12
+  kt de 210, 12 kt de cua: el 21 no te aproximacio directa).
+- Proves de propietats (test/terrain-real.test.js) en lloc de la fixture
+  d alcades de LEBL i LEPA del #31, que s esborra.
