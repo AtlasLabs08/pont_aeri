@@ -50,7 +50,7 @@ index.html            Seccions 8c–20: tot el que toca el navegador.
 src/core/             Simulador headless, sense window/document/THREE
   constants.js  noise.js  atmosphere.js  aircraft-data.js  model-geom.js
   flight-model.js  trim.js  autopilot.js  harness.js
-  flight-recorder.js  landing-watch.js
+  flight-recorder.js  landing-watch.js  ground-throttle.js
   index.js            barrel: la resta del joc importa d'aquí
 src/world/            Món headless
   geo.js  airports.js  terrain.js  ils.js  taxi.js  route.js  weather.js
@@ -693,6 +693,7 @@ recull les que tenen una funció especial:
 | `test/platform.test.js` | `platform/` amb dobles injectats a `globalThis` |
 | `test/balance-harness.test.js` | el harness econòmic (`tools/balance.mjs`) és determinista |
 | `test/terrain-real.test.js` | terreny real (fase A, TA-1 a TA-9), proves de propietats: el fitxer es descodifica igual d'un `Uint8Array` i d'un `ArrayBuffer`, aeroports plans a `A.elev` sense excavacions, mar i terra on toca (també als deltes), cims dins del marge de 250 m, rebaixa urbana ≤ 25 m, normals contínues, Photo mana, senda de cada cap amb aproximació directa (`glidePathMargin`) i caps sense aproximació directa que de debò no la compleixen. Les proves que necessiten el terreny el carreguen amb `test/helpers/terrain.js` |
+| `test/ground-throttle.test.js` | palanca a terra (`core/ground-throttle.js`, `docs/DECISIONS.md` 02/10/2026): transicions del reverse a ralenti (el de cada avió), limitador de taxi (no passa de 30 kt amb el gas a fons, tampoc amb vent de cua; desactivat torna a accelerar), avís als 3 s i cablejat a `index.html` llegit com a text |
 | `test/smoke.test.js` | els mòduls carreguen i exporten el que toca; un `FlightModel` avança amb valors plausibles. **Actualitza'l** quan s'afegeixi un export que la resta del joc necessiti o canviï el nombre d'avions |
 
 ### Dades d'aeroports: `tools/airports-ourairports.mjs`
@@ -814,7 +815,7 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 ## 12. Etapes
 
 Estat real de cada tasca. El detall de cada decisió és a `docs/DECISIONS.md`;
-aquí només hi ha què existeix i què falta. **Total de proves vigent: 1862 proves**
+aquí només hi ha què existeix i què falta. **Total de proves vigent: 1934 proves**
 (`npm test`); no s'apunten comptes per tasca perquè es queden vells.
 
 ### Ordre de feina (26/09)
