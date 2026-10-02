@@ -21,7 +21,7 @@ import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airlin
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
   airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
-  recoverStaleOrders, planContract, startContract, debriefModel, _resetDispatch
+  recoverStaleOrders, planContract, startContract, debriefModel, airlineClosing, AIRLINE_CONTACT_KM, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -330,5 +330,87 @@ describe('debriefModel (D3D4-12)', () => {
     assert.equal(m.route.location, 'LEGE');
     assert.equal(m.arrivalDeltaMin, 2);
     assert.ok(m.xp.progress >= 0 && m.xp.progress <= 1);
+  });
+});
+
+describe('tancament del vol d Airline un cop ha tocat terra (revisio del PR #36)', () => {
+  const lebl = () => AIRPORTS.LEBL;
+  /** punt del mon a la pista de LEBL, a 600 m del llindar del primer cap; side = metres de costat respecte de l eix */
+  const onLebl = (side = 0) => {
+    const A = lebl(), en = A.allEnds[0];
+    const w = A.toWorld(en.thr[0] + en.dir[0] * 600 - en.dir[1] * side, en.thr[1] + en.dir[1] * 600 + en.dir[0] * side);
+    return { e: w[0], n: w[1] };
+  };
+  const grass = () => {           // al costat de la pista, fora de paviment i a menys de 5 km
+    for (const side of [120, 160, 220, 300, 400]) { const p = onLebl(side); if (!airportAt(p.e, p.n)) return p; }
+    throw new Error('cap punt fora de paviment al costat de la pista');
+  };
+  const sea = () => ({ e: lebl().e + 30000, n: lebl().n - 30000 });
+
+  test('sense contacte: sortir abandona (cancel); si no, res', () => {
+    assert.equal(airlineClosing({ leaving: true, contact: null, stopped: false, onGround: false, pavedAt: null }).action, 'cancel');
+    assert.equal(airlineClosing({ leaving: false, contact: null, stopped: true, onGround: true, pavedAt: 'LEBL' }).action, 'none');
+  });
+
+  test('amb contacte, rodant i sense sortir: encara no es tanca', () => {
+    assert.equal(airlineClosing({ leaving: false, contact: onLebl(), stopped: false, onGround: true, pavedAt: 'LEBL' }).action, 'none');
+  });
+
+  test('(a) contacte a la pista i aturat a la pista: es tanca a l aeroport, sense excursion', () => {
+    assert.deepEqual(airlineClosing({ leaving: false, contact: onLebl(), stopped: true, onGround: true, pavedAt: 'LEBL' }),
+      { action: 'close', landedAt: 'LEBL', stoppedOffPavement: false });
+  });
+
+  test('(b) contacte a la pista i el pilot surt abans d aturar-se: es tanca, no s abandona', () => {
+    assert.deepEqual(airlineClosing({ leaving: true, contact: onLebl(), stopped: false, onGround: true, pavedAt: 'LEBL' }),
+      { action: 'close', landedAt: 'LEBL', stoppedOffPavement: false });
+  });
+
+  test('(a) aturat fora de paviment dins dels 5 km: es tanca a l aeroport mes proper, stoppedOffPavement', () => {
+    const p = grass();
+    assert.equal(airportAt(p.e, p.n), null);
+    assert.deepEqual(airlineClosing({ leaving: false, contact: onLebl(), stopped: true, onGround: true, pavedAt: null }),
+      { action: 'close', landedAt: 'LEBL', stoppedOffPavement: true });
+    assert.deepEqual(airlineClosing({ leaving: false, contact: p, stopped: true, onGround: true, pavedAt: null }),
+      { action: 'close', landedAt: 'LEBL', stoppedOffPavement: true });
+  });
+
+  test('(b) fora de paviment dins dels 5 km i el pilot surt: el mateix tancament', () => {
+    assert.deepEqual(airlineClosing({ leaving: true, contact: grass(), stopped: false, onGround: true, pavedAt: null }),
+      { action: 'close', landedAt: 'LEBL', stoppedOffPavement: true });
+  });
+
+  test('contacte a 5 km o mes de qualsevol aeroport: accident, aturat o sortint', () => {
+    assert.ok(Math.hypot(sea().e - lebl().e, sea().n - lebl().n) >= AIRLINE_CONTACT_KM * 1000);
+    for (const leaving of [false, true]) {
+      assert.deepEqual(airlineClosing({ leaving, contact: sea(), stopped: !leaving, onGround: true, pavedAt: null }),
+        { action: 'crash', landedAt: null, stoppedOffPavement: false });
+    }
+  });
+
+  test('del tancament a la liquidacio: fora de paviment despres de tocar la pista, excursion; tocant fora de pista, nomes offRunway', () => {
+    initDispatch();
+    for (const onRunway of [true, false]) {
+      _resetAirline(); _resetFlight(); _resetDispatch(); initDispatch();
+      updateCareer(careerWithCommuter());
+      setFlightLauncher(() => {});
+      const p = planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 });
+      startOwnFlight(p);
+      const airline = activeAirlineFlight().airline;
+      const d = airlineClosing({ leaving: true, contact: grass(), stopped: false, onGround: true, pavedAt: null });
+      const rec = new FlightRecorder();
+      rec.start(recorderMeta({ aircraftTypeId: 'commuter', from: 'LEBL', to: 'LERS', fuelKg: p.fuelKg, airline }));
+      fly(rec, 600);
+      const base = record();
+      rec.touchdown({ ...base.touchdown, onRunway, rwy: onRunway ? 'LEBL 06L' : null, gNow: base.touchdown.g }, { score: 70, pts: base.touchdown.pts });
+      rec.rollout(500);
+      const r = rec.finish(finishExtras(airline, rec.block, d.landedAt, d.stoppedOffPavement));
+      assert.equal(r.stoppedOffPavement, true);
+      assert.equal(r.landedAt, 'LEBL');
+      onFlightFinished(r);
+      const ids = pendingDebrief().damage.items.map(i => i.id);
+      assert.deepEqual(ids, onRunway ? ['excursion'] : ['offRunway'], 'onRunway ' + onRunway);
+      assert.equal(currentCareer().fleet[0].location, 'LEBL');
+    }
   });
 });
