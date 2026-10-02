@@ -53,7 +53,8 @@ src/core/             Simulador headless, sense window/document/THREE
   flight-recorder.js  landing-watch.js
   index.js            barrel: la resta del joc importa d'aquí
 src/world/            Món headless
-  geo.js  airports.js  terrain.js  ils.js  index.js
+  geo.js  airports.js  terrain.js  ils.js  taxi.js  index.js
+  airport-data.js     generat per tools/airports-ourairports.mjs (F1), no editar a mà
 test/
   smoke.test.js       els mòduls carreguen i exporten el que toca
   harness.test.js     cada fila del harness dins del seu rang
@@ -648,6 +649,26 @@ Tot amb `node:test`, com les existents. `npm test` les corre totes.
 | `test/snapshot.test.js` | física idèntica. Vegeu la regla 2 de §0 |
 | `test/career/*.test.js` | NOU. Una prova per funció pública de `career/` |
 | `test/recorder.test.js` | NOU. `FlightRecorder` alimentat amb un `FlightModel` real |
+| `test/airport-data.test.js` | `world/airport-data.js` (F1): pistes, caps amb id i rumb, elevació, coordenades dins de la graella, mida i portes, ILS |
+| `test/airports.test.js` | aeroports nous (F1+F2): `AIRPORT_ORDER`, ILS per cap, camí de cada porta a cada cap a les tres dificultats, res fora de `bounds`, cap taxiway ni plataforma sobre la pista fora dels connectors, `RUNWAY_SCALE.hard` només a pistes de 2.000 m o més |
+| `test/arrival-end.test.js` | `arrivalEnd` i `flightApproach`: pista d'arribada dels vols de Free Flight (cap amb ILS, vent de cara, pista més llarga; ruta, inici en final, la resta) i si se'n sintonitza l'aproximació |
+| `test/rnp-autopilot.test.js` | el pilot automàtic acobla una RNP com un ILS, sobre caps reals (LESU 21, LELL 13, LERS 25) |
+| `test/final-fix.test.js` | `finalFix`: FF a 10 nm sobre l'eix de tots els caps, la senda al FF 300 ft per sobre del terreny i el tram IF -> FF volable a tots els caps nous |
+| `test/route.test.js` | `world/route.js` (H16, H17): punts d'aproximació i altituds mínimes, MEA, trams volables, ruta per l'IF, sostre de l'avió, vent de cua i caps no volables descartats |
+| `test/terrain-airports.test.js` | terreny dels aeroports nous: senda de 3° 300 ft per sobre del terreny fins a 10 km i fins a l'inici en final de Free Flight (10 nm), pendent de la vall ≤ 12 % i res més abrupte que el natural per sobre del 25 %; LEBL i LEPA idèntics a `test/fixtures/terrain-lebl-lepa.json` (**no es regenera**) |
+
+### Dades d'aeroports: `tools/airports-ourairports.mjs`
+
+`node tools/airports-ourairports.mjs [dir]`. No forma part de `npm test` i és
+l'únic lloc del projecte que fa peticions de xarxa: baixa `runways.csv` i
+`airports.csv` d'OurAirports (o els llegeix de `dir`) i reescriu
+`src/world/airport-data.js`, que es comiteja. El joc i les proves només
+llegeixen el fitxer generat. Regles a la capçalera de l'script i a
+`docs/DECISIONS.md` (01/10/2026, H2); el que no surt d'OurAirports (ILS, noms
+curts, terreny) és la taula `EXTRA` de l'script, les designacions que
+OurAirports té antigues (LEGE 02/20) són a `IDS_OVERRIDE`, i la mida surt de
+`BALANCE.airportSize`. Per afegir un aeroport: `ORDER` i `EXTRA`, i tornar-lo
+a córrer.
 
 ### Estabilitat del tren i qualitats de vol: `tools/estabilitat.mjs`
 
@@ -808,8 +829,9 @@ A3 i A4 són dos PR separats: el primer no toca `index.html`, el segon sí.
 
 | Id | Tasca | Nota |
 | --- | --- | --- |
-| F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | Pistes reals d'OurAirports |
-| F2 | Taxiways i portes procedimentals | Tots menys LEBL i LEPA |
+| F1 | Més aeroports a `world/airports.js` (fases 1–3 del disseny) | **Fet** per a les fases 1 i 2 amb F2 (`docs/DECISIONS.md`, 01/10/2026, H1-H10); la fase 3 és F1b. LEGE, LERS, LEIB, LEMH, LELL, LEDA i LESU surten de `world/airport-data.js`, generat per `tools/airports-ourairports.mjs` amb les pistes reals d'OurAirports. ILS per cap (`en.ils`, només als caps marcats dels aeroports nous; LEBL i LEPA, tots). Terreny propi (`World._airportShape`): anell pla per aeroport, con del 20 % i passadís d'aproximació de 20 km amb el fons 120 m sota la senda; LEBL i LEPA idèntics. `RUNWAY_SCALE.hard` només a pistes de 2.000 m o més. Escenografia mandrosa (es construeix a menys de 60 km i s'allibera a més de 80 km) i caps sense ILS sense ALS ni marques de zona de toc. Free Flight amb destí lliure (`Game.opts.dest`, `selAlt` segons la distància, text amb distància, rumb i pista d'arribada, `bearingDeg` nova a `world/geo.js`); pista d'arribada de qualsevol vol de Free Flight amb `arrivalEnd` i `flightApproach` (`world/ils.js`: el cap amb ILS, o el de més vent de cara, o la pista més llarga; H11), aproximació a tots els caps (`en.kind` 'ILS' o 'RNP', mateixa interfície `ILS.nav`, el pilot automàtic l'acobla sense tocar `core/`; H12), sintonitzada des de l'enlairament en ruta i des de l'inici en final (H13), ruta del ND fins al FF (`finalFix`, 10 nm sobre l'eix) i el llindar, pista d'arribada i FF sempre al ND amb la distància i el temps fins al FF (H14), un estil per a cada cosa al ND i llegenda (H15), punt intermedi (IF a 20 nm), altituds mínimes i caps no volables descartats (`world/route.js`, H16), MEA per tram, sostre de l'avió i vent de cua màxim de 10 kt (H17). Terreny dels aeroports nous: una vall natural al llarg de l'eix (`VALLEY` a `world/terrain.js`, vores al 8 %, sense cràters ni formes circulars). 162 proves noves (19 a `airport-data.test.js`, 78 a `airports.test.js`, 23 a `terrain-airports.test.js`, 11 a `arrival-end.test.js`, 3 a `rnp-autopilot.test.js`, 16 a `final-fix.test.js`, 10 a `route.test.js`, 2 a `geo.test.js`), 1839 en total |
+| F2 | Taxiways i portes procedimentals | **Fet** amb F1, tots menys LEBL i LEPA: `proceduralDef` (`world/airports.js`) posa la plataforma al costat de l'ARP, amb terminal, torre, hangars i portes per mida (petit 3, mitjà 6, gran 10, de `BALANCE.airportSize` via l'script); `makeAirport` genera les taxiways de la pista ja escalada: petit, un connector i es rodola per la pista (tram `backtrack` a la xarxa, no es pinta); mitjà o més, paral·lela amb connectors als dos caps i al mig. `taxiRoute` troba camí de cada porta a cada cap |
+| F1b | Fase 3: LEVC, LEAL, LECH, LFMP | Cal ampliar la graella (`World.G`, ara fins a n = −300 km) i la costa: `COAST.mainland` de `geo.js` acaba a lat 39,95, i el relleu (`World.heightRaw`, abans dins de `heightProc`) tracta com a illa tot el que és a n < −120000, on cauen València, Alacant i Castelló. Després, mateix pipeline: `ORDER` i `EXTRA` de `tools/airports-ourairports.mjs` |
 | F3 | `world/weather.js` amb llavor | **Fet.** `weatherFor` i `toGameWeather`, purs, sense cablejar al joc (contracte a §7). Patrons locals i estacionals com a taula de dades. 14 proves a `test/weather.test.js` i 1 de puresa a `purity.test.js`, 1656 en total |
 | F4 | Migjorn Mi-9 i Xaloc X-90 a `aircraft-data.js` | **Fet.** Ids `commuter` i `rj`. Rangs al bloc `expect` de cada avió. `smoke.test.js` a deu avions i `snapshot.json` regenerat amb F5, al mateix PR: els valors dels quatre avions existents no canvien. 839 proves en total |
 | F5 | Variants G-42, G-72F, M-100, M-300, L-900ER, T-4F | **Fet** amb F4, sense G-72F ni T-4F (ajornats fins que hi hagi contractes de càrrega). Ids `tpShort`, `nbShort`, `nbStretch` i `wbEr` |

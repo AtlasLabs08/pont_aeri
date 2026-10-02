@@ -707,6 +707,267 @@ Extres del mateix PR:
 ## 2026-10-01 - F3: meteo procedimental pura, sense cablejar
 world/weather.js (weatherFor, toGameWeather) fa servir nomes hash2: mateixa entrada, mateixa sortida. Distribucio objectiu: vent apreciable un 20 %, condicions dures (severity >= 0,7) un 6,7 %. Els patrons locals son una taula de dades. Game no es toca: encara no accepta rafegues, visibilitat ni sostre, i Game.updateGusts continua amb Math.random.
 
+## 2026-10-01 - F1+F2: aeroports
+
+Decisions d en Marc per a F1+F2 (aeroports de les fases 1 i 2, amb
+taxiways i portes procedimentals, i desti lliure a Free Flight).
+
+- H1. Abast: fases 1 i 2, que caben a la graella actual: LEGE, LERS, LEIB,
+  LEMH, LELL, LEDA, LESU. La fase 3 (LEVC, LEAL, LECH, LFMP) necessita
+  ampliar la graella i la costa (geo.js acaba a lat 39,95, i el relleu tracta
+  com a illa n < -120000): va a una tasca nova, F1b (seccio 12).
+- H2. Dades. tools/airports-ourairports.mjs baixa runways.csv i airports.csv
+  d OurAirports (davidmegginson/ourairports-data, branca main) i genera
+  src/world/airport-data.js, comitejat, amb la capcalera "generat per
+  tools/airports-ourairports.mjs, no editar a ma". El joc i les proves no fan
+  mai cap peticio de xarxa. Fora les pistes amb closed=1; peus a metres; si
+  falta el rumb, es calcula de les coordenades dels dos llindars; ids amb
+  sufix L/R/C via ids. El que no surt d OurAirports (ILS, noms curts, terreny)
+  es una taula de l script.
+- H3. ILS per cap de pista, camp nou nomes als aeroports nous: LEGE 20, LERS
+  25, LEIB 24, LEMH 01, LEDA 31; LELL i LESU, cap. ils.js nomes sintonitza
+  els caps marcats. LEBL i LEPA es queden com ara (tots els caps amb ILS).
+- H4. Marques i llums segons el cap. Amb ILS: com ara (precisio, ALS de
+  900 m). Sense ILS: llindar, designacio, eix, punt de mira i PAPI, sense ALS
+  ni marques de zona de toc. LEBL i LEPA no canvien.
+- H5. Taxiways, aprons i portes procedimentals (F2), de la pista i de
+  BALANCE.airportSize: plataforma al costat de l eix on cau el punt de
+  referencia (ARP) d airports.csv (si cau sobre l eix, a l esquerra del
+  primer cap); mida petita, un connector de la plataforma a la pista (es
+  rodola per la pista); mitjana o mes, paral.lela amb connectors als dos caps
+  i un al mig; plataforma, terminal, torre i portes al costat triat, portes
+  per mida al fitxer generat (petit 3, mitja 6, gran 10); bounds calculats
+  perque tot hi capiga. Proves: cami de cada porta a cada cap, res fora de
+  bounds, cap solapament amb la pista fora dels connectors, com a minim una
+  porta.
+- H6. Terreny. Radi d aplanament per aeroport (dades) als aeroports nous;
+  LEBL i LEPA amb el mateix terreny d ara. Per a cada cap nou, la senda de
+  3 graus fins a 10 km del llindar passa com a minim 300 ft per sobre del
+  terreny, i el pendent maxim de la transicio de l aeroport al relleu no passa
+  del 25 %. Si el relleu no ho permet, es rebaixa en un passadis d aproximacio
+  sobre l eix allargat.
+- H7. Dificultat: RUNWAY_SCALE.hard nomes a pistes de 2.000 m o mes. Les mes
+  curtes (LESU, LELL) no s escurcen.
+- H8. Rendiment: l escenografia d un aeroport es construeix a menys de 60 km
+  de l avio i s allibera (geometria i materials) a mes de 80 km. Es mesura al
+  Chromium headless abans i despres (descripcio del PR).
+- H9. Free Flight: selector de desti (tots els aeroports menys l origen). El
+  mode route funciona amb qualsevol parell: desti a Game.opts.dest, ruta del
+  ND directa de l origen al desti, selAlt segons la distancia (taula al lloc
+  del valor fix) i text del mode amb la distancia i el rumb calculats. Els
+  best continuen per aeroport.
+- H10. LEBL i LEPA no canvien en res: geometria, fotografia de LEBL,
+  llicons, startingBase, test/threshold.test.js i test/taxi.test.js. No es
+  toca test/snapshot.json.
+
+Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
+
+- LEGE: vegeu l entrada seguent (02/20, ILS al 20).
+- world/ no pot importar career/ (seccio 3): la mida surt de
+  BALANCE.airportSize a l script (tools/ si que pot) i queda escrita al
+  fitxer generat (size, layout, gates). Una prova comprova que coincideix.
+- Mides com a dades: small -> petit, regional -> mitja, major i hub -> gran.
+- Aeroports petits: la xarxa de rodatge inclou el tram de pista (backtrack,
+  no es pinta), perque taxiRoute arribi als dos caps rodant per la pista. Al
+  llindar s arriba encarat al reves i cal girar a la capcalera (no hi ha
+  plataforma de gir: BACKLOG).
+- Les taxiways dels aeroports nous es generen a makeAirport a partir de la
+  pista ja escalada (els connectors cauen als caps a qualsevol dificultat);
+  plataforma, portes, edificis i bounds son fixos. La plataforma es centra a
+  l ARP, sense sortir del tram de pista que queda a hard.
+- Terreny dels aeroports nous (world/terrain.js, _airportShape): nomes
+  retalla el relleu natural amb superficies de pendent acotat, aixi el pendent
+  de la transicio queda limitat per construccio: anell pla de flatR m (petit
+  400, mitja 600, gran 800), despres un con del 20 %, i un passadis en V per
+  cap amb el fons 120 m sota la senda i les parets al 20 %. Sense passadis cap
+  dels set compleix la senda (LESU, 1.353 m per sota; LEDA, 248 m; fins i tot
+  LEMH, per 2,6 m): tots en porten. El passadis arriba a 20 km, no a 10,
+  perque l inici en final de Free Flight es a 10 nm i a LESU el relleu hi
+  tornava a passar per sobre de la senda.
+- Prova de la senda: entre el llindar i el punt on la senda es a 300 ft
+  (uns 1,3 km) el terreny no pot passar de l elevacio de l aeroport; d alla a
+  10 km, 300 ft sota la senda. A l eix i a 150 m a cada costat.
+- Prova del pendent: es transicio una parella de punts veins on el terreny
+  difereix del natural (heightRaw) als dos punts: com a molt 25 %. A la vora,
+  la transicio no pot ser mes abrupta que el relleu natural de la mateixa
+  parella. Els pics llunyans que el con retalla (Pirineu a 13 km de LESU) son
+  relleu natural escarpat i no compten com a transicio. El fons del mar no
+  compta.
+- LEBL i LEPA: alcades identiques a 7.442 mostres preses abans del canvi
+  (test/fixtures/terrain-lebl-lepa.json). No es regenera.
+- Ciutat: urbanAt no posa edificis a menys de 150 m del rectangle dels
+  aeroports nous (LELL es dins de Sabadell).
+- Free Flight: dropSpawnOpts no cal tocar-lo. Nomes esborra els camps spawn*
+  que deixa una llico; dest es una opcio de Free Flight com airport, i les
+  llicons no la fan servir. Altitud del vol cronometrat: fins a 80 km, 8.000 /
+  6.000 ft (jet / turbohelix); fins a 150 km, 15.000 / 11.000; fins a 260 km,
+  24.000 / 17.000 (LEBL-LEPA, com abans); mes, 30.000 / 20.000.
+
+## 2026-10-01 - F1: LEGE 02/20, taula d excepcions de designacio
+
+Decisio d en Marc despres de revisar el PR #31. OurAirports te la numeracio
+antiga de LEGE (01/19); la pista real es 02/20 (AIP i diverses fonts) i l ILS
+es al 20, com deia H3.
+
+- tools/airports-ourairports.mjs te una taula IDS_OVERRIDE d excepcions de
+  designacio: nomes canvia els ids dels caps; la geometria (llindars, rumb,
+  llargada, amplada) continua sortint d OurAirports. Si una excepcio ja no
+  coincideix amb cap pista oberta d OurAirports, l script falla.
+- LEGE: 01/19 -> 02/20, ILS al 20. airport-data.js regenerat.
+- Comprovades la resta de designacions contra les reals: LERS 07/25, LEIB
+  06/24, LEMH 01/19, LEDA 13/31, LELL 13/31, LESU 03/21. Totes coincideixen
+  amb OurAirports: LEGE es l unica excepcio. Una prova fixa les set.
+
+## 2026-10-01 - F1: pista d arribada del vol cronometrat de Free Flight
+
+Decisio d en Marc dins del PR #31 (mode 'route' de Free Flight). No toca la
+fisica ni test/snapshot.json.
+
+- Pista d arribada: al desti, el cap de pista amb ILS; si n hi ha diversos o
+  cap, el que tingui mes vent de cara amb el vent del vol; si no hi ha vent,
+  el de la pista mes llarga. Funcio pura arrivalEnd(A, windDir, windKt) a
+  world/ils.js, amb proves (test/arrival-end.test.js). Empat: el primer cap
+  de l aeroport. Sense vent vol dir windKt <= 0.
+- Ruta del ND: final de la pista de sortida (amb el nom de l origen) -> punt
+  d aproximacio final a 10 nm del llindar d arribada, sobre l eix allargat,
+  amb el nom FF + pista (FF25) -> llindar (RW25). Els noms es dibuixen com
+  els de la resta de punts de ruta.
+- ILS: en mode 'route', l ILS sintonitzat es el de la pista d arribada des de
+  l enlairament, no el de l aeroport mes proper. El PFD en mostra el nom, el
+  curs i la distancia encara que no hi hagi senyal (mes enlla de 25 nm); les
+  agulles surten quan n hi ha. Si la pista d arribada no te ILS (LELL, LESU,
+  o un cap sense ILS), no se sintonitza cap ILS en tot el vol. Fora del mode
+  'route', com ara (auto-sintonia del cap amb que estas alineat).
+- Les distancies a l aeroport de desti (Game.destEnd) prefereixen l ILS
+  sintonitzat i despres la pista d arribada.
+- UI.modeText afegeix la pista d arribada ("LERS 25") i s actualitza si es
+  canvia el vent al menu.
+
+## 2026-10-01 - F1: H11-H15, la pista d arribada sempre al ND
+
+Decisions d en Marc despres de provar el PR #31 al navegador. Substitueixen
+l entrada anterior sobre la pista d arribada (en conserven el que encaixa).
+Volant cap a LESU, les muntanyes tapaven l aeroport i el ND no deia ni on era
+la pista ni per on enfilar-la; en mode ruta la linia magenta anava d aeroport
+a aeroport, l ILS sintonitzat era el de l aeroport mes proper, i la linia
+continua (ruta) i la discontinua (localitzador) no s entenien. Objectiu: que
+el pilot sapiga sempre, nomes mirant el ND, on es la pista d arribada i per on
+l ha d enfilar, encara que no la vegi. Sense tocar la fisica de
+core/flight-model.js ni test/snapshot.json.
+
+- H11. Pista d arribada (arrivalEnd i flightApproach, world/ils.js, purs): al
+  desti, el cap amb ILS; si n hi ha diversos o cap, el de mes vent de cara amb
+  el vent del vol; sense vent, el de la pista mes llarga (empat: el primer
+  cap). En mode 'route', la del desti; a l inici "en final", la de la propia
+  arrencada; a la resta de Free Flight, la de l aeroport triat.
+- H12. Aproximacio a tots els caps: en.kind 'ILS' als caps de H3 i 'RNP' a la
+  resta dels aeroports nous; LEBL i LEPA, tots 'ILS'. Mateixa interficie que
+  l ILS (ILS.nav: curs i senda de 3 graus); el PFD mostra "ILS 25" o "RNP 21"
+  amb les mateixes escales. Marques i llums segueixen H4. El pilot automatic
+  segueix la RNP a traves de world/ils.js sense tocar core/ (llegeix nomes la
+  geometria de nav).
+- H13. Sintonia: en mode 'route', des de l enlairament, l aproximacio de la
+  pista d arribada; a l inici "en final", la de la pista de l arrencada. Fora
+  d aixo, com abans (l auto-sintonia, que nomes tria ILS).
+- H14. Ruta del ND: en mode 'route', final de la pista de sortida -> FF (10 nm
+  sobre l eix allargat de la pista d arribada, nom "FF" + designacio) ->
+  llindar; a l inici "en final" i a Free Flight sense ruta, FF -> llindar. La
+  pista d arribada i el FF es dibuixen sempre. Al costat del desti, la
+  distancia i el temps fins al FF. UI.modeText diu la pista d arribada.
+- H15. Un estil per a cada cosa al ND: ruta magenta continua i gruixuda; curs
+  sintonitzat cian discontinu, del llindar fins mes enlla del FF, amb
+  l etiqueta "ILS 25" o "RNP 21" a l extrem; pista d arribada en verd amb el
+  nom; FF en rombe amb el nom. Cap altra linia magenta. Llegenda petita amb
+  els quatre elements.
+
+Com s ha aplicat:
+
+- Mode 'route' amb inici en final: mana la ruta (la pista d arribada es la
+  del desti).
+- Llicons: res no canvia. Game.step nomes fa la sintonia d H13 fora de les
+  llicons, el ND de les llicons no rep la ruta ni la pista d arribada, i la
+  distancia a la pista no prefereix la pista d arribada. Comprovat al
+  Chromium amb les llicons ils, landing i taxi: el mateix ILS i el mateix cap
+  que a dev.
+- El curs cian i el nom al PFD surten encara que no hi hagi senyal (mes
+  enlla de 25 nm); les agulles, nomes amb senyal.
+- La linia del rumb seleccionat del pilot automatic (abans magenta
+  discontinua) passa a gris; el requadre del rumb seleccionat continua
+  magenta, perque no es una linia.
+- Textos nous de la llegenda a i18n (nd.legend.*). Els identificadors (FF21,
+  RW21, RNP 21) i les unitats (NM, MIN) son els del ND.
+- Terreny: conca de 4 km (terrain.corridor.basin) al voltant del FF de cada
+  cap nou, 120 m sota la senda al FF i parets al 20 %. Al Prat -> La Seu (03,
+  sense vent) el tram final creuava la paret del passadis a 1.854 m, per
+  sobre del FF (1.793 m), i el gir al FF entrava a les parets. Amb la conca,
+  el turbohelix hi aterra seguint la ruta.
+- Limit conegut, sense resoldre: Prat -> La Seu quan la pista d arribada es
+  la 21 (vent del sud-oest). El tram directe fins al FF21 creua relleu natural
+  de 2.700-2.800 m entre 13 i 8 nm abans del FF, per sobre d un descens de
+  3 graus cap al FF; seguint la ruta tal com la defineix H14 no s hi pot
+  baixar. Proposta per a en Marc (no implementada perque canvia H14): un punt
+  intermedi sobre l eix allargat mes enlla del FF (per exemple a 20 nm), o
+  que H11 descarti un cap si el tram fins al seu FF no es pot volar des de
+  l origen.
+
+## 2026-10-01 - F1: H16, punt intermedi, caps no volables i terreny natural
+
+Decisio d en Marc per resoldre el Prat -> La Seu 21, i condicio sobre el
+terreny: res de crateres ni formes artificials.
+
+- H16. Altitud minima de cada punt: FF a l alcada de la senda de 3 graus a
+  10 nm; IF a l alcada de la senda allargada a 20 nm. Un tram es volable si la
+  recta entre l altitud del punt anterior i la del seguent (a l origen,
+  l altitud de creuer de la ruta) queda com a minim 1.000 ft per sobre del
+  terreny, amb 1 nm de marge a cada costat. Ruta en mode 'route': origen -> FF
+  -> llindar si origen -> FF es volable; si no, origen -> IF -> FF -> llindar
+  si origen -> IF i IF -> FF ho son. Si cap de les dues no ho es, H11 descarta
+  aquell cap i tria el seguent amb la mateixa regla; si cap cap no ho es, el de
+  mes vent de cara, amb un avis a la consola en mode DEV. Al ND, al costat de
+  l IF i del FF, l altitud minima de pas en ft. Funcions pures a
+  world/route.js.
+- Terreny: si cal modificar-lo, ha de semblar natural: forma allargada
+  seguint l eix d aproximacio (com una vall), mai circular; vores amples i
+  suaus (pendent maxim del 12 % a la transicio), barrejades amb el soroll del
+  relleu, sense vores rectes ni fons plans visibles. El mateix criteri per al
+  passadis d H6. LEBL i LEPA identics.
+
+Com s ha aplicat:
+
+- Altitud minima al ND: l alcada de la senda arrodonida cap amunt a 100 ft
+  (IF03 9100, FF03 5900): es un minim, no s arrodoneix avall.
+- Origen: el final de la pista de sortida, a l altitud de creuer de la taula
+  del vol cronometrat (Game.ROUTE_ALT, la que ja feia servir selAlt; jet o
+  turbohelix).
+- "La mateixa regla" d H11 vol dir tornar a aplicar arrivalEnd als caps que
+  queden (si en queda un sol amb ILS, aquest; si no, vent de cara; sense vent,
+  la pista mes llarga). Sense cap cap volable: el de mes vent de cara sense
+  mirar l ILS (sense vent, la pista mes llarga).
+- Terreny dels aeroports nous: en lloc del con del 20 % (que a LESU i LEDA
+  feia un crater al voltant de l aeroport), del passadis en V (franja recta
+  amb el fons pla) i de la conca circular del FF, una sola vall al llarg de
+  l eix de pista (world/terrain.js, VALLEY): fons a l elevacio de l aeroport
+  al costat de la pista i, cap enfora, per sota de la senda (130 m a prop,
+  340 m a partir de 9 km, perque el tram IF -> FF tingui els 1.000 ft) fins a
+  22 nm, on fa un capcal; amplada que creix amb la distancia i ondula amb
+  soroll; vores al 8 % amb arrencada suau i unio suau amb el relleu natural;
+  relleu de soroll al fons (fins a 80 m, escala de 6 km, nomes rebaixa). Les depressions al voltant de l aeroport es
+  reomplen amb el mateix pendent. Pendent de la transicio (dins la vall):
+  maxim 11,4 % (LESU); la prova en mira el 12 % a 55 km de cada aeroport.
+  On la vall s uneix amb relleu natural mes escarpat, mai no hi es mes
+  abrupta que el natural.
+- La conca del FF ja no cal: amb la vall i l IF, totes les rutes que es fan
+  servir son volables sense ella. S ha tret.
+- Prat -> La Seu amb vent del sud-oest: la 21 no es volable per cap de les
+  dues rutes. El tram IF -> FF de la 21 si que ho es (1.135 ft), pero el tram
+  origen -> IF21 creua relleu natural del Pirineu fora de l eix d aproximacio
+  (l IF21 es a 37 km al nord-est de LESU): marge de -333 ft amb el creuer del
+  turbohelix (11.000 ft) i de 646 ft amb el del jet (15.000 ft). Fer-lo
+  volable voldria dir rebaixar el massis fora de l eix, que es justament una
+  forma artificial. Per H16, la 21 es descarta i es fa servir la 03 per l IF
+  (IF03 -> FF03), que es volable. Amb 12 kt de vent del sud-oest, la 03 te
+  uns 12 kt de vent de cua (pista de 1.270 m).
+
 ## 2026-10-01 - Market en targetes i ofertes
 
 Decisions d en Marc.
@@ -751,3 +1012,51 @@ Detalls d implementacio (sense canviar cap contracte):
   d una oferta ("K2: un avio comprat en oferta es ven per com a molt
   purchasePrice * (1 - sellFee)"); restaurat, torna a passar.
 
+
+## 2026-10-01 - F1: H17, MEA per tram, sostre de l avio i vent de cua
+
+Decisio d en Marc: no es toca el terreny del Pirineu. En lloc d aixo,
+altitud minima per tram, com les cartes reals.
+
+- H17a. Altitud minima de tram (MEA): el punt mes alt del terreny dins d 1 nm
+  a cada costat del tram, mes 1.000 ft, arrodonit cap amunt a 100 ft. El tram
+  origen -> IF (o origen -> FF) es vola a max(creuer de la taula, MEA), i la
+  comprovacio d H16 fa servir aquesta altitud. Un cap nomes es descarta si la
+  MEA d algun dels seus trams supera el sostre de servei de l avio.
+- H17b. Al ND, al mig de cada tram on la MEA es mes alta que el creuer de la
+  taula, "MEA 11100" amb l estil del nom dels punts. UI.modeText diu
+  l altitud de creuer que toca.
+- H17c. Vent de cua maxim per aterrar: 10 kt (MAX_TAILWIND_KT). A H11, un cap
+  amb mes vent de cua nomes es tria si no n hi ha cap altre d utilitzable, i
+  llavors UI.modeText ho avisa.
+
+Com s ha aplicat:
+
+- Sostre de servei: limits.ceiling d aircraft-data.js, que ja hi era per als
+  deu avions (25.000 ft els turbohelixs; 39.800 a 45.100 ft els jets). No cal
+  cap dada nova ni tocar la fisica.
+- Com es vola el primer tram: mai per sota de la MEA, i s arriba al punt
+  (IF o FF) a max(altitud minima del punt, MEA). Aixi el tram queda 1.000 ft
+  per sobre del terreny per construccio. La recta literal d H16 des de la MEA
+  a l origen fins a l altitud minima de l IF baixava per sota de la MEA abans
+  d arribar-hi (al Prat -> IF21, -443 ft): no es pot volar una MEA i alhora
+  baixar-ne abans del punt. La ruta es directa si s arriba al FF a la seva
+  altitud minima (MEA <= minima del FF, per poder fer l aproximacio des del
+  FF); si no, per l IF, amb el tram IF -> FF d H16 des de l altitud
+  d arribada a l IF. Un cap es descarta si la MEA passa del sostre, o si no
+  te cap ruta volable (amb la vall d H16, el tram IF -> FF ho es a tots).
+- Prat -> La Seu amb vent del sud-oest: la 21, per l IF21. MEA del tram
+  origen -> IF21: 11.100 ft (terreny mes alt 3.053 m, mostrejat cada 100 m al
+  llarg i 33 punts de costat a costat). En Marc esperava una MEA de mes de
+  11.333 ft: aquell nombre sortia del terreny d abans de la vall d H16, que ha
+  rebaixat la zona de l IF21. Amb el turbohelix (creuer de la taula 11.000
+  ft) es vola a 11.100 ft i el ND mostra MEA 11100; amb el jet (15.000 ft) no
+  cal etiqueta.
+- MEA nomes al primer tram (origen -> IF o origen -> FF), com diu H17a. El
+  tram IF -> FF es l aproximacio per la vall i es comprova amb la regla
+  d H16.
+- Vent de cua (H17c) dins d arrivalEnd: la regla d H11 s aplica primer als
+  caps amb 10 kt de vent de cua o menys; si no n hi ha cap, a tots. Canvia
+  dues proves d H11 de manera esperada: amb 30 kt de cua el cap amb ILS ja no
+  es tria, i LERS amb 20 kt de 070 aterra al 07. Avis: freeFlight.tailwind
+  ("Tailwind 12 kt on landing.").

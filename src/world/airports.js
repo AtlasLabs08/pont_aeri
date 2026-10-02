@@ -1,18 +1,38 @@
 /* Aeroports: definicions, pistes, carrers de rodatge, portes.
  * ORIGEN: linies 1369-1465 de l'original.
  *
- * EXPORTA: RUNWAY_SCALE makeAirport setRunwayDifficulty airportPavedAt
- *          AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
+ * EXPORTA: RUNWAY_SCALE HARD_MIN_LEN_M makeAirport setRunwayDifficulty
+ *          airportPavedAt proceduralDef AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
  *
- * IMPORTA: ../core/constants.js, ./geo.js
+ * IMPORTA: ../core/constants.js, ./geo.js, ./airport-data.js
  *
- * NOTA: AIRPORT_DEFS son literals escrits a ma. Aquest es el fitxer que ha
- *       de llegir de data/airports/*.json quan facis el pipeline; makeAirport()
- *       es queda igual i nomes canvia d on venen les dades.
+ * NOTA: LEBL i LEPA son literals escrits a ma i no canvien. Els aeroports de
+ *       les fases 1 i 2 (F1+F2, docs/DECISIONS.md, 2026-10-01) surten
+ *       d airport-data.js (OurAirports) amb proceduralDef(): plataforma,
+ *       terminal, torre, portes i bounds son fixos; les taxiways es generen a
+ *       makeAirport() a partir de la pista ja escalada per la dificultat.
+ *
+ * INTERFICIE (no la canviis, ils.js, terrain.js, index.html i les proves en
+ * depenen):
+ *   en.ils    cada cap de pista: true si te ILS. def.ils (llista d ids) nomes
+ *             als aeroports nous; sense def.ils, tots els caps en tenen (H3).
+ *   en.kind   aproximacio del cap (H12): 'ILS' si en.ils, 'RNP' si no. Tots
+ *             els caps en tenen una, amb la mateixa interficie (ILS.nav).
+ *   def.terrain  { flatR, valley } nomes als aeroports nous (H6, H16).
+ *   twy.conn  true als trams de taxiway que entren a la pista (connectors).
+ *   twy.backtrack  true al tram de rodatge sobre l eix de la pista (aeroports
+ *             petits: es rodola per la pista). Es a la xarxa, no es pinta.
+ *   gate.tdir costat de la terminal en c (+1/-1) i gate.bridge (pasarel.la)
+ *             nomes als aeroports nous; LEBL i LEPA no en tenen.
+ *   A.hangars hangars dels aeroports nous: { a, c, la, lc, h }.
  */
 
 import { DEG, wrap360 } from '../core/constants.js';
 import { ll } from './geo.js';
+import { AIRPORT_DATA } from './airport-data.js';
+
+export const RUNWAY_SCALE = { easy: 1.45, normal: 1.0, hard: 0.6 };        // difficulty: very long / real / short runways
+export const HARD_MIN_LEN_M = 2000;                                          // H7: per sota, la dificultat no escurca la pista
 export function makeAirport(def, lenK) {
   const A = Object.assign({}, def); lenK = def.photo ? 1 : (lenK || 1); A.def = def; A.apronPolys = def.apronPolys || [];
   const o = ll(def.lon, def.lat); A.e = o[0]; A.n = o[1];
@@ -23,7 +43,7 @@ export function makeAirport(def, lenK) {
   A.runways = def.runways.map(r => {
     const rel = (r.hdg - def.axis) * DEG, d = [Math.cos(rel), -Math.sin(rel)];      // runway direction in (a,c); +rel = clockwise = toward -c
     // difficulty scales the runway about its centre; it may never leave the flattened airport rectangle
-    let len = r.len * lenK; const B = def.bounds, mrg = 160;
+    let len = r.len * (lenK < 1 && r.len < HARD_MIN_LEN_M ? 1 : lenK); const B = def.bounds, mrg = 160;     // H7: les pistes curtes no s escurcen
     const lim = (o, dd, lo, hi) => Math.abs(dd) < 1e-6 ? 1e9 : Math.min((hi - mrg - o) / Math.abs(dd), (o - lo - mrg) / Math.abs(dd));
     len = Math.round(Math.min(len, 2 * lim(r.a, d[0], B[0], B[1]), 2 * lim(r.c, d[1], B[2], B[3])) / 10) * 10;
     const h = len / 2, p1 = [r.a - d[0] * h, r.c - d[1] * h], p2 = [r.a + d[0] * h, r.c + d[1] * h];
@@ -34,13 +54,17 @@ export function makeAirport(def, lenK) {
     A.paved.push({ a1: p1[0] - d[0] * 60, c1: p1[1] - d[1] * 60, a2: p2[0] + d[0] * 60, c2: p2[1] + d[1] * 60, hw: r.wid / 2 + 7.5, kind: 'rwy', rw: R });
     return R;
   });
-  for (const t of def.taxiways) for (let i = 0; i + 1 < t.pts.length; i++) {
+  if (def.layout) A.taxiways = proceduralTaxiways(def, A.runways[0]);
+  for (const t of A.taxiways) for (let i = 0; i + 1 < t.pts.length; i++) {
     if (Math.hypot(t.pts[i + 1][0] - t.pts[i][0], t.pts[i + 1][1] - t.pts[i][1]) < 0.5) continue;
-    A.paved.push({ a1: t.pts[i][0], c1: t.pts[i][1], a2: t.pts[i + 1][0], c2: t.pts[i + 1][1], hw: (t.w || 30) / 2, kind: 'twy' });
+    const s = { a1: t.pts[i][0], c1: t.pts[i][1], a2: t.pts[i + 1][0], c2: t.pts[i + 1][1], hw: (t.w || 30) / 2, kind: 'twy' };
+    if (t.conn) s.conn = true;
+    if (t.backtrack) s.backtrack = true;
+    A.paved.push(s);
   }
   for (const p of def.aprons) A.paved.push({ a1: p[0], c1: p[2], a2: p[1], c2: p[2], hw: p[3] / 2, kind: 'apron' });
   for (const s of A.paved) { const dx = s.a2 - s.a1, dy = s.c2 - s.c1; s.L = Math.hypot(dx, dy); s.ux = dx / s.L; s.uy = dy / s.L; }
-  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; A.allEnds.push(en); }));
+  A.allEnds = []; A.runways.forEach(r => r.ends.forEach(en => { en.rw = r; en.ils = !def.ils || def.ils.includes(en.id); en.kind = en.ils ? 'ILS' : 'RNP'; A.allEnds.push(en); }));
   return A;
 }
 /** is the local point (a,c) on pavement? returns the segment (or apron polygon) or null */
@@ -54,6 +78,71 @@ export function airportPavedAt(A, a, c) {
     for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const ai = P[i][0], ci = P[i][1], aj = P[j][0], cj = P[j][1]; if ((ci > c) !== (cj > c) && a < (aj - ai) * (c - ci) / (cj - ci) + ai) inside = !inside; }
     if (inside) return P; }
   return null;
+}
+
+/* ---- F2: plataforma, terminal, torre, portes i taxiways procedimentals (H5) ----
+ * Tot en coordenades locals (a, c) d una pista: a al llarg de l eix, c = 0 a
+ * l eix, +c a l esquerra del primer cap. sg = costat de la plataforma: on cau
+ * el punt de referencia (ARP) respecte de l eix; si hi cau a sobre, +c.
+ * Mides en m. parallel = separacio eix de pista - eix de la paral.lela (0: cap);
+ * apronGap = de la paral.lela (o de l eix de la pista) al cantell de la
+ * plataforma; spacing = entre portes; links = enllacos plataforma-paral.lela. */
+const LAYOUT = {
+  small:  { parallel: 0,   apronGap: 110, spacing: 60, links: 1, termH: 9,  towerH: 18, hangars: 1, bridge: false },
+  medium: { parallel: 180, apronGap: 75,  spacing: 70, links: 1, termH: 14, towerH: 28, hangars: 2, bridge: true },
+  large:  { parallel: 200, apronGap: 75,  spacing: 80, links: 3, termH: 18, towerH: 40, hangars: 3, bridge: true }
+};
+const TWY_W = 23, APRON_D = 150, TERM_LC = 40, BOUNDS_MRG = 300;
+
+/** definicio d aeroport (el mateix format que LEBL i LEPA) a partir d una entrada d AIRPORT_DATA */
+export function proceduralDef(D) {
+  const P = LAYOUT[D.layout], R0 = D.runways[0];
+  const mid = r => [(r.le[0] + r.he[0]) / 2, (r.le[1] + r.he[1]) / 2];
+  const [lat, lon] = mid(R0), axis = R0.hdg, o = ll(lon, lat), ax = axis * DEG;
+  const ua = [Math.sin(ax), Math.cos(ax)], uc = [-Math.cos(ax), Math.sin(ax)];
+  const loc = (la, lo) => { const p = ll(lo, la), de = p[0] - o[0], dn = p[1] - o[1]; return [de * ua[0] + dn * ua[1], de * uc[0] + dn * uc[1]]; };
+  const runways = D.runways.map(r => { const m = loc(...mid(r)); return { hdg: r.hdg, len: r.len, wid: r.wid, a: m[0], c: m[1], ids: r.ids }; });
+  const ref = loc(D.ref[0], D.ref[1]), sg = Math.abs(ref[1]) < 1 ? 1 : Math.sign(ref[1]);
+  const hwR = R0.wid / 2, cT = P.parallel ? Math.max(P.parallel, hwR + 7.5 + 130) : 0;
+  const near = (cT || hwR) + P.apronGap, lane = near + 30, gateC = near + 95, far = near + APRON_D, termC = far + 5 + TERM_LC / 2;
+  // la plataforma, centrada a l ARP, mai fora del tram de pista que queda a la dificultat mes dificil
+  const lMin = R0.len >= HARD_MIN_LEN_M ? R0.len * RUNWAY_SCALE.hard : R0.len, lim = Math.max(0, lMin / 2 - 150);
+  const n = D.gates, apronLen = n * P.spacing + 60, a0 = Math.max(-lim, Math.min(lim, ref[0])), a1 = a0 - apronLen / 2, a2 = a0 + apronLen / 2;
+  const gates = [];
+  for (let i = 0; i < n; i++) gates.push({ a: a0 - (n - 1) / 2 * P.spacing + i * P.spacing, c: sg * gateC, hdg: wrap360(axis + 90 * sg),
+    size: D.layout === 'large' && i < 3 ? 'H' : 'M', tdir: sg, bridge: P.bridge });
+  const hangars = [];
+  for (let i = 0; i < P.hangars; i++) hangars.push({ a: a1 - 90 - i * 130, c: sg * (near + 60), la: 100, lc: 70, h: 12 + 3 * i });
+  const tower = { a: a2 + 50, c: sg * (near + 60), h: P.towerH };
+  const terminals = [{ a: a0, c: sg * termC, la: apronLen - 20, lc: TERM_LC, h: P.termH, name: 'Terminal' }];
+  const links = P.links === 1 ? [a0] : [a1 + 40, a0, a2 - 40];
+  // bounds: tot el que hi ha, mes un marge; la pista es pot allargar (facil) fins a bounds - 160
+  const rects = [[-R0.len / 2 - 60, R0.len / 2 + 60, -hwR - 7.5, hwR + 7.5], [a1, a2, sg * near, sg * far], [a0 - apronLen / 2, a0 + apronLen / 2, sg * (termC - TERM_LC / 2), sg * (termC + TERM_LC / 2)],
+    [tower.a - 10, tower.a + 10, tower.c - 10, tower.c + 10], ...hangars.map(h => [h.a - h.la / 2, h.a + h.la / 2, h.c - h.lc / 2, h.c + h.lc / 2])];
+  const lo = k => Math.min(...rects.map(r => Math.min(r[k], r[k + 1]))), hi = k => Math.max(...rects.map(r => Math.max(r[k], r[k + 1])));
+  const bounds = [lo(0) - BOUNDS_MRG, hi(0) + BOUNDS_MRG, lo(2) - BOUNDS_MRG / 2, hi(2) + BOUNDS_MRG / 2];
+  return { icao: D.icao, name: D.name, city: D.city, lat, lon, elev: D.elev, axis, ref: D.ref, size: D.size, ils: D.ils, terrain: D.terrain,
+    bounds, runways, taxiways: [], aprons: [[a1, a2, sg * (near + APRON_D / 2), APRON_D]], terminals, tower, gates, hangars,
+    layout: { sg, cT, lane, a0, a1, a2, links } };
+}
+
+/** taxiways d un aeroport procedimental per a la pista R ja escalada (makeAirport). conn = entra a la pista */
+function proceduralTaxiways(def, R) {
+  const L = def.layout, sg = L.sg, w = TWY_W, pa1 = Math.min(R.p1[0], R.p2[0]), pa2 = Math.max(R.p1[0], R.p2[0]), rc = (R.p1[1] + R.p2[1]) / 2;
+  const t = [{ pts: [[L.a1 + 20, sg * L.lane], [L.a2 - 20, sg * L.lane]], w }];            // carrer de la plataforma, davant de les portes
+  if (!L.cT) {
+    // mida petita: un connector de la plataforma a la pista; es rodola per la pista fins als caps
+    // (backtrack: el tram de pista forma part de la xarxa de rodatge, pero no es pinta)
+    t.push({ pts: [[L.a0, sg * L.lane], [L.a0, rc]], w, conn: true });
+    t.push({ pts: [[pa1, rc], [pa2, rc]], w, backtrack: true });
+    return t;
+  }
+  // mitjana o mes: paral.lela, connectors als dos caps i al mig, i els enllacos de la plataforma
+  const xs = [pa1, pa2, ...L.links];
+  t.push({ pts: [[Math.min(...xs), sg * L.cT], [Math.max(...xs), sg * L.cT]], w });
+  for (const a of [pa1, (pa1 + pa2) / 2, pa2]) t.push({ pts: [[a, sg * L.cT], [a, rc]], w, conn: true });
+  for (const a of L.links) t.push({ pts: [[a, sg * L.lane], [a, sg * L.cT]], w });
+  return t;
 }
 
 export const AIRPORT_DEFS = {
@@ -98,10 +187,10 @@ export const AIRPORT_DEFS = {
                  { a: -600, c: -200, la: 80, lc: 280, h: 15 }, { a: 50, c: -200, la: 80, lc: 280, h: 15 } ],
     tower: { a: 420, c: 0, h: 58 },
     gates: (() => { const g = []; for (const s of [1, -1]) for (const a of [-780, -420, -300, -180, 230, 340]) g.push({ a, c: s * 130, hdg: 58 - s * 90, size: (a === -780 || a === 340) ? 'H' : 'M' }); return g; })()
-  })
+  }),
+  ...Object.fromEntries(Object.keys(AIRPORT_DATA).map(id => [id, proceduralDef(AIRPORT_DATA[id])]))
 };
-export const AIRPORT_ORDER = ['LEBL', 'LEPA'];
-export const RUNWAY_SCALE = { easy: 1.45, normal: 1.0, hard: 0.6 };        // difficulty: very long / real / short runways
+export const AIRPORT_ORDER = ['LEBL', 'LEPA', ...Object.keys(AIRPORT_DATA)];
 export const AIRPORTS = {};
 /** (re)build both airports for a difficulty level. Scenery is rebuilt by AirportScenery.rebuild(). */
 export function setRunwayDifficulty(level) { for (const id of AIRPORT_ORDER) { const old = AIRPORTS[id]; AIRPORTS[id] = makeAirport(AIRPORT_DEFS[id], RUNWAY_SCALE[level] || 1); AIRPORTS[id].oldGroup = old && old.group; } }

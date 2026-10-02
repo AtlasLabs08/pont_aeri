@@ -1,7 +1,7 @@
 /* ILS: localitzador i senda de planeig de 3 graus per a cada cap de pista.
  * ORIGEN: linies 1639-1685 de l'original (SECTION 8b).
  *
- * EXPORTA: ILS thresholdDistNm destinationEnd
+ * EXPORTA: ILS thresholdDistNm destinationEnd arrivalEnd tailwindKt MAX_TAILWIND_KT flightApproach finalFix FINAL_FIX_NM
  *
  * IMPORTA: ../core/constants.js, ./airports.js
  *
@@ -21,6 +21,36 @@
  *   destinationEnd(A, ...candidats) -> cap de pista de destinacio a A: el
  *     primer candidat que sigui un cap de pista d A (index.html hi passa el
  *     sintonitzat i despres l assignat); si cap ho es, el primer d A.
+ *
+ * ILS per cap (F1, docs/DECISIONS.md, 2026-10-01, H3 i H12): nomes els caps
+ * amb en.ils (airports.js) tenen ILS; la resta dels aeroports nous tenen una
+ * aproximacio RNP (en.kind) amb la mateixa interficie: nav() hi dona curs i
+ * senda de 3 graus igual, i ident = en.kind + ' ' + id ('ILS 25', 'RNP 21').
+ * update() (l auto-sintonia) nomes sintonitza ILS; una RNP nomes es sintonitza
+ * a proposit (flightApproach, H13). Un cap sense els camps (LEBL, LEPA, la
+ * pista sintetica del harness) es ILS.
+ *
+ *   arrivalEnd(A, windDir, windKt) -> cap de pista d arribada a A del vol
+ *     cronometrat de Free Flight (docs/DECISIONS.md, 2026-10-01, pista
+ *     d arribada). Funcio pura: si A te un sol cap amb ILS, aquest; si en te
+ *     diversos, d entre ells, i si no en te cap, d entre tots: el de mes vent
+ *     de cara (windDir = d on ve el vent, graus; windKt en nusos); sense vent
+ *     (windKt <= 0), el de la pista mes llarga. Empat: el primer d A.allEnds.
+ *     H17c: un cap amb mes de MAX_TAILWIND_KT de vent de cua (tailwindKt)
+ *     nomes es tria si no n hi ha cap altre: la regla s aplica primer als caps
+ *     que en tenen com a molt MAX_TAILWIND_KT.
+ *   tailwindKt(en, windDir, windKt) -> nusos de vent de cua al cap en (negatiu:
+ *     vent de cara).
+ *   flightApproach({ mode, start, airport, dest, runway, windDir, windKt })
+ *     -> { A, en, tuned }   pista d arribada d un vol de Free Flight (H11) i si
+ *     se n sintonitza l aproximacio des del principi (H13). Els camps son els
+ *     de Game.opts (dest ja resolt: un altre aeroport). mode 'route': el desti,
+ *     arrivalEnd, sintonitzada. Inici 'final' (sense ruta): l aeroport triat,
+ *     el cap de l arrencada (runway), sintonitzada. Altrament: l aeroport
+ *     triat, arrivalEnd, sense sintonitzar (l auto-sintonia de sempre).
+ *   finalFix(A, en) -> { e, n, a, c, name, h }   punt d aproximacio final
+ *     (H14): FINAL_FIX_NM abans del llindar d en, sobre l eix allargat; nom
+ *     'FF' + designacio ('FF21'); h = alcada de la senda de 3 graus en m MSL.
  */
 
 import { DEG, NM, wrapPi } from '../core/constants.js';
@@ -33,6 +63,32 @@ export function thresholdDistNm(A, en, e, n) {
 
 export function destinationEnd(A, ...candidates) {
   return candidates.find(en => en && A.allEnds.includes(en)) || A.allEnds[0];
+}
+
+export const MAX_TAILWIND_KT = 10;
+export function tailwindKt(en, windDir, windKt) { return windKt > 0 ? -windKt * Math.cos((windDir - en.hdg) * DEG) : 0; }
+
+export function arrivalEnd(A, windDir, windKt) {
+  const ok = A.allEnds.filter(en => tailwindKt(en, windDir, windKt) <= MAX_TAILWIND_KT + 1e-9), ends = ok.length ? ok : A.allEnds;
+  const ils = ends.filter(en => en.ils !== false);
+  if (ils.length === 1) return ils[0];
+  if (ils.length === 1) return ils[0];
+  const pool = ils.length ? ils : ends, calm = !(windKt > 0);
+  const score = en => calm ? en.rw.len : windKt * Math.cos((windDir - en.hdg) * DEG);
+  return pool.reduce((best, en) => score(en) > score(best) + 1e-9 ? en : best);
+}
+
+export function flightApproach({ mode, start, airport, dest, runway, windDir, windKt }) {
+  if (mode === 'route') { const A = AIRPORTS[dest]; return { A, en: arrivalEnd(A, windDir, windKt), tuned: true }; }
+  const A = AIRPORTS[airport];
+  if (start === 'final') return { A, en: A.allEnds[(runway || 0) % A.allEnds.length], tuned: true };
+  return { A, en: arrivalEnd(A, windDir, windKt), tuned: false };
+}
+
+export const FINAL_FIX_NM = 10;
+export function finalFix(A, en) {
+  const d = FINAL_FIX_NM * NM, a = en.thr[0] - en.dir[0] * d, c = en.thr[1] - en.dir[1] * d, w = A.toWorld(a, c);
+  return { e: w[0], n: w[1], a, c, name: 'FF' + en.id, h: A.elev + (d + ILS.GS_S) * Math.tan(ILS.GS) };
 }
 
 export const ILS = {
@@ -48,7 +104,7 @@ export const ILS = {
   /** full receiver output for a chosen runway end */
   nav(A, en, f) {
     const o = f.out, g = this.geom(A, en, f.e, f.n, f.h - f.cfg.gear.zStatic);
-    g.A = A; g.en = en; g.crs = en.hdg * DEG; g.ident = 'ILS ' + en.id; g.apt = A.icao;
+    g.A = A; g.en = en; g.crs = en.hdg * DEG; g.kind = en.kind || 'ILS'; g.ident = g.kind + ' ' + en.id; g.apt = A.icao;
     g.locValid = g.dA > 150 && g.dist < this.RANGE && Math.abs(g.locAng) < 35 * DEG;
     g.gsDev = g.gsAng - this.GS;
     g.gsValid = g.locValid && !f.wow && g.dG > 120 && g.dist < 16 * NM && Math.abs(g.locAng) < 10 * DEG && Math.abs(g.gsDev) < 6 * DEG;
@@ -64,6 +120,7 @@ export const ILS = {
     for (const id of AIRPORT_ORDER) {
       const A = AIRPORTS[id]; if (Math.hypot(f.e - A.e, f.n - A.n) > this.RANGE + 6000) continue;
       A.allEnds.forEach((en, i) => {
+        if (en.ils === false) return;
         const g = this.nav(A, en, f); if (!g.locValid || g.hdgDiff > 100 * DEG) return;
         let score = Math.abs(g.locAng) * 3 + g.hdgDiff;
         if (prev && prev.apt === A.icao && prev.idx === i) score -= 0.35;               // hysteresis: keep the tuned ILS

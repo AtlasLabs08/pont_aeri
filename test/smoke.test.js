@@ -28,7 +28,7 @@ test('core exporta el que ha d exportar', () => {
 });
 
 test('world exporta el que ha d exportar', () => {
-  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm', 'thresholdDistNm', 'destinationEnd',
+  for (const name of ['GEO', 'AIRPORTS', 'AIRPORT_ORDER', 'World', 'ILS', 'distanceKm', 'bearingDeg', 'AIRPORT_DATA', 'arrivalEnd', 'flightApproach', 'finalFix', 'approachFix', 'legFlyable', 'legMeaFt', 'planRoute', 'planArrival', 'tailwindKt', 'MAX_TAILWIND_KT', 'thresholdDistNm', 'destinationEnd',
     'buildTaxiGraph', 'taxiRoute', 'nearestOnPolyline']) {
     assert.ok(name in world, `falta l export: ${name}`);
   }
