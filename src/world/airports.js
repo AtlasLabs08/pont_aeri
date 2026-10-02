@@ -210,6 +210,10 @@ export const AIRPORT_DEFS = {
 };
 export const AIRPORT_ORDER = ['LEBL', 'LEPA', ...Object.keys(AIRPORT_DATA)];
 export const AIRPORTS = {};
+/** l aeroport mes proper a (e, n) per distancia, entre tots els d AIRPORT_ORDER (camera de torre); `fallback` es el punt de partida de la cerca */
+export function nearestAirport(e, n, fallback) {
+  return AIRPORT_ORDER.map(id => AIRPORTS[id]).reduce((b, x) => Math.hypot(e - x.e, n - x.n) < Math.hypot(e - b.e, n - b.n) ? x : b, fallback);
+}
 /** (re)build both airports for a difficulty level. Scenery is rebuilt by AirportScenery.rebuild(). */
 export function setRunwayDifficulty(level) { for (const id of AIRPORT_ORDER) { const old = AIRPORTS[id]; AIRPORTS[id] = makeAirport(AIRPORT_DEFS[id], RUNWAY_SCALE[level] || 1); AIRPORTS[id].oldGroup = old && old.group; } }
 setRunwayDifficulty('normal');

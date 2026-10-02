@@ -137,7 +137,7 @@ import {
 } from './src/core/index.js';
 
 import {
-  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
+  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, nearestAirport, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
   setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, tailwindKt, MAX_TAILWIND_KT, distanceKm, bearingDeg
 } from './src/world/index.js';
 
@@ -2003,7 +2003,7 @@ const Cameras = {
     } else if (this.mode === 'tower') {
       // la torre de l aeroport mes proper (airportNear torna el primer d AIRPORT_ORDER dins d un quadrat de 60 km, que pot ser un
       // aeroport vei: llavors la camera mirava l avio des de 60 km i el relleu real li tapava)
-      const A = AIRPORT_ORDER.map(id => AIRPORTS[id]).reduce((b, x) => Math.hypot(fdm.e - x.e, fdm.n - x.n) < Math.hypot(fdm.e - b.e, fdm.n - b.n) ? x : b, Game.airport);
+      const A = nearestAirport(fdm.e, fdm.n, Game.airport);
       if (!A.towerPos) AirportScenery.place(A);
       const tp = A.towerPos; cam.position.set(rx(tp[0]), A.towerH + 2, rz(tp[1])); cam.up.set(0, 1, 0); cam.lookAt(px, py, pz);
       const d = cam.position.distanceTo(mdl.root.position); cam.fov = clamp(2 * Math.atan(L * this.towerFov / 20 * 1.6 / d) * RAD, 1.2, 50);
