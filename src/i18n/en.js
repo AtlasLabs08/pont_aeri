@@ -339,7 +339,7 @@ export default {
   'guide.key.spoiler': 'Speedbrakes out or in.',
   'guide.key.brake': 'Wheel brakes, while you hold it.',
   'guide.key.parkBrake': 'Parking brake on or off.',
-  'guide.key.reverse': 'Reverse thrust, on the ground only. Then thrust forward adds reverse power.',
+  'guide.key.reverse': 'Reverse thrust, on the ground only. The levers go to idle first and the reversers deploy or stow there; then thrust forward adds reverse power.',
   'guide.key.landingLights': 'Landing lights. Automatic until you touch them.',
   'guide.key.autopilot': 'Autopilot on or off. It needs 400 ft above the ground.',
   'guide.key.autothrottle': 'Autothrottle: holds the selected speed.',
@@ -451,6 +451,11 @@ export default {
   'credits.airports.term': 'Airports',
   'credits.airports.text': 'Runways, elevations and positions of the airports.',
   'credits.airports.attribution': 'OurAirports (ourairports.com)',
+  'msg.reverseDeployed': 'Reverse thrust: Shift adds reverse power, minus reduces it',
+  'msg.reverseStowed': 'Reversers stowed, thrust at idle',
+  'msg.reverseArming': 'Levers to idle, then the reversers deploy',
+  'msg.reverseStowing': 'Levers to idle, then the reversers stow',
+  'msg.reverseCancelled': 'Reverse change cancelled',
   'hud.alt': 'ALT',
   'hud.raValue': 'RA {ft}'
 };

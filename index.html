@@ -133,7 +133,8 @@ import {
   AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FT, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
-  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder, LandingWatch
+  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder, LandingWatch,
+  leverIdle, reverseToggle, reverseUpdate, reverseCancel
 } from './src/core/index.js';
 
 import {
@@ -1964,12 +1965,15 @@ const Input = {
     const dir = (K.down('ShiftLeft', 'ShiftRight', 'NumpadAdd') || K.keys.PlusChar ? 1 : 0) - (K.down('NumpadSubtract') || K.keys.MinusChar ? 1 : 0);
     if (dir !== this.lastDir) this.detHold = false; this.lastDir = dir;
     if (dir !== 0 && currentLesson()) currentLesson().onCommand('throttle');
+    if (dir !== 0) reverseCancel(ctl);      // el jugador mou la palanca: la transicio automatica del reverse es cancel.la
     if (dir !== 0 && !this.detHold) {
       const prev = ctl.throttle; let next = clamp(prev + dir * 0.38 * dt, 0, 1);
       if (!ctl.reverse && ((prev < THR_CLB && next >= THR_CLB) || (prev > THR_CLB && next <= THR_CLB))) { next = THR_CLB; this.detHold = true; Game.msg('Thrust levers in the CLB detent'); }
       if (next === 1 && prev < 1) Game.msg(ctl.reverse ? 'Maximum reverse' : 'TOGA'); if (next === 0 && prev > 0) Game.msg('Thrust idle');
       ctl.throttle = next;
     }
+    // reverse: la palanca baixa a ralenti i alla s activa o es desactiva (core/ground-throttle.js)
+    const revEv = reverseUpdate(ctl, dt, leverIdle(fdm.cfg)); if (revEv) Game.msg(t(revEv === 'deployed' ? 'msg.reverseDeployed' : 'msg.reverseStowed'));
     if (K.down('KeyX')) ctl.trim = Math.min(1, ctl.trim + 0.07 * dt); if (K.down('KeyZ')) ctl.trim = Math.max(-1, ctl.trim - 0.07 * dt);
     ctl.brake = K.down('KeyB') ? 1 : 0;
   }
@@ -2265,7 +2269,7 @@ const Game = {
       case 'KeyG': if (f.wow) this.msg('Gear lever locked on the ground'); else { c.gearDown = !c.gearDown; this.msg(c.gearDown ? 'Gear down' : 'Gear up'); } break;
       case 'KeyP': c.parkBrake = !c.parkBrake; this.msg(c.parkBrake ? 'Parking brake set' : 'Parking brake released'); break;
       case 'KeyK': c.spoiler = c.spoiler ? 0 : 1; this.msg(c.spoiler ? 'Speedbrake extended' : 'Speedbrake retracted'); break;
-      case 'KeyR': if (f.wow) { c.reverse = !c.reverse; if (c.reverse) c.throttle = Math.min(c.throttle, 0.05); this.msg(c.reverse ? 'Reverse thrust: Shift adds reverse power, minus reduces it' : 'Reversers stowed'); } else this.msg('Reverse is only available on the ground'); break;
+      case 'KeyR': if (f.wow) { const r = reverseToggle(c, leverIdle(f.cfg)); this.msg(t({ deployed: 'msg.reverseDeployed', arming: 'msg.reverseArming', stowing: 'msg.reverseStowing', cancelled: 'msg.reverseCancelled' }[r])); } else this.msg('Reverse is only available on the ground'); break;
       case 'KeyJ': if (this.ap.on) { this.ap.disengage(); this.msg('Autopilot off'); } else if (f.wow || f.out.aglFt < 400) this.msg('Autopilot needs 400 ft AGL'); else { this.ap.engage(); this.ap.tripped = false; this.msg('Autopilot on: HDG ' + this.ap.selHdg + ' / ' + this.ap.vert); } break;
       case 'KeyT': this.ap.setAthr(!this.ap.athr); this.msg(this.ap.athr ? 'Autothrottle on: ' + this.ap.selSpd + ' kt' : 'Autothrottle off'); break;
       case 'KeyN': this.cycleAccel(); break;
@@ -2299,7 +2303,7 @@ const Game = {
     if (Cameras.mode === 'cockpit') { const a = Cockpit.hit(mx, my), up = -dir;
       if (a === 'knob:spd') { ap.selSpd = clamp(ap.selSpd + up * fast, 100, 400); return; } if (a === 'knob:hdg') { ap.selHdg = wrap360(ap.selHdg + up * fast); return; }
       if (a === 'knob:alt') { ap.selAlt = clamp(ap.selAlt + up * 100 * fast, 0, 45000); if (ap.on && ap.vert === 'ALT' && Math.abs(ap.selAlt - this.fdm.out.altFt) > 250) { ap.vert = 'VS'; ap.selVs = sign(ap.selAlt - this.fdm.out.altFt) * (ap.selVs !== 0 ? Math.abs(ap.selVs) : 1500); } return; }
-      if (a === 'knob:vs') { ap.selVs = clamp(ap.selVs + up * 100, -6000, 6000); return; } if (a === 'thrust') { this.ctl.throttle = clamp(this.ctl.throttle + up * 0.04, 0, 1); return; }
+      if (a === 'knob:vs') { ap.selVs = clamp(ap.selVs + up * 100, -6000, 6000); return; } if (a === 'thrust') { reverseCancel(this.ctl); this.ctl.throttle = clamp(this.ctl.throttle + up * 0.04, 0, 1); return; }
       if (a === 'flaps') { this.onKey(up > 0 ? 'KeyV' : 'KeyF'); return; } if (a === 'bright') { Cockpit.brightness = clamp(Cockpit.brightness + up * 0.08, 0.15, 1); return; } if (a === 'nd') { const r = [10, 20, 40, 80, 160], i = clamp(r.indexOf(this.ndRange) + dir, 0, 4); this.ndRange = r[i]; return; }
       Cameras.fov = clamp(Cameras.fov + dir * 4, 18, 85);
     } else if (Cameras.mode === 'tower') Cameras.towerFov = clamp(Cameras.towerFov * (dir > 0 ? 1.15 : 0.87), 4, 60); else Cameras.dist = clamp(Cameras.dist * (dir > 0 ? 1.12 : 0.89), 0.35, 8);
@@ -2320,7 +2324,7 @@ const Game = {
     const wasOn = this.ap.on; this.ap.update(PHYS_DT, c); if (wasOn && !this.ap.on) this.msg('AUTOPILOT DISCONNECT', 4);
     for (const ev of this.ap.events) this.onApEvent(ev); this.ap.events.length = 0;
     if (this._apWas && !this.ap.on) Sound.apDisc(); this._apWas = this.ap.on;
-    if (!f.wow && c.reverse) c.reverse = false;
+    if (!f.wow) { c.reverse = false; reverseCancel(c); }
     this.updateGusts(PHYS_DT);
     f.step(PHYS_DT, c, this.env); this.time += PHYS_DT; this.record();
     if (this.state !== 'replay') Recorder.sample(f, c, PHYS_DT);

@@ -337,7 +337,7 @@ export default {
   'guide.key.spoiler': 'Aerofrens fora o dins.',
   'guide.key.brake': 'Frens de les rodes, mentre la mantens premuda.',
   'guide.key.parkBrake': 'Posa o treu el fre d\'aparcament.',
-  'guide.key.reverse': 'Inversors d\'empenta, només a terra. Després, potència endavant dona empenta inversa.',
+  'guide.key.reverse': 'Inversors d\'empenta, només a terra. Primer les palanques van a ralentí, i allà els inversors s\'activen o es guarden; després, potència endavant dona empenta inversa.',
   'guide.key.landingLights': 'Llums d\'aterratge. Automàtics fins que els toques.',
   'guide.key.autopilot': 'Pilot automàtic sí o no. Necessita 400 ft sobre el terra.',
   'guide.key.autothrottle': 'Potència automàtica: manté la velocitat seleccionada.',
@@ -449,6 +449,11 @@ export default {
   'credits.airports.term': 'Aeroports',
   'credits.airports.text': 'Pistes, elevacions i posicions dels aeroports.',
   'credits.airports.attribution': 'OurAirports (ourairports.com)',
+  'msg.reverseDeployed': 'Empenta inversa: Shift afegeix potència inversa, el menys en treu',
+  'msg.reverseStowed': 'Inversors guardats, empenta a ralentí',
+  'msg.reverseArming': 'Palanques a ralentí; després els inversors s\'activen',
+  'msg.reverseStowing': 'Palanques a ralentí; després els inversors es guarden',
+  'msg.reverseCancelled': 'Canvi de reverse cancel·lat',
   'hud.alt': 'ALT',
   'hud.raValue': 'RA {ft}'
 };
