@@ -286,7 +286,8 @@ describe('debriefModel (D3D4-12)', () => {
     const st = pendingDebrief(), m = debriefModel(st);
     const R = st.result;
     assert.deepEqual(m.revenue.map(r => r.value), [R.revenue.tickets, R.revenue.punctuality, R.revenue.fuelSaving]);
-    assert.deepEqual(m.costs.map(c => c.value), [R.costs.fuel, R.costs.crew, R.costs.fees, R.costs.maintenance, R.costs.finance]);
+    assert.deepEqual(m.costs.map(c => c.value), [R.costs.fuel, R.costs.crew, R.costs.fees, R.costs.maintenance]);
+    assert.equal(R.costs.finance, 0, 'sense lloguer, la fila no surt');
     assert.equal(m.net, R.net);
     assert.deepEqual(m.after.map(a => a.value), [-st.cycleCost, -st.damage.playerCost, -st.instalments]);
     assert.equal(m.net + m.after.reduce((s, a) => s + a.value, 0), m.cashDelta);

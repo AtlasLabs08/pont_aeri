@@ -87,7 +87,7 @@
  *   debriefModel(settlement) -> el compte de resultats del debrief (D3D4-12),
  *     tot del settlement: { mode, contract, route, landing, blockMin,
  *     arrivalDeltaMin, revenue: [{ key, value }], revenueTotal, costs,
- *     costsTotal, factor: { K, rotation, subtotal } (null al contracte), net,
+ *     costsTotal (la fila finance nomes si no es 0), factor: { K, rotation, subtotal } (null al contracte), net,
  *     after: [{ key, value }] (cicles, danys i quotes, en negatiu),
  *     cashDelta, cashAfter, xp: { gained, total, rankBefore, rankAfter,
  *     rankUp, rankDown, next, remaining, progress }, wear: [{ key, before,
@@ -152,6 +152,7 @@ export function debriefModel(st) {
     : [['contract', r.revenue.contract]];
   const costs = own
     ? [['fuel', r.costs.fuel], ['crew', r.costs.crew], ['fees', r.costs.fees], ['maintenance', r.costs.maintenance], ['finance', r.costs.finance]]
+      .filter(([key, v]) => key !== 'finance' || v !== 0)   // el lloguer (G1) encara no existeix
     : [];
   const rows = list => list.map(([key, value]) => ({ key, value }));
   const sum = list => list.reduce((s, [, v]) => s + v, 0);
