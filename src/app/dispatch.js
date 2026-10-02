@@ -4,7 +4,7 @@
  * vol), que la desen i emeten 'career:changed' amb updateCareer.
  * NOU: tasques D3+D4 d ENGINEERING.md.
  *
- * EXPORTA: HOURS_PER_DAY planOwnFlight dispatchModel departureRunwayIndex
+ * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
  *          startOwnFlight activeAirlineFlight _resetDispatch
  *
@@ -54,6 +54,8 @@
  *     amb o = { aircraft, airport, dest, runway, windDir, windKt } -> { en,
  *     tailwindKt }. Per defecte (Node, proves): arrivalEnd amb el vent (H11).
  *     Sense argument torna al per defecte.
+ *   AIRLINE_STOP_KT = 1   velocitat respecte de terra per sota de la qual
+ *     l avio s ha aturat: index.html tanca el vol d Airline (D3D4-7)
  *   airportAt(e, n) -> ICAO de l aeroport amb paviment (airportPavedAt) en
  *     aquest punt del mon, o null (D3D4-7).
  *   startOwnFlight(plan) -> { ok, reason?, order? }   crea l ordre
@@ -77,6 +79,7 @@ import { launchFlight } from './flight.js';
 import { currentCareer, updateCareer } from './airline.js';
 
 export const HOURS_PER_DAY = 24;
+export const AIRLINE_STOP_KT = 1;
 const MINUTES_PER_HOUR = 60;
 
 let active = null;

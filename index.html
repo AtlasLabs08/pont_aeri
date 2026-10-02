@@ -150,7 +150,7 @@ import {
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
   currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on,
-  recorderMeta, setArrivalPlanner
+  recorderMeta, setArrivalPlanner, finishExtras, airportAt, AIRLINE_STOP_KT
 } from './src/app/index.js';
 import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
@@ -2225,7 +2225,7 @@ const Game = {
     // start() torna timeAccelMax a 1: no cal setTimeAccel pel timeAccel = 1 d'aquesta funcio
     // D3D4-6: amb Game.airline, els valors reals del pla (app/dispatch.js, recorderMeta); sense, com abans
     Recorder.start(recorderMeta({ aircraftTypeId: O.aircraft, from: this.flight.from.icao, to: this.flight.to.icao, fuelKg: f.fuel, airline: this.airline }));
-    this.recordDone = false; this.warnWas = {}; this.tailStrike = false;
+    this.recordDone = false; this.landedAt = null; this.warnWas = {}; this.tailStrike = false;
   },
   /** destinacio del vol cronometrat (F1, H9): opts.dest si es un altre aeroport; si no, LEPA des de LEBL i LEBL des de la resta */
   // F1 (H9): altitud de creuer del vol cronometrat segons la distancia: [fins a km, jet ft, turbohelix ft]. LEBL-LEPA (202 km): 24000 / 17000, com abans
@@ -2344,8 +2344,10 @@ const Game = {
     if (this.report && !this.report.shown && f.wow && o.gs < 35) { this.report.shown = true; this.report.rollout = f.distGround - this.report.dist0; fl.landings++;
       const atDest = Math.hypot(f.e - fl.to.e, f.n - fl.to.n) < 6000; if (fl.mode === 'route' && atDest) { fl.done = true; }
       Recorder.touchdown(this.report, this.scoreReport(this.report)); Recorder.rollout(this.report.rollout);
-      if (fl.done || fl.mode === 'free') this.finishRecord();          // el vol lliure no te desti: acaba al primer aterratge amb nota
+      if (!this.airline && (fl.done || fl.mode === 'free')) this.finishRecord();          // el vol lliure no te desti: acaba al primer aterratge amb nota
       UI.showReport(this.report, fl); }
+    // D3D4-7: un vol d Airline acaba quan l avio s atura sobre el paviment de qualsevol aeroport despres d haver volat
+    if (this.airline && !this.recordDone && fl.airborne && this.report && this.report.shown && f.wow && o.gs < AIRLINE_STOP_KT) this.closeAirlineFlight();
     if (this.timeAccel > 1 && o.altFt < 10000) { this.timeAccel = 1; Recorder.setTimeAccel(1); this.msg('Below 10,000 ft: time back to 1x'); }
     if (this.lights.landingAuto) this.lights.landing = (o.altFt < 10000 && !f.wow) || (f.wow && c.throttle > 0.4);
   },
@@ -2417,8 +2419,11 @@ const Game = {
   /** tanca el FlightRecord del vol, nomes un cop per vol; en DEV l'escriu a la consola.
    * onFlightFinished no fa res si no hi ha cap vol llancat per app/flight.js (Free Flight): C2+C3. */
   /** D3D4-6: sortir d un vol d Airline (menu): el vol que no s ha tancat s abandona sense cost */
-  leaveAirlineFlight() { if (!this.recordDone) cancelFlight(); this.airline = null; },
-  finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish({ arrivalMin: null }); if (IS_DEV) console.log('[FlightRecord]', record); onFlightFinished(record); },
+  leaveAirlineFlight() { if (!this.recordDone && this.report && this.report.shown) this.closeAirlineFlight(); if (!this.recordDone) cancelFlight(); this.airline = null; },
+  /** D3D4-7: tanca el vol d Airline si l avio es sobre el paviment d un aeroport (landedAt); si no, no fa res.
+   *  Si s ha aterrat i se surt al menu abans d aturar-se, tambe es tanca: el vol no es pot abandonar despres de la nota */
+  closeAirlineFlight() { const f = this.fdm, at = f.wow ? airportAt(f.e, f.n) : null; if (!at) return; this.landedAt = at; this.finishRecord(); },
+  finishRecord() { if (this.recordDone) return; this.recordDone = true; const record = Recorder.finish(finishExtras(this.airline, Recorder.block, this.landedAt)); if (IS_DEV) console.log('[FlightRecord]', record); onFlightFinished(record); },
   /** Recorder.event(type) quan un avis existent passa d'apagat a ences */
   warnEvent(type, on) { if (on && !this.warnWas[type]) Recorder.event(type); this.warnWas[type] = on; },
 
