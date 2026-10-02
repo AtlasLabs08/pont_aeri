@@ -5,7 +5,7 @@
  * NOU: tasques D3+D4 d ENGINEERING.md.
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
- *          minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
+ *          turbulenceLevel minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief recoverStaleOrders _resetDispatch
  *
@@ -40,6 +40,8 @@
  *     contracts: contractOffers amb name, fromCity i toCity }
  *     Els contractes hi son sempre, tambe amb el saldo negatiu (D3D4-9).
  *     destinations: AIRPORT_ORDER menys la ubicacio de l avio.
+ *   turbulenceLevel(w) -> 'light' | 'moderate' (la que el simulador vola,
+ *     toGameWeather) | 'strong' (turbulence >= 0,6), per al briefing
  *   minuteParts(minute) -> { day, hour, minute, hhmm } d un minut de partida
  *     ('09:05'), per pintar hores sense fer comptes a ui/
  *   departureRunwayIndex(A, windDir, windKt) -> index a A.allEnds del cap amb
@@ -131,6 +133,7 @@ export function initDispatch() {
 }
 
 export function pendingDebrief() { return lastSettlement; }
+
 export function clearDebrief() { lastSettlement = null; }
 
 export function recoverStaleOrders() {
@@ -245,6 +248,12 @@ export function dispatchModel(state) {
       })
     }))
   };
+}
+
+const STRONG_TURBULENCE = 0.6;   // escala 0..1 de weatherFor; moderada = la que vola el simulador (toGameWeather)
+
+export function turbulenceLevel(w) {
+  return w.turbulence >= STRONG_TURBULENCE ? 'strong' : toGameWeather(w).turb ? 'moderate' : 'light';
 }
 
 export function minuteParts(minute) {

@@ -45,6 +45,7 @@ import { guideScreen } from './guide.js';
 import { fleetPanel } from './fleet.js';
 import { marketPanel } from './market.js';
 import { dispatchPanel } from './dispatch.js';
+import { briefingScreen } from './briefing.js';
 
 let root = null, hooks = {}, bannerTimer = 0, screen = null, opsTab = null;
 
@@ -201,14 +202,33 @@ function showOps(tab = null) {
     panels: {
       dispatch: () => dispatchPanel(dispatchModel(currentCareer()), {
         planOf: sel => planOwnFlight(currentCareer(), sel),
-        onBriefing: plan => fly(plan),
-        onContract: id => fly(planContract(currentCareer(), id))
+        onBriefing: plan => showBriefing(plan),
+        onContract: id => showBriefing(planContract(currentCareer(), id))
       }),
       fleet: () => fleetPanel(fleetModel(currentCareer()), { onSell: sell, onMarket: () => showOps('market') }),
       market: () => marketPanel(marketModel(currentCareer()), { onBuy: buy })
     }
   }), true, false, 'ops');
   if (again) root.scrollTop = scroll;
+}
+
+/** torna a fer el pla amb canvis (combustible, desti alternatiu), del mateix tipus */
+function replanOf(plan, changes) {
+  const state = currentCareer();
+  if (plan.contract) return planContract(state, plan.offerId, { fuelKg: changes.fuelKg ?? plan.fuelKg });
+  return planOwnFlight(state, { reg: plan.reg, to: changes.to ?? plan.to, hour: plan.hour,
+    price: changes.to ? null : plan.price, fuelKg: changes.to ? null : changes.fuelKg ?? plan.fuelKg });
+}
+
+/** briefing (D3D4-4): pla, meteo, combustible i, si cal, l alternatiu (D3D4-5) */
+function showBriefing(plan) {
+  if (!plan || (!plan.ok && !plan.from)) { banner(t('dispatch.reason.' + (plan ? plan.reason : 'unknown'))); return showOps('dispatch'); }
+  mount(briefingScreen(plan, {
+    replan: changes => replanOf(plan, changes),
+    onAlternate: icao => showBriefing(replanOf(plan, { to: icao })),
+    onFly: p => fly(p),
+    onBack: () => showOps('dispatch')
+  }), false, false, 'briefing');
 }
 
 /** llanca el vol del pla (D3D4-6): la capa es tanca quan el launcher arrenca el vol */

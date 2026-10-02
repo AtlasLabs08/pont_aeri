@@ -3,12 +3,14 @@
  * fines, accents ambre i verd. Nomes fonts del sistema: cap font externa.
  * NOU: tasca C5+D1 d ENGINEERING.md (docs/DECISIONS.md, 30/09/2026, E8).
  *
- * EXPORTA: el ensureStyles
+ * EXPORTA: el fill ensureStyles
  *
  * INTERFICIE (no la canviis, la resta de ui/ en depen):
  *   el(tag, props, ...children) -> Element. props: class, style (cssText),
  *     on<event> (addEventListener), la resta com a atributs (true = buit,
  *     null/false = cap). Els fills de text entren com a text, mai com a HTML.
+ *   fill(node, ...children)   substitueix els fills de node amb les mateixes
+ *     regles que el (null, undefined i false no es pinten). D3+D4.
  *   ensureStyles()   afegeix el <style> de ui/ un sol cop.
  */
 
@@ -25,6 +27,11 @@ export function el(tag, props = {}, ...children) {
     if (c === null || c === undefined || c === false) continue;
     node.append(c instanceof Node ? c : String(c));
   }
+  return node;
+}
+
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat(Infinity).filter(c => c !== null && c !== undefined && c !== false));
   return node;
 }
 

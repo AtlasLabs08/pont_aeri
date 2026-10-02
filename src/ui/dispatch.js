@@ -16,7 +16,7 @@
 
 import { t, fmtMoney, fmtNumber } from '../i18n/index.js';
 import { HOURS_PER_DAY } from '../app/index.js';
-import { el } from './dom.js';
+import { el, fill } from './dom.js';
 
 const button = (label, onClick, primary, disabled) =>
   el('button', { type: 'button', class: primary ? 'pa-primary' : null, onclick: onClick, disabled: !!disabled }, label);
@@ -49,7 +49,7 @@ function ownFlight(model, { planOf, onBriefing }) {
     const summary = el('div', { class: 'pa-summary' });
     function update() {
       const p = planOf(sel);
-      summary.replaceChildren(
+      fill(summary,
         kv(t('dispatch.price'), t('dispatch.priceValue', { price: fmtMoney(p.price), rec: fmtMoney(p.recommendedPrice) })),
         kv(t('dispatch.pax'), t('dispatch.paxValue', { pax: fmtNumber(p.pax), seats: fmtNumber(p.seats) })),
         kv(t('dispatch.revenue'), fmtMoney(p.estimate.revenue.tickets)),
@@ -57,7 +57,7 @@ function ownFlight(model, { planOf, onBriefing }) {
         p.ok ? null : el('p', { class: 'pa-msg pa-bad' }, t('dispatch.reason.' + p.reason)),
         el('div', { class: 'pa-btns' }, button(t('dispatch.toBriefing'), () => onBriefing(planOf(sel)), true, !p.ok)));
     }
-    node.replaceChildren(
+    fill(node,
       el('div', { class: 'pa-fields' },
         select(t('dispatch.aircraft'), ready.map(x => ({ value: x.airframe.reg, label: t('dispatch.aircraftOption', { reg: x.airframe.reg, name: x.name, icao: x.airframe.location }) })),
           sel.reg, v => { sel.reg = v; sel.to = firstDest(ready.find(x => x.airframe.reg === v)); sel.price = null; render(); }),
