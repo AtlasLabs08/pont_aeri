@@ -1363,3 +1363,24 @@ Limitacions conegudes:
   moment, i el rodatge que compta es el fet fins aleshores: si l avio hauria
   sortit per l extrem de la pista, sortir abans d arribar-hi estalvia la
   excursion.
+
+## 2026-10-02 - D3+D4: l informe d aterratge d un vol d Airline
+
+Decisio del projecte (prova del PR #36 al navegador, vol LEBL -> LERS). A
+l informe d aterratge (Game.scoreReport), Continue tornava el control de
+l avio com a Free Flight, i a Airline el vol ja ha acabat.
+
+- En un vol d Airline, l informe d aterratge nomes te dos botons:
+  - Continue: tanca el vol en aquell moment, amb airlineClosing (el mateix
+    cami que sortir del vol despres de tocar terra), i porta directament al
+    debrief d Airline. El jugador ja no recupera el control de l avio.
+  - Watch replay: igual que ara, i en acabar torna a l informe.
+- Fly again i Main menu no surten a Airline. A Free Flight i a l escola,
+  l informe no canvia.
+
+Com s ha aplicat: la llista de botons surt d una funcio pura,
+reportButtons({ airline }) (app/dispatch.js), amb proves a Node; UI.showReport
+amaga Fly again i Main menu quan Game.airline hi es. Continue crida UI.toMenu,
+que fa leaveAirlineFlight (airlineClosing amb leaving) i mostra el debrief.
+Si el vol ja s havia tancat sol (avio aturat), Continue porta igualment al
+debrief.
