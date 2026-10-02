@@ -21,7 +21,7 @@ import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airlin
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
   airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
-  recoverStaleOrders, _resetDispatch
+  recoverStaleOrders, planContract, startContract, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -241,5 +241,36 @@ describe('liquidacio en flight:finished (D3D4-8)', () => {
     assert.equal(recoverStaleOrders(), true);
     assert.deepEqual(currentCareer().dispatch.queue, []);
     assert.equal(currentCareer().fleet[0].status, 'ready');
+  });
+});
+
+describe('contractes al Dispatch (D3D4-9)', () => {
+  test('el model porta les ofertes; planContract i startContract volen l avio de l altra companyia', () => {
+    initDispatch();
+    const broke = careerWithCommuter();
+    broke.company.cash = -1000;
+    updateCareer(broke);
+    const m = dispatchModel(currentCareer());
+    assert.equal(m.negative, true);
+    assert.equal(m.contracts.length, BALANCE.contracts.offers);
+    const offer = m.contracts[0];
+    const p = planContract(currentCareer(), offer.id);
+    assert.equal(p.ok, true);
+    assert.equal(p.contract, true);
+    assert.equal(p.reg, offer.reg);
+    assert.equal(p.pax, offer.pax);
+    assert.equal(planContract(currentCareer(), 'C9-9').reason, 'unknown');
+    let opts = null;
+    setFlightLauncher(o => { opts = o; });
+    const r = startContract(p);
+    assert.equal(r.ok, true);
+    assert.equal(r.order.contract, true);
+    assert.equal(opts.aircraft, offer.typeId);
+    assert.equal(opts.airport, offer.from);
+    assert.equal(currentCareer().fleet[0].status, 'ready', 'la flota no es toca');
+    onFlightFinished(record({ aircraftTypeId: offer.typeId, from: offer.from, to: offer.to, landedAt: offer.to, paxOnBoard: offer.pax }));
+    assert.ok(currentCareer().company.cash > -1000);
+    assert.equal(pendingDebrief().mode, 'contract');
+    assert.equal(startContract(planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 })).reason, 'unknown');
   });
 });

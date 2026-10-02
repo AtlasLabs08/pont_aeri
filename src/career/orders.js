@@ -57,6 +57,7 @@
  *     cashAfter, draws, logEntry }. Llanca un Error si l ordre no hi es.
  */
 
+import { toGameWeather } from '../world/index.js';
 import { BALANCE } from './balance.js';
 import { MINUTES_PER_DAY } from './util.js';
 import { draw } from './rng.js';
@@ -73,7 +74,6 @@ export const SETTLE_DRAWS = Object.freeze(['crashSeverity']);
 export const PILOT_CREW_ID = 'pilot';
 
 const REPUTATION_MAX = 100;     // escala de la reputacio (esquema, state.js)
-const TURBULENT = 0.35;         // com toGameWeather: turbulencia que el simulador vola (0..1)
 
 const PLAN_KEYS = ['typeId', 'pax', 'fuelKg', 'tripFuelKg', 'plannedArrivalMin', 'arrivalRunway', 'alternate', 'weather', 'contract'];
 
@@ -199,7 +199,7 @@ export function settleFlight(state, orderId, record) {
   // 5. XP i rang
   const xpGained = flightXp({
     landingXp: result.landing.xp,
-    turbulence: weathers.some(w => w && w.turbulence >= TURBULENT),
+    turbulence: weathers.some(w => w && toGameWeather(w).turb),
     hardWeather: weathers.some(w => w && w.hard),
     destination: landedAt ?? order.to
   }) - damage.xpLoss;

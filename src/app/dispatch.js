@@ -6,7 +6,7 @@
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
- *          startOwnFlight activeAirlineFlight initDispatch pendingDebrief
+ *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief recoverStaleOrders _resetDispatch
  *
  * IMPORTA: career/ (flightplan.js, orders.js, demand.js, BALANCE...),
@@ -31,8 +31,14 @@
  *     d arribada te mes de MAX_TAILWIND_KT de cua, l aeroport mes proper
  *     al desti amb una pista sense aquest problema (amb la seva meteo); si no,
  *     null. reason: 'unknown' (avio o desti), 'same' (desti = origen), 'range'.
+ *   planContract(state, offerId, { fuelKg? }) -> el mateix pla per a una
+ *     oferta de contractOffers (D3D4-9): contract true, offerId, fee, reg de
+ *     l altra companyia, pax de l oferta, price 0, sense estimate. reason
+ *     'unknown' si l oferta ja no hi es (el dia ha canviat).
  *   dispatchModel(state) -> { day, month, negative, aircraft: [{ airframe,
- *     name, ready, destinations: [{ icao, city, km, inRange }] }], hasPending }
+ *     name, ready, destinations: [{ icao, city, km, inRange }] }], hasPending,
+ *     contracts: contractOffers amb name, fromCity i toCity }
+ *     Els contractes hi son sempre, tambe amb el saldo negatiu (D3D4-9).
  *     destinations: AIRPORT_ORDER menys la ubicacio de l avio.
  *   departureRunwayIndex(A, windDir, windKt) -> index a A.allEnds del cap amb
  *     mes vent de cara (sense vent, la pista mes llarga; empat, el primer).
@@ -59,10 +65,13 @@
  *     l avio s ha aturat: index.html tanca el vol d Airline (D3D4-7)
  *   airportAt(e, n) -> ICAO de l aeroport amb paviment (airportPavedAt) en
  *     aquest punt del mon, o null (D3D4-7).
- *   startOwnFlight(plan) -> { ok, reason?, order? }   crea l ordre
+ *   startFlight(plan) -> { ok, reason?, order? }   crea l ordre
  *     (createOrder), la desa i llanca el vol. reason 'none', 'negative'... o
  *     el de planOwnFlight / createOrder. Si el vol s abandona (launchFlight
- *     resol null), l ordre es cancel.la i es desa.
+ *     resol null), l ordre es cancel.la i es desa. Es pot volar amb el saldo
+ *     negatiu (D3D4-10 nomes bloqueja gastar).
+ *   startOwnFlight(plan), startContract(plan)   startFlight nomes amb un pla
+ *     del tipus que toca (reason 'contract' / 'unknown' si no).
  *   activeAirlineFlight() -> { orderId, airline } del vol en marxa, o null
  *   initDispatch()   subscriu la liquidacio a 'flight:finished' (un sol cop;
  *     airline-ui.js la crida en iniciar-se). Amb un vol d Airline en marxa:
@@ -80,7 +89,7 @@
 import {
   BALANCE, routeFor, dispatchDay, dispatchMonth, departMinuteOf, routeKm, recommendedPrice, priceBounds,
   plannedPax, plannedBlockMin, tripFuelKg, minFuelKg, maxFuelKg, inRange, takeoffMassKg, weatherBonusFor,
-  estimateOwnFlight, createOrder, cancelOrder, releaseGrounded, settleFlight, tierOf, airframeTier, MINUTES_PER_DAY, PILOT_CREW_ID
+  estimateOwnFlight, contractOffers, createOrder, cancelOrder, releaseGrounded, settleFlight, tierOf, airframeTier, MINUTES_PER_DAY, PILOT_CREW_ID
 } from '../career/index.js';
 import {
   AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather, arrivalEnd, tailwindKt, MAX_TAILWIND_KT, airportPavedAt
@@ -166,35 +175,57 @@ function alternateFor(state, plan) {
   return null;
 }
 
-export function planOwnFlight(state, { reg, to, hour, price, fuelKg }) {
-  const a = state.fleet.find(x => x.reg === reg);
-  if (!a || !AIRPORTS[to]) return { ok: false, reason: 'unknown' };
-  const from = a.location, typeId = a.typeId;
-  if (to === from) return { ok: false, reason: 'same' };
+/** hora, meteo, pista, combustible i massa d un vol, comuns al vol propi i al contracte */
+function flightBasics(state, { typeId, from, to, hour }) {
   const km = routeKm(from, to), day = dispatchDay(state), month = dispatchMonth(day);
   const departMinute = departMinuteOf(day, hour);
   const blockMin = plannedBlockMin(typeId, km), plannedArrivalMin = departMinute + blockMin;
-  const route = routeFor(from, to), bounds = priceBounds(route), rec = recommendedPrice(route);
-  const ticket = clampInt(price ?? rec, bounds[0], bounds[1]);
   const weather = { origin: weatherAt(state, from, departMinute), dest: weatherAt(state, to, plannedArrivalMin) };
-  const pax = plannedPax({ route, price: ticket, typeId, departMinute, weatherSeverity: Math.max(weather.origin.severity, weather.dest.severity), reputation: state.company.reputation });
   const arr = arrivalOf(typeId, from, to, weather.dest);
-  const minF = minFuelKg(typeId, km), maxF = maxFuelKg(typeId, pax);
-  const fuel = clampInt(fuelKg ?? minF, minF, Math.max(minF, maxF));
-  const bonus = weatherBonusFor([weather.origin, weather.dest]);
-  const revenueMult = tierOf(airframeTier(a)).revenueMult;
-  const plan = {
-    ok: inRange(typeId, km, pax), reg, typeId, name: nameOf(typeId), from, to, km, day, month, hour,
-    departMinute, blockMin, plannedArrivalMin, route, recommendedPrice: rec, priceBounds: bounds, price: ticket,
-    pax, seats: BALANCE.fleetTypes[typeId].seats, weather, gameWeather: toGameWeather(weather.dest),
+  return {
+    typeId, name: nameOf(typeId), from, to, km, day, month, hour, departMinute, blockMin, plannedArrivalMin,
+    seats: BALANCE.fleetTypes[typeId].seats, weather, gameWeather: toGameWeather(weather.dest),
     arrivalRunway: arr.en.id, tailwindKt: Math.round(arr.tailwindKt), alternate: null,
-    tripFuelKg: tripFuelKg(typeId, km), minFuelKg: minF, maxFuelKg: maxF, fuelKg: fuel,
-    massKg: takeoffMassKg(typeId, pax, fuel), weatherBonus: bonus, revenueMult,
-    estimate: estimateOwnFlight({ typeId, from, to, ticketPrice: ticket, pax, crewCount: state.company.crewCount ?? 0, weatherBonus: bonus, revenueMult })
+    tripFuelKg: tripFuelKg(typeId, km), weatherBonus: weatherBonusFor([weather.origin, weather.dest])
   };
+}
+
+/** combustible (minim, maxim, triat), massa, abast i alternatiu del pla */
+function finishPlan(state, plan, fuelKg) {
+  const minF = minFuelKg(plan.typeId, plan.km), maxF = maxFuelKg(plan.typeId, plan.pax);
+  plan.minFuelKg = minF; plan.maxFuelKg = maxF;
+  plan.fuelKg = clampInt(fuelKg ?? minF, minF, Math.max(minF, maxF));
+  plan.massKg = takeoffMassKg(plan.typeId, plan.pax, plan.fuelKg);
+  plan.ok = inRange(plan.typeId, plan.km, plan.pax);
   if (!plan.ok) plan.reason = 'range';
-  if (arr.tailwindKt > MAX_TAILWIND_KT) plan.alternate = alternateFor(state, plan);
+  if (plan.tailwindKt > MAX_TAILWIND_KT) plan.alternate = alternateFor(state, plan);
   return plan;
+}
+
+export function planOwnFlight(state, { reg, to, hour, price, fuelKg }) {
+  const a = state.fleet.find(x => x.reg === reg);
+  if (!a || !AIRPORTS[to]) return { ok: false, reason: 'unknown' };
+  if (to === a.location) return { ok: false, reason: 'same' };
+  const plan = { reg, contract: false, ...flightBasics(state, { typeId: a.typeId, from: a.location, to, hour }) };
+  const route = routeFor(plan.from, to), bounds = priceBounds(route), rec = recommendedPrice(route);
+  const ticket = clampInt(price ?? rec, bounds[0], bounds[1]);
+  const W = plan.weather;
+  plan.route = route; plan.recommendedPrice = rec; plan.priceBounds = bounds; plan.price = ticket;
+  plan.pax = plannedPax({ route, price: ticket, typeId: plan.typeId, departMinute: plan.departMinute,
+    weatherSeverity: Math.max(W.origin.severity, W.dest.severity), reputation: state.company.reputation });
+  plan.revenueMult = tierOf(airframeTier(a)).revenueMult;
+  plan.estimate = estimateOwnFlight({ typeId: plan.typeId, from: plan.from, to, ticketPrice: ticket, pax: plan.pax,
+    crewCount: state.company.crewCount ?? 0, weatherBonus: plan.weatherBonus, revenueMult: plan.revenueMult });
+  return finishPlan(state, plan, fuelKg);
+}
+
+export function planContract(state, offerId, { fuelKg } = {}) {
+  const offer = contractOffers(state).find(o => o.id === offerId);
+  if (!offer) return { ok: false, reason: 'unknown' };
+  const plan = { reg: offer.reg, contract: true, offerId, fee: offer.fee,
+    ...flightBasics(state, { typeId: offer.typeId, from: offer.from, to: offer.to, hour: offer.hour }) };
+  plan.pax = offer.pax; plan.price = 0; plan.revenueMult = 1;
+  return finishPlan(state, plan, fuelKg);
 }
 
 export function dispatchModel(state) {
@@ -203,6 +234,7 @@ export function dispatchModel(state) {
   return {
     day, month: dispatchMonth(day), negative: state.company.cash < 0,
     hasPending: state.dispatch.queue.some(o => o.crewId === PILOT_CREW_ID),
+    contracts: contractOffers(state).map(o => ({ ...o, name: nameOf(o.typeId), fromCity: AIRPORT_DEFS[o.from].city, toCity: AIRPORT_DEFS[o.to].city })),
     aircraft: s.fleet.map(a => ({
       airframe: a, name: nameOf(a.typeId), ready: a.status === 'ready' && !!AIRPORTS[a.location],
       destinations: AIRPORT_ORDER.filter(id => id !== a.location && AIRPORTS[id] && AIRPORT_DEFS[a.location]).map(id => {
@@ -280,12 +312,20 @@ function abandon(orderId) {
   if (state && state.dispatch.queue.some(o => o.id === orderId)) updateCareer(cancelOrder(state, orderId));
 }
 
-export function startOwnFlight(plan) {
+export function startFlight(plan) {
   if (!plan || !plan.ok) return { ok: false, reason: plan ? plan.reason : 'unknown' };
   return launch({
     reg: plan.reg, typeId: plan.typeId, from: plan.from, to: plan.to, departMinute: plan.departMinute,
     ticketPrice: plan.price, pax: plan.pax, fuelKg: plan.fuelKg, tripFuelKg: plan.tripFuelKg,
     plannedArrivalMin: plan.plannedArrivalMin, arrivalRunway: plan.arrivalRunway, alternate: plan.alternate,
-    weather: plan.weather, contract: false
+    weather: plan.weather, contract: plan.contract === true
   }, plan);
+}
+
+export function startOwnFlight(plan) {
+  return startFlight(plan && plan.contract ? { ...plan, ok: false, reason: 'contract' } : plan);
+}
+
+export function startContract(plan) {
+  return startFlight(plan && plan.contract ? plan : { ...plan, ok: false, reason: 'unknown' });
 }

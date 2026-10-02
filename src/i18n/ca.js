@@ -434,5 +434,6 @@ export default {
   'guide.symbols.taxiTarget.term': 'Anella verda',
   'guide.symbols.taxiTarget.text': 'Escola, lliçó de rodatge: el punt objectiu i el camí per les calles de rodatge.',
   'airline.flight.loading': 'Preparant el vol',
-  'airline.flight.start': 'De {from} a {to}. Fre d\'estacionament posat: la P el treu i la H mostra tots els comandaments. El vol s\'acaba quan t\'aturis sobre el paviment d\'un aeroport.'
+  'airline.flight.start': 'De {from} a {to}. Fre d\'estacionament posat: la P el treu i la H mostra tots els comandaments. El vol s\'acaba quan t\'aturis sobre el paviment d\'un aeroport.',
+  'market.reason.negative': 'El saldo és negatiu: no pots comprar fins que torni a ser positiu. Vola contractes per recuperar-te.'
 };

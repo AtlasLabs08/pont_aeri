@@ -436,5 +436,6 @@ export default {
   'guide.symbols.taxiTarget.term': 'Green ring',
   'guide.symbols.taxiTarget.text': 'School, taxi lesson: the target point and the route along the taxiways.',
   'airline.flight.loading': 'Preparing the flight',
-  'airline.flight.start': '{from} to {to}. Parking brake set: P releases it, H shows every control. The flight ends when you stop on the pavement of an airport.'
+  'airline.flight.start': '{from} to {to}. Parking brake set: P releases it, H shows every control. The flight ends when you stop on the pavement of an airport.',
+  'market.reason.negative': 'The balance is negative: you cannot buy until it is back above zero. Fly contracts to recover.'
 };

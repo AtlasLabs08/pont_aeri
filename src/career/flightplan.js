@@ -33,7 +33,7 @@
  *     (1 - HARD_SEVERITY)); el maxim de totes, 0 si cap no ho es
  *   estimateOwnFlight({ typeId, from, to, ticketPrice, pax, crewCount,
  *                       weatherBonus, revenueMult })
- *     -> computeFlightResult d un vol nominal: nota 85 (tram solid, mult 1),
+ *     -> computeFlightResult d un vol nominal: la nota minima del tram de mult 1,
  *        durada i combustible del pla, a l hora. Nomes per al Dispatch i el
  *        briefing ("ingressos estimats"); la liquidacio fa servir el record real.
  */
@@ -49,7 +49,6 @@ const MINUTES_PER_HOUR = 60;
 const DAYS_PER_MONTH = 30;      // D3D4-3: mes de partida fins al rellotge (E1)
 const MONTHS_PER_YEAR = 12;
 const HOURS_PER_DAY = 24;
-const NOMINAL_SCORE = 85;       // nota d un aterratge solid (escala 0..100) per a l estimacio
 
 function fleetType(typeId, fn) {
   const ft = lookup(BALANCE.fleetTypes, typeId, null);
@@ -130,7 +129,7 @@ export function estimateOwnFlight({ typeId, from, to, ticketPrice, pax, crewCoun
   const record = {
     aircraftTypeId: typeId, from, to, blockSeconds: blockMin * 60, fuelBurntKg: fuel, fuelPlannedKg: fuel,
     paxOnBoard: pax, skippedCruiseFuelKg: 0, arrivalDeltaMin: 0, crashCause: null,
-    touchdown: { score: NOMINAL_SCORE, fpm: 0, g: 1 }
+    touchdown: { score: BALANCE.landingBands.find(b => b.mult === 1).min, fpm: 0, g: 1 }
   };
   return computeFlightResult({ record, mode: 'own', ticketPrice, paxOnBoard: pax, crewCount, weatherBonus, revenueMult });
 }

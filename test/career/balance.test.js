@@ -281,5 +281,6 @@ describe('BALANCE: mercat d ocasio i categories (D2+D5)', () => {
     assert.ok(BALANCE.divert.revenueMult >= 0 && BALANCE.divert.revenueMult < 1);
     const C = BALANCE.contracts;
     assert.ok(Number.isInteger(C.offers) && C.offers > 0 && C.maxKm > 0 && C.loadFactor[0] < C.loadFactor[1]);
+    assert.ok(C.hours[0] >= 0 && C.hours[0] < C.hours[1] && C.hours[1] <= 24);
   });
 });

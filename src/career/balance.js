@@ -206,7 +206,7 @@ export const BALANCE = deepFreeze({
     crash: -6
   },
   divert: { revenueMult: 0.5, reputation: -2 },   // D3D4-7: vol que acaba en un altre aeroport
-  contracts: { offers: 3, maxKm: 600, loadFactor: [0.6, 0.95] },   // D3D4-9: ofertes del Dispatch
+  contracts: { offers: 3, maxKm: 600, loadFactor: [0.6, 0.95], hours: [6, 22] },   // hours: sortida [inici, fi)   // D3D4-9: ofertes del Dispatch
 
   cruiseSkipFuelPenalty: 0.08,
   xpMultipliers: { turbulence: 1.3, hardWeather: 1.4 },

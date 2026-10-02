@@ -18,4 +18,5 @@ export * from './lessons.js';
 export * from './school.js';
 export * from './flightplan.js';
 export * from './orders.js';
+export * from './contracts.js';
 export { MINUTES_PER_DAY } from './util.js';

@@ -16,7 +16,7 @@ import { on, _resetBus } from '../../src/app/bus.js';
 import { CAREER_KEY } from '../../src/app/save.js';
 import {
   openAirline, currentCareer, createAirline, unlockAllLessons, graduateCareer, topBarModel,
-  ensureMarket, _resetAirline
+  ensureMarket, updateCareer, _resetAirline
 } from '../../src/app/airline.js';
 import {
   MINUTES_PER_DAY, listingOffer, cardModel, marketModel, fleetModel, buyListing, sellAirframe, devNewMarket
@@ -221,6 +221,16 @@ describe('buyListing, fleetModel i sellAirframe', () => {
     assert.deepEqual(stored(), n);
     const bar = topBarModel(n);
     assert.deepEqual([bar.fleetReady, bar.fleetTotal], [1, 1]);
+  });
+
+  test('D3D4-10: amb el saldo negatiu no es pot comprar (reason negative), ni al model ni a buyListing', () => {
+    const s = graduatedCareer(), l = basicMi9(s);
+    updateCareer({ ...s, company: { ...s.company, cash: -1 } });
+    const offer = listingOffer(currentCareer(), l);
+    assert.equal(offer.cash.reason, 'negative');
+    assert.equal(offer.financed.reason, 'negative');
+    assert.deepEqual(buyListing(l.reg, 'cash'), { ok: false, reason: 'negative' });
+    assert.equal(currentCareer().fleet.length, 0);
   });
 
   test('comprar financat: la fila de la flota porta la quota i els vols que queden', () => {
