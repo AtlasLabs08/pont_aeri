@@ -491,6 +491,7 @@ export default {
   'dispatch.reason.type': 'The aircraft type does not match.',
   'dispatch.reason.none': 'No career loaded.',
   'dispatch.reason.contract': 'That is a contract flight.',
+  'dispatch.reason.launch': 'The flight could not start: another flight is already in progress.',
   'briefing.title': 'Briefing {from} → {to}',
   'briefing.subtitle': 'Own flight · {name} {reg}',
   'briefing.subtitleContract': 'Contract flight · {name} {reg} (another company\'s aircraft)',

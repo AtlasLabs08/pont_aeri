@@ -70,8 +70,10 @@
  *   airportAt(e, n) -> ICAO de l aeroport amb paviment (airportPavedAt) en
  *     aquest punt del mon, o null (D3D4-7).
  *   startFlight(plan) -> { ok, reason?, order? }   crea l ordre
- *     (createOrder), la desa i llanca el vol. reason 'none', 'negative'... o
- *     el de planOwnFlight / createOrder. Si el vol s abandona (launchFlight
+ *     (createOrder) i llanca el vol; nomes si launchFlight arrenca el vol, la
+ *     desa i el deixa com a vol d Airline en marxa. reason 'none', 'launch'
+ *     (launchFlight ha llancat: cap launcher o ja hi ha un altre vol en marxa;
+ *     no es desa res) o el de planOwnFlight / createOrder. Si el vol s abandona (launchFlight
  *     resol null), l ordre es cancel.la i es desa. Es pot volar amb el saldo
  *     negatiu (D3D4-10 nomes bloqueja gastar).
  *   startOwnFlight(plan), startContract(plan)   startFlight nomes amb un pla
@@ -365,10 +367,14 @@ function launch(planFields, plan) {
   const state = releaseGrounded(saved, dispatchDay(saved) * MINUTES_PER_DAY);
   const r = createOrder(state, planFields);
   if (!r.ok) return r;
-  updateCareer(r.state);
   const opts = orderOpts(r.order, plan);
+  // l ordre nomes existeix si el vol arrenca: si launchFlight llanca (cap launcher, o ja hi ha un altre vol en
+  // marxa), no es desa res i cap vol que acabi despres no es liquida amb aquesta ordre
+  let flight;
+  try { flight = launchFlight(opts); } catch (e) { active = null; return { ok: false, reason: 'launch' }; }
   active = { orderId: r.order.id, airline: opts.airline };
-  launchFlight(opts).then(record => { if (record === null) abandon(r.order.id); }, () => abandon(r.order.id));
+  updateCareer(r.state);
+  flight.then(record => { if (record === null) abandon(r.order.id); }, () => abandon(r.order.id));
   return { ok: true, order: r.order };
 }
 

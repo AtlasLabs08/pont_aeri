@@ -489,6 +489,7 @@ export default {
   'dispatch.reason.type': 'El tipus d\'avió no coincideix.',
   'dispatch.reason.none': 'No hi ha cap partida carregada.',
   'dispatch.reason.contract': 'Això és un vol de contracte.',
+  'dispatch.reason.launch': 'El vol no ha pogut començar: ja hi ha un altre vol en marxa.',
   'briefing.title': 'Briefing {from} → {to}',
   'briefing.subtitle': 'Vol propi · {name} {reg}',
   'briefing.subtitleContract': 'Vol de contracte · {name} {reg} (avió d\'una altra companyia)',
