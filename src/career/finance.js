@@ -81,10 +81,8 @@
  */
 
 import { BALANCE } from './balance.js';
+import { eur } from './util.js';
 import { priceOf, airframeTier } from './market.js';
-
-/** euros enters; converteix -0 en 0 */
-const eur = x => Math.round(x) || 0;
 
 function checkEuros(x, name, fn) {
   if (!Number.isInteger(x) || x < 0) throw new Error(fn + ': ' + name + ' ha de ser un enter no negatiu (euros)');

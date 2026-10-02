@@ -62,6 +62,7 @@
  */
 
 import { BALANCE } from './balance.js';
+import { lookup } from './util.js';
 import { derivedRng } from './rng.js';
 
 export const DEFAULT_TIER = 'standard';
@@ -73,7 +74,6 @@ const REG_PREFIX = 'EC-';
 const REG_LETTERS = 3;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const lerp = (a, b, s) => a + (b - a) * s;
 

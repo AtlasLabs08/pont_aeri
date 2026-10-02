@@ -49,13 +49,13 @@
 
 import {
   BALANCE, tierOf, airframeTier, purchaseRule, buyAircraft, sellQuote, sellAircraft,
-  generateMarket, marketEpoch
+  generateMarket, marketEpoch, MINUTES_PER_DAY
 } from '../career/index.js';
 import { AIRCRAFT } from '../core/index.js';
 import { currentCareer, updateCareer } from './airline.js';
 import { imageOf, silhouetteOf } from './aircraft-images.js';
 
-export const MINUTES_PER_DAY = 1440;
+export { MINUTES_PER_DAY };
 
 const nameOf = typeId => AIRCRAFT[typeId] ? AIRCRAFT[typeId].name : typeId;
 
