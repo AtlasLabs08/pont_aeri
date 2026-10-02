@@ -431,5 +431,7 @@ export default {
   'guide.symbols.papi.term': 'PAPI',
   'guide.symbols.papi.text': 'Quatre llums al costat de la pista. Dos de blancs i dos de vermells: a la senda de 3°. Més blancs: massa alt. Més vermells: massa baix.',
   'guide.symbols.taxiTarget.term': 'Anella verda',
-  'guide.symbols.taxiTarget.text': 'Escola, lliçó de rodatge: el punt objectiu i el camí per les calles de rodatge.'
+  'guide.symbols.taxiTarget.text': 'Escola, lliçó de rodatge: el punt objectiu i el camí per les calles de rodatge.',
+  'loading.terrain': 'Carregant el relleu real de Catalunya i les Balears',
+  'ap.gsCaptured': "Senda capturada: el pilot automàtic baixa per la senda de {deg}°"
 };

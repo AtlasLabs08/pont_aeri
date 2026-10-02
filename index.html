@@ -137,13 +137,13 @@ import {
 } from './src/core/index.js';
 
 import {
-  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll,
+  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
   setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, tailwindKt, MAX_TAILWIND_KT, distanceKm, bearingDeg
 } from './src/world/index.js';
 
 import { modelGeom, legTopY, legLength } from './src/core/model-geom.js';
 import { IS_DEV } from './src/platform/index.js';
-import { t } from './src/i18n/index.js';
+import { t, fmtNumber } from './src/i18n/index.js';
 import { LESSONS, CONTROL_KEYS, isLessonAvailable } from './src/career/index.js';
 import {
   lessonGoalParams, attemptMessage, messageText, debriefRows,
@@ -907,16 +907,16 @@ const Terrain = {
   /** build one chunk a few rows at a time (keeps the frame rate steady) */
   startJob(nd) {
     const N = R3.q.grid, M = N + 3, step = nd.size / N;
-    // coarse chunks take their shading normals from a fixed 30 m stencil, so lighting does not change when the LOD refines
-    const fine = step > 45;
-    this.job = { nd, N, M, step, row: 0, H: new Float32Array(M * M), fine, DX: fine ? new Float32Array(M * M) : null, DN: fine ? new Float32Array(M * M) : null };
+    // every chunk takes its shading normals from World.slopeAt (a stencil as wide as the 250 m terrain cell, 30 m in the
+    // photo zone): smooth across cells, and the lighting does not change when the LOD refines
+    this.job = { nd, N, M, step, row: 0, H: new Float32Array(M * M), DX: new Float32Array(M * M), DN: new Float32Array(M * M) };
   },
   runJob(budgetMs) {
     const t0 = performance.now(), J = this.job, nd = J.nd;
     while (J.row < J.M) {
       const n = nd.n0 + (J.row - 1) * J.step;
       for (let i = 0; i < J.M; i++) { const e = nd.e0 + (i - 1) * J.step, k = J.row * J.M + i, h = J.H[k] = World.heightAt(e, n);
-        if (J.fine && h > -2 && i > 0 && i < J.M - 1 && J.row > 0 && J.row < J.M - 1) { J.DX[k] = (World.heightAt(e + 30, n) - World.heightAt(e - 30, n)) / 60; J.DN[k] = (World.heightAt(e, n + 30) - World.heightAt(e, n - 30)) / 60; } }
+        if (h > -2 && i > 0 && i < J.M - 1 && J.row > 0 && J.row < J.M - 1) { const sl = World.slopeAt(e, n); J.DX[k] = sl[0]; J.DN[k] = sl[1]; } }
       J.row++;
       if (performance.now() - t0 > budgetMs) return false;
     }
@@ -937,7 +937,7 @@ const Terrain = {
       const ab = World._airportBlend(e, n); if (ab && !ab[3].photo) h -= 2.2 * smoothstep(0.80, 1.0, ab[0]);       // sink under the airport slab
       else { const sp = World._shapeAt(e, n); if (sp && sp.d < 450) h -= 2.2 * (1 - smoothstep(370, 450, sp.d)); }      // F1: the same under the slab of a new airport (bounds + 260 m)
       pos[k * 3] = e - ce; pos[k * 3 + 1] = h; pos[k * 3 + 2] = -(n - cn);
-      const dx = J.fine ? J.DX[hi] : (H[hi + 1] - H[hi - 1]) / (2 * step), dn = J.fine ? J.DN[hi] : (H[hi + M] - H[hi - M]) / (2 * step), il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
+      const dx = J.DX[hi], dn = J.DN[hi], il = 1 / Math.sqrt(dx * dx + dn * dn + 1);
       nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = dn * il;
       wp[k * 3] = e; wp[k * 3 + 1] = H[hi]; wp[k * 3 + 2] = n;
       const u = H[hi] > 0.5 ? World.urbanAt(e, n, H[hi], uo) : 0;
@@ -1165,8 +1165,8 @@ const AirportScenery = {
           for (let t = -15; t <= 15; t += 3) if (Math.abs(t) > 2) { const p = P(-300, t); put(-300, t, WH, 1.5, 1, 0, yAt(p[0], p[1]) + 1.5); }
           for (let s = -30; s >= -270; s -= 30) for (const sg of [1, -1]) for (const t of [7.5, 9, 10.5]) { const p = P(s, sg * t); put(s, sg * t, RE, 1.2, 1, 0, yAt(p[0], p[1]) + 1.5); }
         }
-        // PAPI: four units left of the runway abeam the aiming point, 3 degree glide path
-        [3.5, 3.17, 2.83, 2.5].forEach((ang, i) => put(420, hw + 15 + i * 9, WH, 3.0, 2, ang, 0.8));
+        // PAPI: four units left of the runway abeam the aiming point, on the glide path of the end
+        [3.5, 3.17, 2.83, 2.5].forEach((ang, i) => put(420, hw + 15 + i * 9, WH, 3.0, 2, ang + glideAngle(en) * RAD - 3, 0.8));      // centrat a la senda del cap (TA-9)
         en.papi = P(420, 0);
       });
     }
@@ -2179,7 +2179,7 @@ const Game = {
         if (O.spawnAglFt != null) {
           alt = A.elev + O.spawnAglFt * FT + cfg.gear.zStatic; gamma = 0; flaps = O.spawnFlaps === 'approach' ? cfg.flapTO : 0; gearDown = false;
         } else {
-          alt = A.elev + (d + 420) * Math.tan(3 * DEG) + cfg.gear.zStatic; gamma = -3 * DEG; flaps = cfg.flapLDG; gearDown = true;
+          const gs = glideAngle(en); alt = A.elev + (d + ILS.GS_S) * Math.tan(gs) + cfg.gear.zStatic; gamma = -gs; flaps = cfg.flapLDG; gearDown = true;     // senda del cap (TA-9)
         }
       } else if (O.start === 'airborne') {
         // en vol, anivellat, uns spawnOffsetNm mar endins de l aeroport (mateix eix que 'final'),
@@ -2350,7 +2350,7 @@ const Game = {
   onApEvent(ev) {
     const on = this.ap.on;
     if (ev === 'LOC') this.msg('Localizer captured' + (on ? '' : ': follow the guidance circle'));
-    else if (ev === 'G/S') this.msg('Glideslope captured' + (on ? ': the autopilot is descending on the 3\u00b0 path' : ': keep the path vector in the guidance circle'), 3.5);
+    else if (ev === 'G/S') this.msg(on ? t('ap.gsCaptured', { deg: (d => fmtNumber(d, Number.isInteger(d) ? 0 : 1))(this.nav ? +(this.nav.gs * RAD).toFixed(1) : 3) }) : 'Glideslope captured: keep the path vector in the guidance circle', 3.5);      // senda del cap (TA-9)
     else if (ev === 'MINIMUMS') this.msg('100 ft: autopilot off. Flare and land by hand', 4);
     else if (ev === 'RETARD') this.msg('Autothrottle: levers to idle for the flare');
     else if (ev === 'LOC LOST' || ev === 'G/S LOST') this.msg(ev.replace('LOST', 'signal lost'), 3);
@@ -2551,7 +2551,7 @@ const HUD = {
     // flight path vector, -3 degree reference and guidance cue
     const vmag = Math.hypot(f.vn, f.ve, f.vd); let FP = null;
     if (!f.wow && vmag > 20) {
-      if (f.flapPos > 0.5 && o.aglFt < 4000) { const a = this.he(trk - 5 * DEG, -3 * DEG), b = this.he(trk + 5 * DEG, -3 * DEG); if (a && b) { c.setLineDash([14, 7]); c.lineWidth = 2; this.line(c, a, b); c.setLineDash([]); c.lineWidth = 1.6; font(11, true); c.textAlign = 'left'; c.fillText('-3', b[0] + u[0] * 8, b[1] + u[1] * 8); } }
+      if (f.flapPos > 0.5 && o.aglFt < 4000) { const gs = nav && nav.locValid ? nav.gs : 3 * DEG, a = this.he(trk - 5 * DEG, -gs), b = this.he(trk + 5 * DEG, -gs); if (a && b) { c.setLineDash([14, 7]); c.lineWidth = 2; this.line(c, a, b); c.setLineDash([]); c.lineWidth = 1.6; font(11, true); c.textAlign = 'left'; c.fillText('-' + +(gs * RAD).toFixed(1), b[0] + u[0] * 8, b[1] + u[1] * 8); } }      // senda del cap sintonitzat (TA-9)
       FP = this.dir(f.ve / vmag, -f.vd / vmag, -f.vn / vmag);
       if (FP) { const [x, y] = FP, r = 7; c.lineWidth = 2; c.beginPath(); c.arc(x, y, r, 0, 6.3);
         c.moveTo(x - u[0] * r, y - u[1] * r); c.lineTo(x - u[0] * 22, y - u[1] * 22); c.moveTo(x + u[0] * r, y + u[1] * r); c.lineTo(x + u[0] * 22, y + u[1] * 22);
@@ -2608,7 +2608,7 @@ const HUD = {
     c.textBaseline = 'middle'; font(13, true); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(nav.ident, x0 + 10, y0 + 16);
     c.textAlign = 'right'; c.fillStyle = '#9db3c2'; font(12); c.fillText(thresholdDistNm(nav.A, nav.en, f.e, f.n).toFixed(1) + ' nm', x0 + W - 10, y0 + 16);
     // PAPI: four lights, white above their setting angle, red below
-    const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5];
+    const el = nav.gsAng * RAD, pa = [3.5, 3.17, 2.83, 2.5].map(a => a + nav.gs * RAD - 3);      // PAPI centrat a la senda del cap (TA-9)
     pa.forEach((a, i) => { const x = x0 + 50 + i * 26, y = y0 + 44, wht = el > a; c.beginPath(); c.arc(x, y, 8, 0, 6.3); c.fillStyle = wht ? '#fbfbf2' : '#ff3b30'; c.shadowColor = c.fillStyle; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; });
     // localizer and glideslope
     const cx = x0 + 82, cy = y0 + 100, D = 24; c.strokeStyle = '#e8f1f5'; c.lineWidth = 1.5;
@@ -2808,9 +2808,11 @@ const Main = {
     const prog = (p, t) => UI.loading(p, t), tick = () => new Promise(r => setTimeout(r, 15));
     const photo = await Photo.probe();               // a local photo scenery pack next to the page?
     if (photo) { try { Photo.applyAirport(); } catch (e) { console.warn('photo scenery: airport data', e); Photo.revert(); } }
-    UI.init(); prog(0.05, 'Building the coastline of Catalonia and the Balearics'); await tick();
+    UI.init(); prog(0.05, t('loading.terrain'));
+    const terrain = fetch(TERRAIN_FILE).then(r => { if (!r.ok) throw new Error('terrain file: HTTP ' + r.status); return r.arrayBuffer(); });      // en paral.lel amb el DEM de Photo
     if (photo && Photo.oldDef) { prog(0.08, 'Loading the real relief around Barcelona'); try { await Photo.loadDem(); } catch (e) { console.warn('photo scenery: relief', e); Photo.revert(); } }
-    World.build(); prog(0.3, 'Starting the renderer'); await tick();
+    await World.load(await terrain);
+    prog(0.3, 'Starting the renderer'); await tick();
     initRenderer(document.getElementById('view')); HUD.init(); Photo.initRender();
     if (Photo.on) { try { await Photo.loadTextures((i, L) => prog(0.31 + i * 0.03, 'Loading aerial photos of Barcelona (' + (i + 1) + ' of 3)')); } catch (e) { console.warn('photo scenery: images', e); } }
     Env.init(); Sea.init(); Terrain.init(); Clouds.init(); prog(0.4, 'Laying out Barcelona and Palma'); await tick();
