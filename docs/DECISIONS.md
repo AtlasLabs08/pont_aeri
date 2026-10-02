@@ -1290,3 +1290,22 @@ Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
   types.js i a la seccio 5.
 - El harness economic no canvia: npm run balance -- --seeds 50 dona la
   mateixa sortida que abans (els valors nous de BALANCE no hi entren).
+
+## 2026-10-02 - D3+D4: correccions de la revisio del PR #36
+
+- Una ordre d Airline nomes existeix si el vol arrenca. app/dispatch.js
+  (launch) crea l ordre en memoria i nomes la desa, i nomes la deixa com a
+  vol en marxa, si launchFlight no llanca. Si llanca (ja hi ha un altre vol
+  en marxa, o no hi ha launcher), no es desa res i el Dispatch diu
+  dispatch.reason.launch. Abans l ordre quedava desada i activa, i el vol
+  que acabava despres (una llico, per exemple) es liquidava amb ella.
+- El titol del debrief d Airline te una clau propia, debrief.airline.title.
+  debrief.title era dues vegades a en.js i ca.js: la segona sobreescrivia la
+  de l escola. Una prova llegeix el codi font de cada fitxer d i18n i falla
+  si hi ha cap clau repetida (comprovat amb la clau repetida de nou).
+- Game.opts despres d un vol d Airline. El launcher desa els camps que el vol
+  d Airline sobreescriu (avio, aeroport, desti, pista, sortida, hora, vent,
+  turbulencia, mode i dificultat) i leaveAirlineFlight els torna com eren en
+  sortir del vol, tant si ha acabat com si s ha abandonat; si l avio era un
+  altre, Game.setAircraft. Com es fa amb els camps spawn* de les llicons: el
+  menu de Free Flight no hereta res del vol d Airline.
