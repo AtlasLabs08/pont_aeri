@@ -8,5 +8,7 @@ Simulador de vol i gestio d aerolinia al navegador, ambientat als Paisos Catalan
 
 ## Documentacio
 
+- `ENGINEERING.md` — especificacio d enginyeria: regles per a l agent, arquitectura i contractes
+- `docs/DESIGN.md` — disseny de joc (economia, progressio, escola de vol, contingut)
 - `docs/DECISIONS.md` — decisions preses i per que
 - `docs/BACKLOG.md` — idees aparcades

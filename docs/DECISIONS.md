@@ -2,6 +2,8 @@
 
 Una linia per decisio, amb data. Serveix per no rediscutir el mateix d aqui a quatre mesos.
 
+> A partir d ara els ids de decisio porten el prefix de la tasca (per exemple `D3D4-1`). Els ids antics no es renombren.
+
 ## 2026-09-22 — Ruleset de main amb 0 aprovacions
 
 Posat a 0 temporalment per poder treballar sol. PENDENT: pujar a 1 quan el company accepti la invitacio a l organitzacio.
