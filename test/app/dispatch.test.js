@@ -21,7 +21,7 @@ import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airlin
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
   airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
-  recoverStaleOrders, planContract, startContract, _resetDispatch
+  recoverStaleOrders, planContract, startContract, debriefModel, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -272,5 +272,30 @@ describe('contractes al Dispatch (D3D4-9)', () => {
     assert.ok(currentCareer().company.cash > -1000);
     assert.equal(pendingDebrief().mode, 'contract');
     assert.equal(startContract(planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 })).reason, 'unknown');
+  });
+});
+
+describe('debriefModel (D3D4-12)', () => {
+  test('tots els numeros surten del settlement', () => {
+    initDispatch();
+    updateCareer(careerWithCommuter());
+    setFlightLauncher(() => {});
+    const p = planOwnFlight(currentCareer(), { reg: 'EC-TST', to: 'LERS', hour: 9 });
+    startOwnFlight(p);
+    onFlightFinished(record({ paxOnBoard: p.pax, landedAt: 'LEGE' }));
+    const st = pendingDebrief(), m = debriefModel(st);
+    const R = st.result;
+    assert.deepEqual(m.revenue.map(r => r.value), [R.revenue.tickets, R.revenue.punctuality, R.revenue.fuelSaving]);
+    assert.deepEqual(m.costs.map(c => c.value), [R.costs.fuel, R.costs.crew, R.costs.fees, R.costs.maintenance, R.costs.finance]);
+    assert.equal(m.net, R.net);
+    assert.deepEqual(m.after.map(a => a.value), [-st.cycleCost, -st.damage.playerCost, -st.instalments]);
+    assert.equal(m.net + m.after.reduce((s, a) => s + a.value, 0), m.cashDelta);
+    assert.equal(m.cashAfter, currentCareer().company.cash);
+    assert.equal(m.xp.gained, st.xp.gained);
+    assert.equal(m.wear.length, 4);
+    assert.equal(m.divert.landedAt, 'LEGE');
+    assert.equal(m.route.location, 'LEGE');
+    assert.equal(m.arrivalDeltaMin, 2);
+    assert.ok(m.xp.progress >= 0 && m.xp.progress <= 1);
   });
 });

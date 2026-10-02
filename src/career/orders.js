@@ -53,7 +53,8 @@
  *     settlement: { orderId, mode, contract, result, instalments, cycleCost,
  *     damage, xp: { gained, before, after, rankBefore, rankAfter, change,
  *     next }, reputation: { before, after, delta }, wear: { before, after } o
- *     null, diverted, landedAt, to, location, groundedDays, cashBefore,
+ *     null, diverted, landedAt, to, location, groundedDays, plannedArrivalMin,
+ *     arrivalDeltaMin (null sense pla), cashBefore,
  *     cashAfter, draws, logEntry }. Llanca un Error si l ordre no hi es.
  */
 
@@ -253,6 +254,8 @@ export function settleFlight(state, orderId, record) {
       reputation: { before: co.reputation, after: repAfter, delta: repDelta },
       wear: contract ? null : { before: { ...airframe.condition }, after: { ...af.condition } },
       diverted, landedAt, to: order.to, location: contract ? null : arrivedAt, groundedDays: contract ? 0 : damage.groundedDays,
+      plannedArrivalMin: order.plannedArrivalMin ?? null,
+      arrivalDeltaMin: order.plannedArrivalMin != null ? record.arrivalDeltaMin : null,
       cashBefore, cashAfter: cash, draws, logEntry
     }
   };

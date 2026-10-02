@@ -19,7 +19,9 @@
  *   showMainMenu()     les dues portes: Free Flight i Airline
  *   enterAirline()     openAirline() i la resposta a cada estat de loadCareer
  *   showAirlineHome()  la pantalla que toca amb la partida en memoria
- *     (tornar d una llico, boto DEV): nom, escola, graduacio o centre
+ *     (tornar d una llico o d un vol, boto DEV): nom, escola, graduacio o
+ *     centre; si hi ha un vol d Airline liquidat sense veure, el debrief
+ *     (D3D4-12)
  *   hideAirlineUi()    amaga la capa (desa si hi ha partida)
  *   isAirlineUiOpen() -> boolean
  *   refreshAirlineUi()   si el centre d operacions es obert, el torna a
@@ -37,7 +39,7 @@ import {
   acceptBalanceMismatch, startOver, graduateCareer, exportCareer, importCareer,
   saveAirline, topBarModel, NAME_MAX_LENGTH, ensureMarket, marketModel, fleetModel,
   buyListing, sellAirframe, initDispatch, recoverStaleOrders, dispatchModel, planOwnFlight, planContract,
-  startFlight
+  startFlight, pendingDebrief, clearDebrief, debriefModel
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
 import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen } from './screens.js';
@@ -46,6 +48,7 @@ import { fleetPanel } from './fleet.js';
 import { marketPanel } from './market.js';
 import { dispatchPanel } from './dispatch.js';
 import { briefingScreen } from './briefing.js';
+import { debriefScreen } from './debrief.js';
 
 let root = null, hooks = {}, bannerTimer = 0, screen = null, opsTab = null;
 
@@ -150,6 +153,8 @@ function doStartOver() {
 
 export function showAirlineHome() {
   const state = currentCareer(), screen = entryScreen(state);
+  // D3D4-12: en tornar d un vol d Airline liquidat, primer el debrief
+  if (screen === 'ops' && pendingDebrief()) return showDebrief();
   if (screen === 'name') return showName();
   if (screen === 'graduation') return showGraduation();
   if (screen === 'ops') return showOps();
@@ -210,6 +215,11 @@ function showOps(tab = null) {
     }
   }), true, false, 'ops');
   if (again) root.scrollTop = scroll;
+}
+
+function showDebrief() {
+  const st = pendingDebrief();
+  mount(debriefScreen(debriefModel(st), { onContinue: () => { clearDebrief(); showOps('dispatch'); } }), false, false, 'debrief');
 }
 
 /** torna a fer el pla amb canvis (combustible, desti alternatiu), del mateix tipus */

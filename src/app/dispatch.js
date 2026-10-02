@@ -7,7 +7,7 @@
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          turbulenceLevel minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
- *          clearDebrief recoverStaleOrders _resetDispatch
+ *          clearDebrief debriefModel recoverStaleOrders _resetDispatch
  *
  * IMPORTA: career/ (flightplan.js, orders.js, demand.js, BALANCE...),
  *   world/ (AIRPORTS, AIRPORT_ORDER, AIRPORT_DEFS, weatherFor, toGameWeather,
@@ -84,6 +84,15 @@
  *     rang puja, i 'dispatch:resolved' { settlement, saved }. Sense vol
  *     d Airline en marxa no fa res.
  *   pendingDebrief() -> l ultim settlement, fins a clearDebrief()
+ *   debriefModel(settlement) -> el compte de resultats del debrief (D3D4-12),
+ *     tot del settlement: { mode, contract, route, landing, blockMin,
+ *     arrivalDeltaMin, revenue: [{ key, value }], revenueTotal, costs,
+ *     costsTotal, factor: { K, rotation, subtotal } (null al contracte), net,
+ *     after: [{ key, value }] (cicles, danys i quotes, en negatiu),
+ *     cashDelta, cashAfter, xp: { gained, total, rankBefore, rankAfter,
+ *     rankUp, rankDown, next, remaining, progress }, wear: [{ key, before,
+ *     after, delta }] o null, damage, reputation, divert } (divert null si no
+ *     hi ha desviament). ui/ no fa cap compte.
  *   recoverStaleOrders() -> boolean   ordres del pilot que han quedat a la
  *     cua sense cap vol en marxa (s ha tancat el joc a mig vol): es
  *     cancel.len com un abandonament i es desa. true si n hi havia.
@@ -134,6 +143,46 @@ export function initDispatch() {
 
 export function pendingDebrief() { return lastSettlement; }
 
+const CONDITION_KEYS = ['engines', 'gear', 'airframe', 'avionics'];
+
+export function debriefModel(st) {
+  const r = st.result, own = st.mode === 'own';
+  const revenue = own
+    ? [['tickets', r.revenue.tickets], ['punctuality', r.revenue.punctuality], ['fuelSaving', r.revenue.fuelSaving]]
+    : [['contract', r.revenue.contract]];
+  const costs = own
+    ? [['fuel', r.costs.fuel], ['crew', r.costs.crew], ['fees', r.costs.fees], ['maintenance', r.costs.maintenance], ['finance', r.costs.finance]]
+    : [];
+  const rows = list => list.map(([key, value]) => ({ key, value }));
+  const sum = list => list.reduce((s, [, v]) => s + v, 0);
+  const after = own
+    ? [['cycles', -st.cycleCost], ['damage', -st.damage.playerCost], ['instalments', -st.instalments]]
+    : [['damage', -st.damage.playerCost]];
+  const next = st.xp.next;
+  const floor = BALANCE.ranks.find(k => k.key === st.xp.rankAfter).xp;
+  return {
+    mode: st.mode, contract: st.contract,
+    route: { from: st.logEntry.from, to: st.to, landedAt: st.landedAt, diverted: st.diverted, location: st.location },
+    landing: { key: r.landing.key, score: st.logEntry.score, mult: r.landing.mult },
+    blockMin: st.logEntry.blockMin, arrivalDeltaMin: st.arrivalDeltaMin,
+    revenue: rows(revenue), revenueTotal: sum(revenue),
+    costs: rows(costs), costsTotal: sum(costs),
+    factor: own ? { K: r.K, rotation: r.rotation, subtotal: sum(revenue) - sum(costs) } : null,
+    net: r.net,
+    after: rows(after),
+    cashDelta: st.cashAfter - st.cashBefore, cashAfter: st.cashAfter,
+    xp: { gained: st.xp.gained, total: st.xp.after, rankBefore: st.xp.rankBefore, rankAfter: st.xp.rankAfter,
+      rankUp: st.xp.change === 'up', rankDown: st.xp.change === 'down',
+      next: next ? next.key : null, remaining: next ? next.remaining : null,
+      progress: next ? (st.xp.after - floor) / (next.xp - floor) : 1 },
+    wear: st.wear ? CONDITION_KEYS.map(key => ({ key, before: st.wear.before[key], after: st.wear.after[key],
+      delta: Math.round((st.wear.after[key] - st.wear.before[key]) * 10) / 10 })) : null,
+    damage: { items: st.damage.items.map(i => ({ id: i.id, cost: i.cost, groundedDays: i.groundedDays })),
+      playerCost: st.damage.playerCost, groundedDays: st.groundedDays, xpLoss: st.damage.xpLoss },
+    reputation: { before: Math.round(st.reputation.before * 10) / 10, after: Math.round(st.reputation.after * 10) / 10, delta: st.reputation.delta },
+    divert: st.diverted ? { landedAt: st.landedAt, revenueMult: BALANCE.divert.revenueMult, reputation: BALANCE.divert.reputation } : null
+  };
+}
 export function clearDebrief() { lastSettlement = null; }
 
 export function recoverStaleOrders() {
