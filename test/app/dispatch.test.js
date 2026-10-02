@@ -21,7 +21,7 @@ import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airlin
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
   airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
-  recoverStaleOrders, planContract, startContract, debriefModel, airlineClosing, AIRLINE_CONTACT_KM, _resetDispatch
+  recoverStaleOrders, planContract, startContract, debriefModel, airlineClosing, AIRLINE_CONTACT_KM, reportButtons, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -412,5 +412,14 @@ describe('tancament del vol d Airline un cop ha tocat terra (revisio del PR #36)
       assert.deepEqual(ids, onRunway ? ['excursion'] : ['offRunway'], 'onRunway ' + onRunway);
       assert.equal(currentCareer().fleet[0].location, 'LEBL');
     }
+  });
+});
+
+describe('botons de l informe d aterratge (revisio del PR #36)', () => {
+  test('en un vol d Airline nomes Continue i Watch replay', () => {
+    assert.deepEqual(reportButtons({ airline: true }), ['continue', 'replay']);
+  });
+  test('a Free Flight i a l escola, els quatre de sempre', () => {
+    assert.deepEqual(reportButtons({ airline: false }), ['continue', 'replay', 'restart', 'menu']);
   });
 });
