@@ -41,15 +41,12 @@
 
 import { AIRCRAFT } from '../core/index.js';
 import { BALANCE } from './balance.js';
+import { eur, lookup, effectiveFuelKg } from './util.js';
 import { landingBand } from './landing.js';
 
 const SECONDS_PER_HOUR = 3600;
 const KG_PER_TONNE = 1000;
 
-/** euros enters; converteix -0 en 0 */
-const eur = x => Math.round(x) || 0;
-
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
 
 /** Classe de l avio i MTOW en tones. */
 function aircraftInfo(typeId) {
@@ -101,7 +98,7 @@ export function computeFlightResult(input) {
   const rotation = Math.min(1 + B.rotation.perCrew * crewCount, B.rotation.cap[cls]);
   const mRoute = 1 + lookup(B.airportDifficulty, record.to, 0) + weatherBonus + (exclusive ? B.exclusivityBonus : 0);
 
-  const fuelKg = record.fuelBurntKg + (record.skippedCruiseFuelKg ?? 0) * (1 + B.cruiseSkipFuelPenalty);
+  const fuelKg = effectiveFuelKg(record);
   const hours = record.blockSeconds / SECONDS_PER_HOUR;
 
   const tickets = failed ? 0 : ticketPrice * pax * mRoute * band.mult * revenueMult;

@@ -53,12 +53,12 @@
  */
 
 import { BALANCE } from './balance.js';
+import { lookup } from './util.js';
 import { canGraduate } from './school.js';
 import { startingCompany } from './finance.js';
 
 /** @typedef {import('./types.js').Pilot} Pilot */
 
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
 
 /** Index de rankKey a BALANCE.ranks. Llanca si no hi es. */
 function rankIndex(rankKey, fn) {

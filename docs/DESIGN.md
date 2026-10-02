@@ -26,7 +26,7 @@
 > per a rutes especials.
 >
 > Les decisions de disseny estan tancades (secció *Decisions*). No les
-> reobris sense que ho demani en Marc.
+> reobris sense que ho demani el propietari del projecte.
 
 ---
 

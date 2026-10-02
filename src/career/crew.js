@@ -21,10 +21,10 @@
  */
 
 import { BALANCE } from './balance.js';
+import { lookup } from './util.js';
 
 const EPSILON = 1e-9;   // tolerancia de coma flotant a la divisio, no es economia
 
-const lookup = (table, key, fallback) => Object.hasOwn(table, key) ? table[key] : fallback;
 
 /** Tripulacions que encara pugen el factor de rotacio d aquesta classe. */
 export function maxCrew(cls) {

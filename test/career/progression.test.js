@@ -18,7 +18,7 @@ import {
 
 /** Pilot minim; over sobreescriu camps. */
 const pilot = (over = {}) => ({
-  name: 'Marc', xp: 0, rank: 'student', ratings: [], endorsements: [], logbook: [], ...over
+  name: 'Marta', xp: 0, rank: 'student', ratings: [], endorsements: [], logbook: [], ...over
 });
 
 /** Copia profunda per comprovar que la funcio no toca l entrada. */
@@ -379,7 +379,7 @@ describe('purchaseEndorsement', () => {
 describe('graduate (C5, E2)', () => {
   const allPassed = () => LESSONS.map(l => l.id);
   const career = (school = {}) => {
-    const s = createCareer({ name: 'Marc', seed: 7, createdAt: '2026-09-30T00:00:00.000Z' });
+    const s = createCareer({ name: 'Marta', seed: 7, createdAt: '2026-09-30T00:00:00.000Z' });
     return { ...s, school: { ...s.school, lessonsPassed: allPassed(), ...school } };
   };
 

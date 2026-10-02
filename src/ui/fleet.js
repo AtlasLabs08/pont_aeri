@@ -3,7 +3,7 @@
  * (app/market.js) i crida les accions que rep de l encaminador.
  * NOU: tasca D2 d ENGINEERING.md.
  *
- * EXPORTA: fleetPanel tierBadge conditionCells
+ * EXPORTA: fleetPanel tierBadge
  *
  * INTERFICIE (no la canviis, airline-ui.js i market.js en depenen):
  *   fleetPanel(rows, { onSell(reg), onMarket }) -> Element
@@ -27,7 +27,7 @@ export function tierBadge(key) {
   return el('span', { class: 'pa-tier pa-tier-' + key }, t('tier.' + key));
 }
 
-export function conditionCells(condition) {
+function conditionCells(condition) {
   return el('span', { class: 'pa-conds' }, CONDITION_KEYS.map(k => {
     const v = Math.round(condition[k]);
     return el('span', { class: 'pa-cond' + (v < BALANCE.failure.threshold ? ' pa-bad' : ''), title: t('cond.' + k) },

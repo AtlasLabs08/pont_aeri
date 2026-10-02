@@ -1,7 +1,7 @@
 /* Model de vol 6-DOF: cos rigid, pas fix de 120 Hz.
  * ORIGEN: linies 460-864 de l'original (SECTION 4).
  *
- * EXPORTA: PHYS_DT STALL_W SURF FLAT_ENV FlightModel
+ * EXPORTA: PHYS_DT SURF FLAT_ENV FlightModel
  *
  * IMPORTA: ./constants.js i ./atmosphere.js
  *
@@ -19,7 +19,7 @@ import { ISA, isa, casFromMach } from './atmosphere.js';
 import { hash2 } from './noise.js';
 export const PHYS_DT = 1 / 120;
 export const SURF = { PAVED: 0, GRASS: 1, TERRAIN: 2, WATER: 3 };
-export const STALL_W = 0.022;          // width (rad) of the attached->separated flow blend
+const STALL_W = 0.022;          // width (rad) of the attached->separated flow blend
 /* Amortiment d extensio del tren, en fraccio del critic de cada pota (vegeu _buildGear). Nomes frena l extensio: la
    compressio (i per tant el pic de g del contacte) no canvia. 2,5 per pota deixa el conjunt gairebe critic: un cop,
    sense rebot, i l oscil.lacio de capcineig i d alcada s apaga en menys d 1 s a tots els avions (docs/DECISIONS.md,

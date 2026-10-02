@@ -5,7 +5,7 @@
  * NOU: tasca C5+D1 d ENGINEERING.md (docs/DECISIONS.md, 30/09/2026).
  * No importa Game ni render/: el que toca el simulador arriba com a hooks.
  *
- * EXPORTA: initAirlineUi showMainMenu enterAirline showAirlineHome
+ * EXPORTA: initAirlineUi showMainMenu showAirlineHome
  *          hideAirlineUi isAirlineUiOpen showGuide refreshAirlineUi
  *
  * INTERFICIE (no la canviis, index.html en depen):
@@ -100,7 +100,7 @@ export function showMainMenu() {
   }));
 }
 
-export function enterAirline() {
+function enterAirline() {
   const r = openAirline();
   if (r.status === 'balanceMismatch') return balanceNotice();
   if (r.status === 'invalid') return invalidNotice(r.backupKey);

@@ -8,7 +8,7 @@
  * joc i per a tools/balance.mjs, com graduate.
  *
  * EXPORTA: downPayment makeLoan financeAircraft payInstalment startingCompany
- *          STARTING_LOAN_ID PAYMENT_MODES instalmentsPerFlight purchaseRule
+ *          STARTING_LOAN_ID instalmentsPerFlight purchaseRule
  *          buyAircraft sellQuote sellAircraft
  *
  * INTERFICIE (no la canviis, app/, tools/balance.mjs i els tests en depenen):
@@ -81,10 +81,8 @@
  */
 
 import { BALANCE } from './balance.js';
+import { eur } from './util.js';
 import { priceOf, airframeTier } from './market.js';
-
-/** euros enters; converteix -0 en 0 */
-const eur = x => Math.round(x) || 0;
 
 function checkEuros(x, name, fn) {
   if (!Number.isInteger(x) || x < 0) throw new Error(fn + ': ' + name + ' ha de ser un enter no negatiu (euros)');
@@ -146,7 +144,7 @@ export function startingCompany(company) {
 }
 
 /** Maneres de pagar un avio (G5). */
-export const PAYMENT_MODES = Object.freeze(['cash', 'financed']);
+const PAYMENT_MODES = Object.freeze(['cash', 'financed']);
 
 /** Quotes per vol de tots els prestecs vius. */
 export function instalmentsPerFlight(loans) {

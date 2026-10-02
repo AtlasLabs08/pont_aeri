@@ -38,9 +38,9 @@
 import { clamp } from '../core/index.js';
 import { AIRPORT_DEFS, distanceKm } from '../world/index.js';
 import { BALANCE } from './balance.js';
+import { MINUTES_PER_DAY } from './util.js';
 
 const REPUTATION_SCALE = 100;   // la reputacio va de 0 a 100 (esquema, state.js)
-const MINUTES_PER_DAY = 1440;
 
 /** 'AAAA-BBBB' amb els dos ICAO en ordre alfabetic. */
 export function routeKey(a, b) {

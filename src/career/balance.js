@@ -48,7 +48,7 @@ export const BALANCE = deepFreeze({
     nbStretch: { cls: 'narrowbody', seats: 220, rating: 'narrowbody' },
     wbEr:      { cls: 'widebody',   seats: 290, rating: 'widebody'   }
   },
-  // B5: preu d ocasio de referencia per tipus, en euros (proposta d en Marc)
+  // B5: preu d ocasio de referencia per tipus, en euros (proposta del projecte)
   usedPrice: {
     commuter: 350000, tpShort: 1100000, tp: 1800000, rj: 4500000, nbShort: 6500000,
     nb: 8000000, nbStretch: 10000000, wb: 22000000, wbEr: 25000000, jumbo: 30000000

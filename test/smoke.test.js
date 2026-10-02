@@ -59,15 +59,33 @@ test('hi ha deu avions i tots tenen configuracio completa', () => {
   }
 });
 
-test('un FlightModel es pot instanciar i avancar sense petar', () => {
-  const id = core.AIRCRAFT_ORDER[0];
-  const cfg = core.AIRCRAFT[id];
-  const f = new core.FlightModel(cfg);
-  const ctl = core.newCtl();
+test('un FlightModel es pot instanciar i avancar amb valors plausibles', () => {
+  for (const id of core.AIRCRAFT_ORDER) {
+    const cfg = core.AIRCRAFT[id];
+    const f = new core.FlightModel(cfg);
+    const ctl = core.newCtl();
 
-  f.reset({ onGround: true, hdg: 0, mass: cfg.mass.typical, fuel: 1000 });
-  for (let i = 0; i < 120; i++) f.step(core.PHYS_DT, ctl, core.FLAT_ENV);
+    // a terra, sense motors: un segon i l avio segueix quiet, a l alcada del camp
+    f.reset({ onGround: true, hdg: 0, mass: cfg.mass.typical, fuel: 1000 });
+    for (let i = 0; i < 120; i++) f.step(core.PHYS_DT, ctl, core.FLAT_ENV);
+    assert.ok(f.out.ias >= 0 && f.out.ias < 5, `${id}: IAS a terra fora de rang: ${f.out.ias}`);
+    assert.ok(f.out.altFt > -100 && f.out.altFt < 200, `${id}: alcada a terra fora de rang: ${f.out.altFt}`);
+  }
+});
 
-  assert.ok(isFinite(f.out.ias), 'IAS no finita despres d un segon de simulacio');
-  assert.ok(isFinite(f.out.altFt), 'sense altitud a out');
+test('un FlightModel trimat en vol avanca mantenint velocitat i alcada', () => {
+  for (const id of core.AIRCRAFT_ORDER) {
+    const cfg = core.AIRCRAFT[id];
+    const f = new core.FlightModel(cfg);
+    const ctl = core.newCtl();
+    const cas = 110;                                   // m/s, ~214 kt
+    const tr = core.trimAircraft(f, { cas, alt: 1500,         // metres (~4.920 ft)
+      gamma: 0, flaps: 0, gearDown: false,
+      mass: cfg.mass.typical, fuel: cfg.mass.typFuel });
+    ctl.throttle = tr.throttle; ctl.trim = tr.trim;
+    for (let i = 0; i < 120; i++) f.step(core.PHYS_DT, ctl, core.FLAT_ENV);
+    assert.ok(Number.isFinite(f.out.ias) && Number.isFinite(f.out.altFt), `${id}: sortida no finita`);
+    assert.ok(f.out.ias > 190 && f.out.ias < 240, `${id}: IAS fora de rang: ${f.out.ias}`);
+    assert.ok(f.out.altFt > 4700 && f.out.altFt < 5100, `${id}: alcada fora de rang: ${f.out.altFt}`);
+  }
 });
