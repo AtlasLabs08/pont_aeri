@@ -36,13 +36,15 @@ import {
   on, openAirline, currentCareer, pendingCareer, entryScreen, createAirline,
   acceptBalanceMismatch, startOver, graduateCareer, exportCareer, importCareer,
   saveAirline, topBarModel, NAME_MAX_LENGTH, ensureMarket, marketModel, fleetModel,
-  buyListing, sellAirframe
+  buyListing, sellAirframe, initDispatch, recoverStaleOrders, dispatchModel, planOwnFlight, planContract,
+  startFlight
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
 import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen } from './screens.js';
 import { guideScreen } from './guide.js';
 import { fleetPanel } from './fleet.js';
 import { marketPanel } from './market.js';
+import { dispatchPanel } from './dispatch.js';
 
 let root = null, hooks = {}, bannerTimer = 0, screen = null, opsTab = null;
 
@@ -52,6 +54,7 @@ export function initAirlineUi(h) {
   root = el('div', { id: 'airlineUi', class: 'pa-ui pa-side', hidden: true });
   document.body.append(root);
   on('save:error', () => banner(t('save.error')));
+  initDispatch();
 }
 
 export function isAirlineUiOpen() { return !!root && !root.hidden; }
@@ -189,17 +192,29 @@ function showGraduation() {
  *  vendre), la barra superior s actualitza i la posicio de scroll es queda. */
 function showOps(tab = null) {
   ensureMarket();
+  recoverStaleOrders();
   const state = currentCareer();
   const again = screen === 'ops' && isAirlineUiOpen(), scroll = root.scrollTop;
   mount(opsScreen(state, topBarModel(state), {
     onSchool: showSchool, onBack: showMainMenu, ...saveActions(),
     tab: tab ?? opsTab, onTab: id => { opsTab = id; },
     panels: {
+      dispatch: () => dispatchPanel(dispatchModel(currentCareer()), {
+        planOf: sel => planOwnFlight(currentCareer(), sel),
+        onBriefing: plan => fly(plan),
+        onContract: id => fly(planContract(currentCareer(), id))
+      }),
       fleet: () => fleetPanel(fleetModel(currentCareer()), { onSell: sell, onMarket: () => showOps('market') }),
       market: () => marketPanel(marketModel(currentCareer()), { onBuy: buy })
     }
   }), true, false, 'ops');
   if (again) root.scrollTop = scroll;
+}
+
+/** llanca el vol del pla (D3D4-6): la capa es tanca quan el launcher arrenca el vol */
+function fly(plan) {
+  const r = startFlight(plan);
+  if (!r.ok) { banner(t('dispatch.reason.' + r.reason)); showOps('dispatch'); }
 }
 
 function buy(reg, mode) {

@@ -5,7 +5,7 @@
  * NOU: tasques D3+D4 d ENGINEERING.md.
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
- *          orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
+ *          minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief recoverStaleOrders _resetDispatch
  *
@@ -40,6 +40,8 @@
  *     contracts: contractOffers amb name, fromCity i toCity }
  *     Els contractes hi son sempre, tambe amb el saldo negatiu (D3D4-9).
  *     destinations: AIRPORT_ORDER menys la ubicacio de l avio.
+ *   minuteParts(minute) -> { day, hour, minute, hhmm } d un minut de partida
+ *     ('09:05'), per pintar hores sense fer comptes a ui/
  *   departureRunwayIndex(A, windDir, windKt) -> index a A.allEnds del cap amb
  *     mes vent de cara (sense vent, la pista mes llarga; empat, el primer).
  *   orderOpts(order, plan) -> opts del launcher (D3D4-6): { aircraft, airport,
@@ -243,6 +245,12 @@ export function dispatchModel(state) {
       })
     }))
   };
+}
+
+export function minuteParts(minute) {
+  const day = Math.floor(minute / MINUTES_PER_DAY), m = minute - day * MINUTES_PER_DAY;
+  const hour = Math.floor(m / MINUTES_PER_HOUR), min = m % MINUTES_PER_HOUR;
+  return { day, hour, minute: min, hhmm: String(hour).padStart(2, '0') + ':' + String(min).padStart(2, '0') };
 }
 
 export function departureRunwayIndex(A, windDir, windKt) {
