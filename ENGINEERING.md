@@ -216,10 +216,14 @@ Qualsevol altre import de `core/` cap a `world/` és una violació.
   d'`opts` i el deixa a `Game.airline`, de manera que `Game.opts` no hi guanya
   cap camp. Free Flight i les lliçons hi passen sense `airline`.
 - En acabar un vol, `index.html` crida `app.onFlightFinished(record)` amb el
-  `FlightRecord` de §4. Un vol d'Airline acaba quan l'avió s'atura
-  (`AIRLINE_STOP_KT`) sobre el paviment de qualsevol aeroport (`airportAt`)
-  després d'haver volat, o en sortir al menú després de l'aterratge; abans de
-  l'aterratge, sortir l'abandona sense cost (`cancelFlight`).
+  `FlightRecord` de §4. Un vol d'Airline es tanca segons `airlineClosing`
+  (`app/dispatch.js`, revisió del PR #36): aturat (`AIRLINE_STOP_KT`) sobre el
+  paviment de qualsevol aeroport (`airportAt`), a aquell aeroport; un cop ha
+  tocat terra, si s'atura fora de paviment o el pilot surt del vol, a
+  l'aeroport més proper al primer contacte si és a menys d'`AIRLINE_CONTACT_KM`
+  (5 km, `nearestAirport`), amb `stoppedOffPavement` si és fora de paviment, o
+  com un accident (`terrain`) si és més lluny. Abans de tocar terra, sortir
+  l'abandona sense cost (`cancelFlight`).
 - `app/dispatch.js` escolta `flight:finished` (`initDispatch`) i liquida el vol
   d'Airline en marxa: `settleFlight`, desa, `rank:up` si puja de rang i
   `dispatch:resolved`.
@@ -250,7 +254,7 @@ export class FlightRecorder {
   setTimeAccel(k)  cruiseSkip(fuelKg?)  event(type)  tailStrike()  rollout(metres)
   touchdown(report, score) // Game.report + Game.scoreReport(report)
   crash(cause)             // un de CRASH_CAUSES; si no ho és, queda 'fuselage'
-  finish({ arrivalMin, landedAt }) -> FlightRecord   // objecte pla i nou a cada crida
+  finish({ arrivalMin, landedAt, stoppedOffPavement }) -> FlightRecord   // objecte pla i nou a cada crida
 }
 export const CRASH_CAUSES, EVENT_TYPES, RECORD_KEYS, OPTIONAL_RECORD_KEYS
 ```
@@ -291,7 +295,9 @@ Tres regles per a qui l'enganxi a `Game` (A4):
  * @property {boolean} tailStrike
  * @property {string|null} crashCause   CRASH_CAUSES o null
  * @property {Array<{type:string, atSecond:number}>} events
- * @property {string|null} [landedAt]  D3+D4 (D3D4-7): ICAO de l'aeroport on s'ha aturat; to és el planificat
+ * @property {string|null} [landedAt]  D3+D4 (D3D4-7): ICAO de l'aeroport on s'ha tancat el vol; to és el planificat
+ * @property {boolean} [stoppedOffPavement]  revisió del PR #36: el vol s'ha tancat amb l'avió a terra fora de paviment.
+ *           Amb touchdown.onRunway, damage.js hi afegeix excursion (ha tocat la pista i n'ha sortit); fals per defecte
  */
 
 /**
@@ -312,8 +318,11 @@ Als vols d'Airline, `Recorder.start` rep els valors reals del pla
 trajecte (no el carregat), `paxOnBoard` i `plannedArrivalMin`; `finish` rep
 `arrivalMin` = sortida + bloc (`arrivalMinute`) i `landedAt`. Free Flight i les
 lliçons continuen amb `fuelPlannedKg` = combustible del dipòsit, 0, `null`.
-`landedAt` és a `RECORD_KEYS` (el recorder sempre el posa, `null` per
-defecte), però també a `OPTIONAL_RECORD_KEYS`: `onFlightFinished` no l'exigeix.
+`landedAt` i `stoppedOffPavement` són a `RECORD_KEYS` (el recorder sempre els
+posa: `null` i `false` per defecte), però també a `OPTIONAL_RECORD_KEYS`:
+`onFlightFinished` no els exigeix. `stoppedOffPavement` el passa `index.html`
+(`finishExtras`) quan tanca el vol d'Airline amb l'avió a terra fora de
+paviment.
 
 `events[].type`: `engineFailure gearFault hydraulicFault avionicsFault
 stallWarning overspeed gpws goAround divert`. Només els que el simulador ja
@@ -912,7 +921,7 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 ## 12. Etapes
 
 Estat real de cada tasca. El detall de cada decisió és a `docs/DECISIONS.md`;
-aquí només hi ha què existeix i què falta. **Total de proves vigent: 1944 proves**
+aquí només hi ha què existeix i què falta. **Total de proves vigent: 1960 proves**
 (`npm test`); no s'apunten comptes per tasca perquè es queden vells.
 
 ### Ordre de feina (26/09)

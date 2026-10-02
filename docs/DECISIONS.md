@@ -1309,3 +1309,57 @@ Com s ha aplicat (sense trencar cap contracte d ENGINEERING.md):
   sortir del vol, tant si ha acabat com si s ha abandonat; si l avio era un
   altre, Game.setAircraft. Com es fa amb els camps spawn* de les llicons: el
   menu de Free Flight no hereta res del vol d Airline.
+
+## 2026-10-02 - D3+D4: el vol d Airline es tanca sempre un cop ha tocat terra
+
+Decisio del projecte (revisio del PR #36). Abans, sortir del vol despres de
+tocar terra i abans de baixar de 35 kt el cancel.lava sense cost, i un avio
+aturat fora de paviment (airportAt null) no tancava el vol mai: nomes es
+tancava si el pilot tornava a rodar fins al paviment d un aeroport.
+
+- Un cop l avio ha tocat terra, el vol d Airline sempre es tanca, en dos
+  casos: (a) l avio s atura (menys d 1 kt) fora de paviment, i (b) el pilot
+  surt del vol abans que es tanqui sol.
+- Si el primer contacte es a menys de 5 km d un aeroport: es tanca a
+  l aeroport mes proper al punt de contacte (nearestAirport), amb nota, danys,
+  XP i reputacio, i landedAt es aquest aeroport. Si l avio es fora de
+  paviment, s hi afegeix la sortida de pista (excursion de damage.js). Si
+  l informe encara no s havia calculat (per sobre de 35 kt), es calcula amb
+  les dades del contacte i el rodatge fins aquell moment.
+- Si el primer contacte es a 5 km o mes de qualsevol aeroport: es tanca com
+  un accident, igual que els tancaments automatics d index.html ('Terrain
+  impact', causa terrain).
+- excursion: camp opcional nou al FlightRecord, stoppedOffPavement (cert si
+  el vol es tanca amb l avio a terra fora de paviment). assessDamage hi
+  afegeix excursion si stoppedOffPavement i touchdown.onRunway son certs (ha
+  tocat la pista i n ha sortit), a mes de la regla de sempre (rodatge mes
+  llarg que la pista que queda). Amb el contacte fora de pista, nomes
+  offRunway, com fins ara.
+
+Com s ha aplicat:
+
+- La decisio es una funcio pura, airlineClosing (app/dispatch.js), amb
+  proves: contacte a la pista aturat i sortint, fora de paviment dins dels
+  5 km aturat i sortint, i contacte a mes de 5 km. index.html guarda el punt
+  del primer contacte (onTouchdown) i hi passa la posicio, si es a terra i el
+  paviment (airportAt). Aturat sobre paviment continua tancant a aquell
+  aeroport (D3D4-7).
+- Sortir en vol despres d un primer contacte (un toc i enlairar-se de nou):
+  es tanca a l aeroport mes proper al primer contacte, sense
+  stoppedOffPavement (l avio no es a terra).
+- L accident de mes de 5 km fa servir crashNow si el joc vola; si se surt
+  des de la pausa (crashNow no actua fora de 'flying'), Recorder.crash
+  ('terrain') i el tancament directe. Text nou: airline.crash.outside.
+- Prova de mutacio: tornar a cancel.lar en sortir fa fallar quatre proves
+  (les de sortir i la de la liquidacio); restaurat, en verd.
+
+Limitacions conegudes:
+
+- Recarregar la pagina despres d aterrar (o tancar-la) no tanca el vol: en
+  tornar a obrir el centre d operacions, l ordre que ha quedat a la cua es
+  cancel.la sense cost (recoverStaleOrders), com un vol abandonat abans de
+  tocar terra.
+- Sortir per sobre de 35 kt calcula l informe amb el que hi ha en aquell
+  moment, i el rodatge que compta es el fet fins aleshores: si l avio hauria
+  sortit per l extrem de la pista, sortir abans d arribar-hi estalvia la
+  excursion.
