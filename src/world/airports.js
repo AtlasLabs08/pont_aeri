@@ -1,7 +1,7 @@
 /* Aeroports: definicions, pistes, carrers de rodatge, portes.
  * ORIGEN: linies 1369-1465 de l'original.
  *
- * EXPORTA: RUNWAY_SCALE HARD_MIN_LEN_M makeAirport setRunwayDifficulty
+ * EXPORTA: RUNWAY_SCALE makeAirport setRunwayDifficulty
  *          airportPavedAt proceduralDef AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
  *
  * IMPORTA: ../core/constants.js, ./geo.js, ./airport-data.js
@@ -32,7 +32,7 @@ import { ll } from './geo.js';
 import { AIRPORT_DATA } from './airport-data.js';
 
 export const RUNWAY_SCALE = { easy: 1.45, normal: 1.0, hard: 0.6 };        // difficulty: very long / real / short runways
-export const HARD_MIN_LEN_M = 2000;                                          // H7: per sota, la dificultat no escurca la pista
+const HARD_MIN_LEN_M = 2000;                                          // H7: per sota, la dificultat no escurca la pista
 export function makeAirport(def, lenK) {
   const A = Object.assign({}, def); lenK = def.photo ? 1 : (lenK || 1); A.def = def; A.apronPolys = def.apronPolys || [];
   const o = ll(def.lon, def.lat); A.e = o[0]; A.n = o[1];

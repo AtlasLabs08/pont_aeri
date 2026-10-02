@@ -2,7 +2,7 @@
  * ORIGEN: linies 119-197 de l'original (SECTION 1), la part de constants i mates.
  *
  * EXPORTA: DEG RAD FT KT NM G0 FPM
- *          clamp lerp sat smoothstep wrapPi wrap360 sign approach interp1
+ *          clamp lerp sat smoothstep wrapPi wrap360 sign approach
  *          quatFromEuler
  *
  * IMPORTA: res. Es la base de tot.
@@ -24,15 +24,6 @@ export const wrap360 = d => { d %= 360; return d < 0 ? d + 360 : d; };
 export const sign = x => x < 0 ? -1 : 1;
 /** move `cur` toward `tgt` by at most `maxStep` */
 export const approach = (cur, tgt, maxStep) => cur < tgt ? Math.min(tgt, cur + maxStep) : Math.max(tgt, cur - maxStep);
-/** piecewise-linear table lookup: xs ascending */
-export function interp1(xs, ys, x) {
-  const n = xs.length;
-  if (x <= xs[0]) return ys[0];
-  if (x >= xs[n - 1]) return ys[n - 1];
-  let i = 1; while (xs[i] < x) i++;
-  const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
-  return ys[i - 1] + (ys[i] - ys[i - 1]) * t;
-}
 
 /* ---- quaternion helpers. q=[w,x,y,z], rotates BODY (x fwd,y right,z down) -> NED world ---- */
 export function quatFromEuler(phi, theta, psi) {

@@ -8,7 +8,7 @@
  * (docs/DECISIONS.md, 29/09/2026). El model no es toca: el comptatge de rebots
  * i les metriques de contacte del harness queden igual.
  *
- * EXPORTA: LandingWatch touchdownFrom
+ * EXPORTA: LandingWatch
  *
  * INTERFICIE (index.html i test/landing-watch.test.js en depenen):
  *   const w = new LandingWatch()
@@ -35,13 +35,13 @@
  */
 
 /** mateixos camps que FlightModel.touchdown (flight-model.js, seccio 8); vs en m/s cap avall */
-export function touchdownFrom(f) {
+function touchdownFrom(f) {
   const o = f.out;
   return { t: f.time, vs: Math.max(f.vdF || f.vd, 0), nzPeak: f.nz, n: f.n, e: f.e, hdg: o.hdg, track: o.track, gs: o.gs,
     ias: o.ias, pitch: o.pitch, roll: o.roll, bounces: 0 };
 }
 
-export const NET_GS_KT = 35;           // el mateix llindar que tanca l aterratge a Game.step
+const NET_GS_KT = 35;           // el mateix llindar que tanca l aterratge a Game.step
 
 export class LandingWatch {
   constructor() { this.reset(); }

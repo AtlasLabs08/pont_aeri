@@ -8,7 +8,7 @@
  * joc i per a tools/balance.mjs, com graduate.
  *
  * EXPORTA: downPayment makeLoan financeAircraft payInstalment startingCompany
- *          STARTING_LOAN_ID PAYMENT_MODES instalmentsPerFlight purchaseRule
+ *          STARTING_LOAN_ID instalmentsPerFlight purchaseRule
  *          buyAircraft sellQuote sellAircraft
  *
  * INTERFICIE (no la canviis, app/, tools/balance.mjs i els tests en depenen):
@@ -144,7 +144,7 @@ export function startingCompany(company) {
 }
 
 /** Maneres de pagar un avio (G5). */
-export const PAYMENT_MODES = Object.freeze(['cash', 'financed']);
+const PAYMENT_MODES = Object.freeze(['cash', 'financed']);
 
 /** Quotes per vol de tots els prestecs vius. */
 export function instalmentsPerFlight(loans) {
