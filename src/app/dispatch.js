@@ -6,7 +6,7 @@
  *
  * EXPORTA: HOURS_PER_DAY AIRLINE_STOP_KT planOwnFlight dispatchModel departureRunwayIndex
  *          turbulenceLevel minuteParts orderOpts recorderMeta arrivalMinute finishExtras airportAt setArrivalPlanner
- *          AIRLINE_CONTACT_KM airlineClosing reportButtons
+ *          AIRLINE_CONTACT_KM airlineClosing reportButtons pauseButtons
  *          planContract startFlight startOwnFlight startContract activeAirlineFlight initDispatch pendingDebrief
  *          clearDebrief debriefModel recoverStaleOrders _resetDispatch
  *
@@ -65,6 +65,10 @@
  *     PR #36, decisio del projecte): en un vol d Airline nomes 'continue' (tanca
  *     el vol amb airlineClosing i porta al debrief) i 'replay'; a Free Flight i
  *     a l escola, tambe 'restart' i 'menu', com sempre.
+ *   pauseButtons({ airline }) -> botons de vol del menu de pausa (Esc) (revisio
+ *     del PR #36, decisio del projecte): en un vol d Airline 'resume' i 'menu',
+ *     sense 'restart' en cap fase del vol; a Free Flight i a l escola,
+ *     'resume', 'restart' i 'menu', com sempre.
  *   AIRLINE_CONTACT_KM = 5
  *   airlineClosing({ leaving, contact, stopped, onGround, pavedAt })
  *     -> { action, landedAt, stoppedOffPavement }   que fa un vol d Airline
@@ -377,6 +381,10 @@ export function finishExtras(airline, blockSeconds, landedAt, stoppedOffPavement
 
 export function reportButtons({ airline }) {
   return airline ? ['continue', 'replay'] : ['continue', 'replay', 'restart', 'menu'];
+}
+
+export function pauseButtons({ airline }) {
+  return airline ? ['resume', 'menu'] : ['resume', 'restart', 'menu'];
 }
 
 export function airlineClosing({ leaving, contact, stopped, onGround, pavedAt }) {

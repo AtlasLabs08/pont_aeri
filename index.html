@@ -150,7 +150,7 @@ import {
   setFlightLauncher, onFlightFinished, cancelFlight,
   startLesson, currentLesson, currentLessonId, lastLessonId, abandonLesson,
   currentCareer, recordLesson, unlockAllLessons, discardAirline, devNewMarket, on,
-  recorderMeta, setArrivalPlanner, finishExtras, airportAt, AIRLINE_STOP_KT, airlineClosing, reportButtons
+  recorderMeta, setArrivalPlanner, finishExtras, airportAt, AIRLINE_STOP_KT, airlineClosing, reportButtons, pauseButtons
 } from './src/app/index.js';
 import { initAirlineUi, showMainMenu, showAirlineHome, hideAirlineUi, isAirlineUiOpen, showGuide, refreshAirlineUi } from './src/ui/index.js';
 /* ============================================================================
@@ -2993,7 +2993,7 @@ const UI = {
   /** D3D4-6: arrencada d un vol d Airline, despres que el launcher hagi fet Game.spawn() (espill de startFlight) */
   async startAirlineFlight() { if (isAirlineUiOpen()) hideAirlineUi(); Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, t('airline.flight.loading')); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(t('airline.flight.start', { from: Game.flight.from.icao, to: Game.flight.to.icao }), 7); },
-  pause(on) { if (!on && isAirlineUiOpen()) hideAirlineUi(); if (on) { Game.state = 'paused'; Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
+  pause(on) { if (!on && isAirlineUiOpen()) hideAirlineUi(); if (on) { Game.state = 'paused'; this.$('btnRestart').hidden = !pauseButtons({ airline: !!Game.airline }).includes('restart'); Sound.hush(); if (Sound.ctx) { Sound.set(Sound.bed.gain, 0, 0.05); Sound.set(Sound.shakeG.gain, 0, 0.03); } this.el.pause.hidden = false; this.$('pauseQuality').value = R3.qName; this.$('pauseVol').value = Math.round(Sound.vol * 100); } else { this.el.pause.hidden = true; this.el.mixer.hidden = true; Game.state = 'flying'; Main.last = performance.now(); } },
   toggleHelp() { this.el.help.hidden = !this.el.help.hidden; },
   /** Settings des del menu principal (X1): obre el panell de pausa (grafics, so, mesclador, controls, guia) sense Resume,
    *  Restart ni Main menu; en tancar-lo es torna al menu principal. Els ajustos es desen igual que des de la pausa. */
