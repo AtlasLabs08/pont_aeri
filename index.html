@@ -2466,7 +2466,7 @@ const Game = {
     else if (this.state === 'menu') { f._airdata(this.env, 0, 0); this.time += dt; }
     const ak = (f.out.ias - this.lastIas) / Math.max(dt * this.timeAccel, 1e-3); this.accelKt += (ak - this.accelKt) * Math.min(1, 2 * dt); this.lastIas = f.out.ias;
   },
-  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, arrMea: currentLesson() ? null : this.arrMea, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
+  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, arrMea: currentLesson() ? null : this.arrMea, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, taxi: this.taxi, nav: this.state === 'replay' ? null : this.nav }; }
 };
 
 /* ============================================================================
