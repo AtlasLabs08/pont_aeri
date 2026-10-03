@@ -2404,7 +2404,9 @@ const Game = {
   },
   /** landing evaluation */
   onTouchdown() {
-    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; if (this.airline && !this.firstContact) this.firstContact = { e: f.e, n: f.n };   // revisio del PR #36: primer contacte try { Sound.touchdown(td); } catch (err) { this.logOnce('sound:touchdown', 'Sound.touchdown', err); } if (this.report && !this.report.shown) return;   // rebot: el compta LandingWatch.step
+    const f = this.fdm, td = f.touchdown; this.tdTime = this.time; try { Sound.touchdown(td); } catch (err) { this.logOnce('sound:touchdown', 'Sound.touchdown', err); } if (this.report && !this.report.shown) return;   // rebot: el compta LandingWatch.step
+    // revisio del PR #36: primer contacte amb terra d un vol d Airline (airlineClosing)
+    if (this.airline && !this.firstContact) this.firstContact = { e: f.e, n: f.n };
     let best = null; for (const id of AIRPORT_ORDER) { const A = AIRPORTS[id]; if (Math.hypot(f.e - A.e, f.n - A.n) > 8000) continue; const l = A.toLocal(f.e, f.n);
       for (const en of A.allEnds) { const dx = l[0] - en.thr[0], dy = l[1] - en.thr[1], s = dx * en.dir[0] + dy * en.dir[1], t = -dx * en.dir[1] + dy * en.dir[0], dh = Math.abs(wrapPi((td.track - en.hdg) * DEG)) * RAD; if (dh < 35 && s > -300 && s < en.rw.len + 100 && Math.abs(t) < en.rw.wid) { if (!best || Math.abs(t) < Math.abs(best.t)) best = { A, en, s, t, dh }; } } }
     const fpm = td.vs / FPM, R = this.report = { fpm, g: td.nzPeak, bounces: 0, shown: false, dist0: f.distGround, ias: td.ias, pitch: td.pitch, roll: td.roll, onRunway: !!best, get gNow() { return f.touchdown ? f.touchdown.nzPeak : this.g; } };
