@@ -921,7 +921,7 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 ## 12. Etapes
 
 Estat real de cada tasca. El detall de cada decisió és a `docs/DECISIONS.md`;
-aquí només hi ha què existeix i què falta. **Total de proves vigent: 1962 proves**
+aquí només hi ha què existeix i què falta. **Total de proves vigent: 1964 proves**
 (`npm test`); no s'apunten comptes per tasca perquè es queden vells.
 
 ### Ordre de feina (26/09)

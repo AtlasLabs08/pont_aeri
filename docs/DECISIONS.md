@@ -1384,3 +1384,20 @@ amaga Fly again i Main menu quan Game.airline hi es. Continue crida UI.toMenu,
 que fa leaveAirlineFlight (airlineClosing amb leaving) i mostra el debrief.
 Si el vol ja s havia tancat sol (avio aturat), Continue porta igualment al
 debrief.
+
+## 2026-10-03 - D3+D4: Restart flight al menu de pausa d un vol d Airline
+
+Decisio del projecte (revisio del PR #36). Al menu de pausa (Esc) d un vol
+d Airline, Restart flight no reiniciava el vol: feia el mateix que Main menu
+(sortir del vol amb airlineClosing i tornar al centre d operacions), i el
+nom enganyava.
+
+- A Airline, Restart flight no surt al menu de pausa, en cap fase del vol
+  (a la porta, en vol o despres de tocar terra). Per sortir del vol hi ha
+  Main menu.
+- A Free Flight i a l escola, el menu de pausa no canvia.
+
+Com s ha aplicat: la llista surt d una funcio pura, pauseButtons({ airline })
+(app/dispatch.js), amb proves a Node; UI.pause amaga Restart flight quan
+Game.airline hi es. La resta del menu de pausa no es toca en aquesta
+correccio.
