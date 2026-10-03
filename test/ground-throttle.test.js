@@ -22,6 +22,7 @@ import {
   makeTaxiLimiter, taxiToggle, taxiCap, governThrottle, taxiUpdate
 } from '../src/core/index.js';
 import { onRunwayAt, AIRPORTS } from '../src/world/index.js';
+import { t } from '../src/i18n/index.js';
 
 /** un pas com Game.step: transicio del reverse, limitador, fisica, palanca del jugador restaurada */
 function tick(f, ctl, L, onRunway = false, env = FLAT_ENV) {
@@ -168,5 +169,21 @@ describe('cablejat a index.html', () => {
     const snap = html.match(/^ {2}snapshot\(\) \{ return \{.*\}; \}$/m);
     assert.ok(snap, 'Game.snapshot() no trobat');
     assert.match(snap[0], /\btaxi: this\.taxi\b/);
+  });
+  test('en sortir del vol (Game.spawn) es treuen l avis i la casella del limitador', () => {
+    // UI.frame no repinta #warn ni #hud al menu ni al centre d operacions: l avis es quedava a dalt
+    assert.match(html, /this\.taxi = makeTaxiLimiter\(\); UI\.clearTaxiLimiter\(\);/);
+    assert.match(html, /toMenu\(\) \{[^\n]*Game\.state = 'menu'; Game\.spawn\(\);/, 'toMenu passa per Game.spawn');
+    // el metode real d index.html, sobre dobles de #warn i #hud
+    const body = html.match(/^ {2}clearTaxiLimiter\(\) \{\n([\s\S]*?)\n {2}\},$/m);
+    assert.ok(body, 'UI.clearTaxiLimiter() no trobat');
+    const clear = new Function('t', 'TAXI_LIMIT_KT', `return function () {\n${body[1]}\n}`)(t, TAXI_LIMIT_KT);
+    const removed = [], node = (name, extra) => ({ ...extra, remove: () => removed.push(name) });
+    const spans = [node('avis limitador', { textContent: t('warn.taxiLimitRunway', { kt: TAXI_LIMIT_KT }) }), node('OVERSPEED', { textContent: 'OVERSPEED' })];
+    const cells = ['IAS kt', t('hud.limiter'), 'FLAPS'].map(k => node('casella ' + k, { querySelector: () => ({ textContent: k }) }));
+    const sel = list => ({ querySelectorAll: () => list });
+    clear.call({ el: { warn: sel(spans), hud: sel(cells) } });
+    assert.deepEqual(removed, ['avis limitador', 'casella ' + t('hud.limiter')]);
+    assert.doesNotThrow(() => clear.call({}), 'abans d UI.init (sense el) no llanca');
   });
 });
