@@ -2163,7 +2163,7 @@ const Game = {
   /** place the aircraft according to the menu options */
   spawn() {
     const O = this.opts, A = this.airport = AIRPORTS[O.airport], f = this.fdm, cfg = f.cfg, ctl = this.ctl = newCtl(), en = A.allEnds[O.runway % A.allEnds.length];
-    this.taxi = makeTaxiLimiter();
+    this.taxi = makeTaxiLimiter(); UI.clearTaxiLimiter();      // limitador nou: fora l avis i la casella de l anterior
     this.env.windN = -Math.cos(O.windDir * DEG) * O.windKt * KT; this.env.windE = -Math.sin(O.windDir * DEG) * O.windKt * KT;
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
@@ -2997,6 +2997,14 @@ const UI = {
     this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy, alt }) + (P.tailwindKt > MAX_TAILWIND_KT ? ' ' + t('freeFlight.tailwind', { kt: tw }) : '') : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
+  /** Game.spawn (menu, centre d operacions, llico o vol nou): UI.frame no repinta #warn ni #hud fora del vol,
+   *  aixi que l avis i la casella del limitador anterior es treuen aqui. La resta d avisos no es toca. */
+  clearTaxiLimiter() {
+    if (!this.el) return;
+    const warn = t('warn.taxiLimitRunway', { kt: TAXI_LIMIT_KT }), cell = t('hud.limiter');
+    for (const s of this.el.warn.querySelectorAll('span')) if (s.textContent === warn) s.remove();
+    for (const d of this.el.hud.querySelectorAll('.cell')) { const k = d.querySelector('i'); if (k && k.textContent === cell) d.remove(); }
+  },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.airline = null; Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
   restart() { if (Game.airline) { this.toMenu(); return; } this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
