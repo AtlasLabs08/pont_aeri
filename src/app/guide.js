@@ -25,17 +25,23 @@ import { CONTROL_KEYS } from '../career/index.js';
 import { t } from '../i18n/index.js';
 import { keyLabel, aircraftSpeeds } from './lesson-run.js';
 import { LESSONS } from '../career/index.js';
+import { TAXI_LIMIT_KT } from '../core/index.js';
 
 /** valors de les files de text que en tenen: mai escrits al text i18n */
 const TEXT_PARAMS = {
   'hud.vref': () => ({ vref: aircraftSpeeds(LESSONS.find(l => l.id === 'landing').aircraftTypeId).vref })
 };
 
+/** valors de les files de tecles que en tenen */
+const KEY_PARAMS = {
+  taxiLimiter: () => ({ kt: TAXI_LIMIT_KT })
+};
+
 export const GUIDE = [
   { id: 'flying', kind: 'keys', items: ['pitchDown', 'pitchUp', 'rollLeft', 'rollRight', 'steerLeft', 'steerRight',
     'throttleUp', 'throttleDown', 'trimDown', 'trimUp', 'autoTrim', 'mouseYoke'] },
   { id: 'configuration', kind: 'keys', items: ['flapsDown', 'flapsUp', 'gear', 'spoiler', 'brake', 'parkBrake',
-    'reverse', 'landingLights'] },
+    'reverse', 'taxiLimiter', 'landingLights'] },
   { id: 'automation', kind: 'keys', items: ['autopilot', 'autothrottle', 'approach', 'timeAccel'] },
   { id: 'views', kind: 'keys', items: ['camera', 'cameraReset', 'hudToggle', 'sound', 'brightnessDown', 'brightnessUp',
     'help', 'debug', 'pause', 'replayExit'] },
@@ -56,7 +62,7 @@ export function guideSections() {
     id,
     titleKey: 'guide.section.' + id,
     rows: items.map(item => kind === 'keys'
-      ? { term: keysTerm(item), textKey: 'guide.key.' + item }
+      ? { term: keysTerm(item), textKey: 'guide.key.' + item, ...(KEY_PARAMS[item] ? { params: KEY_PARAMS[item]() } : {}) }
       : { term: t('guide.' + id + '.' + item + '.term'), textKey: 'guide.' + id + '.' + item + '.text',
           ...(TEXT_PARAMS[id + '.' + item] ? { params: TEXT_PARAMS[id + '.' + item]() } : {}) })
   }));

@@ -2,7 +2,7 @@
  * ORIGEN: linies 1369-1465 de l'original.
  *
  * EXPORTA: RUNWAY_SCALE APPROACH_DATA makeAirport setRunwayDifficulty
- *          airportPavedAt proceduralDef AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
+ *          airportPavedAt onRunwayAt proceduralDef AIRPORT_DEFS AIRPORTS AIRPORT_ORDER
  *
  * IMPORTA: ../core/constants.js, ./geo.js, ./airport-data.js
  *
@@ -211,6 +211,15 @@ export const AIRPORT_DEFS = {
 export const AIRPORT_ORDER = ['LEBL', 'LEPA', ...Object.keys(AIRPORT_DATA)];
 export const AIRPORTS = {};
 /** l aeroport mes proper a (e, n) per distancia, entre tots els d AIRPORT_ORDER (camera de torre); `fallback` es el punt de partida de la cerca */
+/** el punt (e, n) es sobre alguna pista d algun aeroport: entre els dos llindars i a menys de mig ample de l eix */
+export function onRunwayAt(e, n) {
+  for (const id of AIRPORT_ORDER) {
+    const A = AIRPORTS[id]; if (Math.hypot(e - A.e, n - A.n) > 8000) continue;
+    const l = A.toLocal(e, n);
+    for (const en of A.allEnds) { const dx = l[0] - en.thr[0], dy = l[1] - en.thr[1], s = dx * en.dir[0] + dy * en.dir[1], t = -dx * en.dir[1] + dy * en.dir[0]; if (s >= 0 && s <= en.rw.len && Math.abs(t) < en.rw.wid / 2) return true; }
+  }
+  return false;
+}
 export function nearestAirport(e, n, fallback) {
   return AIRPORT_ORDER.map(id => AIRPORTS[id]).reduce((b, x) => Math.hypot(e - x.e, n - x.n) < Math.hypot(e - b.e, n - b.n) ? x : b, fallback);
 }

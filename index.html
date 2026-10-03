@@ -133,11 +133,12 @@ import {
   AIRCRAFT, AIRCRAFT_ORDER, AutoTrim, Autopilot, DEG, FPM, FT, FlightModel,
   Harness, KT, NM, PHYS_DT, RAD, SURF, THR_CLB, approach, casFromMach,
   clamp, fbm, fdmRestore, fdmSnapshot, hash2, lerp, makeRng, newCtl,
-  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder, LandingWatch
+  sign, smoothstep, trimAircraft, wrap360, wrapPi, FlightRecorder, LandingWatch,
+  TAXI_LIMIT_KT, TAXI_FULL_THR, leverIdle, reverseToggle, reverseUpdate, reverseCancel, makeTaxiLimiter, taxiToggle, governThrottle, taxiUpdate
 } from './src/core/index.js';
 
 import {
-  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, nearestAirport, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
+  AIRPORTS, AIRPORT_DEFS, AIRPORT_ORDER, nearestAirport, onRunwayAt, GEO, ILS, World, ll, TERRAIN_FILE, glideAngle,
   setRunwayDifficulty, setPhoto, thresholdDistNm, destinationEnd, arrivalEnd, flightApproach, approachFix, planArrival, tailwindKt, MAX_TAILWIND_KT, distanceKm, bearingDeg
 } from './src/world/index.js';
 
@@ -1574,6 +1575,7 @@ const Instruments = {
     if (o.ias > vmax.vmo + 3) w.push('OVERSPEED');
     if (f.flapPos > 0.05 && o.ias > fl.vfe + 3) w.push('FLAP OVERSPEED');
     if (f.gearPos > 0.1 && !f.wow && o.ias > c.limits.vle + 3) w.push('GEAR OVERSPEED');
+    if (S.taxi && S.taxi.warn) w.push(t('warn.taxiLimitRunway', { kt: TAXI_LIMIT_KT }));
     if (!f.wow && f.gearPos < 0.99 && o.aglFt < 750 && (f.flapPos >= c.flapLDG - 0.5 || (o.aglFt < 500 && f.eng[0].x < 0.25))) w.push('TOO LOW GEAR');
     return w;
   },
@@ -1661,6 +1663,7 @@ const Instruments = {
     this.font(c, 17, true); c.textAlign = 'center';
     const lv = S.ctl.throttle, thrMode = f.revPos > 0.5 ? ['REV', K.amber] : ap.athr ? ['SPEED', K.green] : lv > 0.985 ? ['MAN TOGA', K.white] : Math.abs(lv - THR_CLB) < 0.004 ? ['THR CLB', K.green] : lv < 0.01 ? ['THR IDLE', K.white] : ['MAN THR', K.white];
     c.fillStyle = thrMode[1]; c.fillText(thrMode[0], 64, 24);
+    if (S.taxi && S.taxi.on) { this.font(c, 14, true); c.fillStyle = K.amber; c.fillText(i18nT('hud.taxiLimit', { kt: TAXI_LIMIT_KT }), 64, 46); this.font(c, 17, true); }
     const fdOn = ap.fd && ap.fd.active; c.fillStyle = K.green;
     if (ap.vert === 'GS' && (ap.on || fdOn)) c.fillText((ap.gsT || 0) < 4 ? 'G/S*' : 'G/S', 192, 24);
     else if (ap.on) c.fillText(ap.vert === 'ALT' ? (Math.abs(ap.selAlt - o.altFt) > 150 ? 'ALT*' : 'ALT') : 'V/S ' + (ap.selVs >= 0 ? '+' : '') + ap.selVs, 192, 24);
@@ -1965,12 +1968,15 @@ const Input = {
     const dir = (K.down('ShiftLeft', 'ShiftRight', 'NumpadAdd') || K.keys.PlusChar ? 1 : 0) - (K.down('NumpadSubtract') || K.keys.MinusChar ? 1 : 0);
     if (dir !== this.lastDir) this.detHold = false; this.lastDir = dir;
     if (dir !== 0 && currentLesson()) currentLesson().onCommand('throttle');
+    if (dir !== 0) reverseCancel(ctl);      // el jugador mou la palanca: la transicio automatica del reverse es cancel.la
     if (dir !== 0 && !this.detHold) {
       const prev = ctl.throttle; let next = clamp(prev + dir * 0.38 * dt, 0, 1);
       if (!ctl.reverse && ((prev < THR_CLB && next >= THR_CLB) || (prev > THR_CLB && next <= THR_CLB))) { next = THR_CLB; this.detHold = true; Game.msg('Thrust levers in the CLB detent'); }
       if (next === 1 && prev < 1) Game.msg(ctl.reverse ? 'Maximum reverse' : 'TOGA'); if (next === 0 && prev > 0) Game.msg('Thrust idle');
       ctl.throttle = next;
     }
+    // reverse: la palanca baixa a ralenti i alla s activa o es desactiva (core/ground-throttle.js)
+    const revEv = reverseUpdate(ctl, dt, leverIdle(fdm.cfg)); if (revEv) Game.msg(t(revEv === 'deployed' ? 'msg.reverseDeployed' : 'msg.reverseStowed'));
     if (K.down('KeyX')) ctl.trim = Math.min(1, ctl.trim + 0.07 * dt); if (K.down('KeyZ')) ctl.trim = Math.max(-1, ctl.trim - 0.07 * dt);
     ctl.brake = K.down('KeyB') ? 1 : 0;
   }
@@ -2145,7 +2151,7 @@ const CRASH_CAUSE_BY_TITLE = { 'Water impact': 'water', 'Terrain impact': 'terra
   'Hard impact': 'hardImpact', 'Wing strike': 'wingStrike', 'Engine pod strike': 'engineStrike', 'Fuselage impact': 'fuselage' };
 
 const Game = {
-  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, airline: null, airlineRestore: null, ctl: newCtl(), mdl: null, airport: AIRPORTS.LEBL,
+  state: 'menu', time: 0, hours: 12, timeAccel: 1, acc: 0, fdm: null, ap: null, airline: null, airlineRestore: null, ctl: newCtl(), taxi: makeTaxiLimiter(), mdl: null, airport: AIRPORTS.LEBL,
   opts: { aircraft: 'nb', airport: 'LEBL', dest: 'LEPA', runway: 0, start: 'runway', hours: 11.5, windDir: 250, windKt: 0, mode: 'free', quality: 'high', difficulty: 'normal', turb: false, autoTrim: true },
   env: { windN: 0, windE: 0, gustN: 0, gustE: 0, gustD: 0, groundHeight: (n, e) => World.groundAt(e, n), surface: (n, e) => World.surfaceAt(e, n) },
   lights: { landing: false, taxi: true, strobe: true, landingAuto: true }, ndRange: 40, flight: null, report: null, landingWatch: new LandingWatch(), lastIas: 0, accelKt: 0, debug: false, help: false,
@@ -2157,6 +2163,7 @@ const Game = {
   /** place the aircraft according to the menu options */
   spawn() {
     const O = this.opts, A = this.airport = AIRPORTS[O.airport], f = this.fdm, cfg = f.cfg, ctl = this.ctl = newCtl(), en = A.allEnds[O.runway % A.allEnds.length];
+    this.taxi = makeTaxiLimiter(); UI.clearTaxiLimiter();      // limitador nou: fora l avis i la casella de l anterior
     this.env.windN = -Math.cos(O.windDir * DEG) * O.windKt * KT; this.env.windE = -Math.sin(O.windDir * DEG) * O.windKt * KT;
     this.env.gustN = this.env.gustE = this.env.gustD = 0; this.gust = { u: 0, v: 0, w: 0, t: 0, amp: 0, dur: 1, next: 8 }; this.rec = []; this.recN = 0; this.replayData = null; this.tdTime = null;
     this.activeEnd = en; this.timeAccel = 1; this.hours = O.hours; this.report = null; this.crash = null; this.landingWatch.reset(); this.errLogged = {}; Input.pitch = Input.roll = Input.yaw = 0;
@@ -2268,7 +2275,8 @@ const Game = {
       case 'KeyG': if (f.wow) this.msg('Gear lever locked on the ground'); else { c.gearDown = !c.gearDown; this.msg(c.gearDown ? 'Gear down' : 'Gear up'); } break;
       case 'KeyP': c.parkBrake = !c.parkBrake; this.msg(c.parkBrake ? 'Parking brake set' : 'Parking brake released'); break;
       case 'KeyK': c.spoiler = c.spoiler ? 0 : 1; this.msg(c.spoiler ? 'Speedbrake extended' : 'Speedbrake retracted'); break;
-      case 'KeyR': if (f.wow) { c.reverse = !c.reverse; if (c.reverse) c.throttle = Math.min(c.throttle, 0.05); this.msg(c.reverse ? 'Reverse thrust: Shift adds reverse power, minus reduces it' : 'Reversers stowed'); } else this.msg('Reverse is only available on the ground'); break;
+      case 'KeyR': if (f.wow) { const r = reverseToggle(c, leverIdle(f.cfg)); this.msg(t({ deployed: 'msg.reverseDeployed', arming: 'msg.reverseArming', stowing: 'msg.reverseStowing', cancelled: 'msg.reverseCancelled' }[r])); } else this.msg('Reverse is only available on the ground'); break;
+      case 'Digit1': if (f.wow) { taxiToggle(this.taxi, true); this.msg(t(this.taxi.on ? 'msg.taxiLimitOn' : 'msg.taxiLimitOff', { kt: TAXI_LIMIT_KT })); } else this.msg(t('msg.taxiLimitGround')); break;
       case 'KeyJ': if (this.ap.on) { this.ap.disengage(); this.msg('Autopilot off'); } else if (f.wow || f.out.aglFt < 400) this.msg('Autopilot needs 400 ft AGL'); else { this.ap.engage(); this.ap.tripped = false; this.msg('Autopilot on: HDG ' + this.ap.selHdg + ' / ' + this.ap.vert); } break;
       case 'KeyT': this.ap.setAthr(!this.ap.athr); this.msg(this.ap.athr ? 'Autothrottle on: ' + this.ap.selSpd + ' kt' : 'Autothrottle off'); break;
       case 'KeyN': this.cycleAccel(); break;
@@ -2302,7 +2310,7 @@ const Game = {
     if (Cameras.mode === 'cockpit') { const a = Cockpit.hit(mx, my), up = -dir;
       if (a === 'knob:spd') { ap.selSpd = clamp(ap.selSpd + up * fast, 100, 400); return; } if (a === 'knob:hdg') { ap.selHdg = wrap360(ap.selHdg + up * fast); return; }
       if (a === 'knob:alt') { ap.selAlt = clamp(ap.selAlt + up * 100 * fast, 0, 45000); if (ap.on && ap.vert === 'ALT' && Math.abs(ap.selAlt - this.fdm.out.altFt) > 250) { ap.vert = 'VS'; ap.selVs = sign(ap.selAlt - this.fdm.out.altFt) * (ap.selVs !== 0 ? Math.abs(ap.selVs) : 1500); } return; }
-      if (a === 'knob:vs') { ap.selVs = clamp(ap.selVs + up * 100, -6000, 6000); return; } if (a === 'thrust') { this.ctl.throttle = clamp(this.ctl.throttle + up * 0.04, 0, 1); return; }
+      if (a === 'knob:vs') { ap.selVs = clamp(ap.selVs + up * 100, -6000, 6000); return; } if (a === 'thrust') { reverseCancel(this.ctl); this.ctl.throttle = clamp(this.ctl.throttle + up * 0.04, 0, 1); return; }
       if (a === 'flaps') { this.onKey(up > 0 ? 'KeyV' : 'KeyF'); return; } if (a === 'bright') { Cockpit.brightness = clamp(Cockpit.brightness + up * 0.08, 0.15, 1); return; } if (a === 'nd') { const r = [10, 20, 40, 80, 160], i = clamp(r.indexOf(this.ndRange) + dir, 0, 4); this.ndRange = r[i]; return; }
       Cameras.fov = clamp(Cameras.fov + dir * 4, 18, 85);
     } else if (Cameras.mode === 'tower') Cameras.towerFov = clamp(Cameras.towerFov * (dir > 0 ? 1.15 : 0.87), 4, 60); else Cameras.dist = clamp(Cameras.dist * (dir > 0 ? 1.12 : 0.89), 0.35, 8);
@@ -2323,9 +2331,12 @@ const Game = {
     const wasOn = this.ap.on; this.ap.update(PHYS_DT, c); if (wasOn && !this.ap.on) this.msg('AUTOPILOT DISCONNECT', 4);
     for (const ev of this.ap.events) this.onApEvent(ev); this.ap.events.length = 0;
     if (this._apWas && !this.ap.on) Sound.apDisc(); this._apWas = this.ap.on;
-    if (!f.wow && c.reverse) c.reverse = false;
+    if (!f.wow) { c.reverse = false; reverseCancel(c); }
     this.updateGusts(PHYS_DT);
-    f.step(PHYS_DT, c, this.env); this.time += PHYS_DT; this.record();
+    // limitador de taxi: l empenta que va a la fisica es retalla; la palanca del jugador no es toca
+    const T = this.taxi, lever = c.throttle; taxiUpdate(T, PHYS_DT, { wow: f.wow, onRunway: T.on && f.wow && lever >= TAXI_FULL_THR && onRunwayAt(f.e, f.n), throttle: lever });
+    c.throttle = governThrottle(T, c, f.out.gs, PHYS_DT);
+    f.step(PHYS_DT, c, this.env); c.throttle = lever; this.time += PHYS_DT; this.record();
     if (this.state !== 'replay') Recorder.sample(f, c, PHYS_DT);
     if (currentLesson()) { currentLesson().sample(lessonSnapshot()); if (!this.recordDone && currentLesson().readyToEnd()) this.finishRecord(); }
     const o = f.out, fl = this.flight;
@@ -2455,7 +2466,7 @@ const Game = {
     else if (this.state === 'menu') { f._airdata(this.env, 0, 0); this.time += dt; }
     const ak = (f.out.ias - this.lastIas) / Math.max(dt * this.timeAccel, 1e-3); this.accelKt += (ak - this.accelKt) * Math.min(1, 2 * dt); this.lastIas = f.out.ias;
   },
-  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, arrMea: currentLesson() ? null : this.arrMea, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, nav: this.state === 'replay' ? null : this.nav }; }
+  snapshot() { return { fdm: this.fdm, ap: this.ap, ctl: this.ctl, time: this.time, ndRange: this.ndRange, wind: { dir: this.opts.windDir, kt: this.opts.windKt }, dest: this.dest, route: currentLesson() ? null : this.route, arrA: currentLesson() ? null : this.arrA, arrEnd: this.arrEnd, arrFF: this.arrFF, arrFixes: this.arrFixes, arrMea: currentLesson() ? null : this.arrMea, timeAccel: this.timeAccel, lights: this.lights, accelKt: this.accelKt, taxi: this.taxi, nav: this.state === 'replay' ? null : this.nav }; }
 };
 
 /* ============================================================================
@@ -2616,7 +2627,7 @@ const HUD = {
     font(12, true); c.textAlign = 'left';
     const fdOn = ap.fd && ap.fd.active, modes = [];
     modes.push(ap.lat === 'LOC' && (ap.on || fdOn) ? 'LOC' : ap.on ? 'HDG' : ''); modes.push(ap.vert === 'GS' && (ap.on || fdOn) ? 'G/S' : ap.on ? (ap.vert === 'ALT' ? 'ALT' : 'V/S') : '');
-    modes.push(ap.on ? 'AP' : fdOn ? 'FD' : ''); if (ap.athr) modes.push('A/THR'); if (ap.appArm) modes.push('APP ARM');
+    modes.push(ap.on ? 'AP' : fdOn ? 'FD' : ''); if (ap.athr) modes.push('A/THR'); if (ap.appArm) modes.push('APP ARM'); if (S.taxi && S.taxi.on) modes.push(t('hud.taxiLimit', { kt: TAXI_LIMIT_KT }));
     c.fillText(modes.filter(Boolean).join('  '), lft + 4, top + 12);
     // ILS deviation scales
     if (nav && nav.locValid) { const D = Math.min(28, hh * 0.18), ly = bot - 12, gx = B[0] + hw * 0.52;
@@ -2986,6 +2997,14 @@ const UI = {
     this.$('modeNote').textContent = O.mode === 'route' ? t('freeFlight.routeNote', { from: a.city, to: b.city, nm, hdg, rwy, alt }) + (P.tailwindKt > MAX_TAILWIND_KT ? ' ' + t('freeFlight.tailwind', { kt: tw }) : '') : 'No objectives. Every landing on a runway is still scored.'; },
   loading(p, t) { this.el.loadbar.style.width = Math.round(p * 100) + '%'; if (t) this.el.loadtxt.textContent = t; this.el.loading.hidden = p >= 1; },
   showMenu(on) { this.el.menu.hidden = !on; this.el.hud.hidden = on; },
+  /** Game.spawn (menu, centre d operacions, llico o vol nou): UI.frame no repinta #warn ni #hud fora del vol,
+   *  aixi que l avis i la casella del limitador anterior es treuen aqui. La resta d avisos no es toca. */
+  clearTaxiLimiter() {
+    if (!this.el) return;
+    const warn = t('warn.taxiLimitRunway', { kt: TAXI_LIMIT_KT }), cell = t('hud.limiter');
+    for (const s of this.el.warn.querySelectorAll('span')) if (s.textContent === warn) s.remove();
+    for (const d of this.el.hud.querySelectorAll('.cell')) { const k = d.querySelector('i'); if (k && k.textContent === cell) d.remove(); }
+  },
   async startFlight() { Sound.unlock(); this.showMenu(false); Game.state = 'loading'; this.loading(0.5, 'Preparing the flight'); dropSpawnOpts(Game.opts); Game.airline = null; Game.spawn(); await Main.preloadTerrain(); this.loading(1); this.el.report.hidden = true; this.el.crash.hidden = true; Game.state = 'flying'; Main.last = performance.now();
     this.toast(Game.opts.start === 'gate' ? 'Parking brake set. P releases it, H shows every control.' : Game.opts.start === 'runway' ? 'Lined up, take-off flaps set. Release the parking brake (P) and hold Shift: the levers stop at CLB, press again for TOGA.' : 'Ten miles out on the ILS, fully configured. Keep the green path vector in the guidance circle, or press J and the autopilot flies it down to 100 ft.', 7); },
   restart() { if (Game.airline) { this.toMenu(); return; } this.el.crash.hidden = true; this.el.report.hidden = true; const id = currentLessonId() ?? lastLessonId(); if (id) { cancelFlight(); launchLesson(id, true); } else this.startFlight(); },
@@ -3084,7 +3103,7 @@ const UI = {
       const cell = (k, v, cls) => `<div class="cell ${cls || ''}"><b>${v}</b><i>${k}</i></div>`;
       this.el.hud.className = Cameras.mode === 'cockpit' ? 'mini' : '';
       this.el.hud.innerHTML = cell('IAS kt', Math.round(o.ias)) + cell('ALT ft', Math.round(o.altFt / 10) * 10) + cell('V/S fpm', Math.round(o.vsFpm / 50) * 50) + cell('HDG', ('00' + Math.round(wrap360(o.hdg)) % 360).slice(-3)) + cell(f.revPos > 0.5 ? 'REVERSE' : c.throttle > 0.985 ? 'THRUST TOGA' : Math.abs(c.throttle - THR_CLB) < 0.004 ? 'THRUST CLB' : c.throttle < 0.01 ? 'THRUST IDLE' : 'THRUST', thr, f.revPos > 0.5 || c.throttle > 0.985 ? 'amber' : '') +
-        cell('FLAPS', cfg.flaps[c.flaps].name) + cell('GEAR', f.gearPos > 0.99 ? 'DOWN' : f.gearPos < 0.01 ? 'UP' : 'TRANSIT', f.gearPos > 0.01 && f.gearPos < 0.99 ? 'amber' : '') + cell('SPLR', f.spoilerPos > 0.05 ? 'OUT' : 'IN', f.spoilerPos > 0.05 ? 'amber' : '') + cell('BRAKE', c.parkBrake ? 'PARK' : f.brakeAct > 0.05 ? 'ON' : 'OFF', c.parkBrake ? 'amber' : '') + cell('AP / ATHR', (S.ap.on ? 'ON' : 'OFF') + ' / ' + (S.ap.athr ? 'ON' : 'OFF'), S.ap.on ? 'green' : '');
+        (S.taxi.on ? cell(t('hud.limiter'), t('hud.taxiLimit', { kt: TAXI_LIMIT_KT }), 'amber') : '') + cell('FLAPS', cfg.flaps[c.flaps].name) + cell('GEAR', f.gearPos > 0.99 ? 'DOWN' : f.gearPos < 0.01 ? 'UP' : 'TRANSIT', f.gearPos > 0.01 && f.gearPos < 0.99 ? 'amber' : '') + cell('SPLR', f.spoilerPos > 0.05 ? 'OUT' : 'IN', f.spoilerPos > 0.05 ? 'amber' : '') + cell('BRAKE', c.parkBrake ? 'PARK' : f.brakeAct > 0.05 ? 'ON' : 'OFF', c.parkBrake ? 'amber' : '') + cell('AP / ATHR', (S.ap.on ? 'ON' : 'OFF') + ' / ' + (S.ap.athr ? 'ON' : 'OFF'), S.ap.on ? 'green' : '');
       const w = Instruments.warnings(S); this.el.warn.innerHTML = w.map(m => `<span>${m}</span>`).join(''); this.el.warn.className = (Game.time * 3 | 0) % 2 ? 'on' : 'off';
       const hh = Math.floor(Game.hours), mm = Math.floor((Game.hours - hh) * 60), fl = Game.flight; let tr = ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2) + (S.timeAccel > 1 ? '  x' + S.timeAccel : '');
       if (fl && fl.mode === 'route') tr += '<br>' + this.fmtTime(fl.t) + '<br>' + thresholdDistNm(fl.to, Game.destEnd(fl.to), f.e, f.n).toFixed(0) + ' nm to ' + fl.to.icao; this.el.topright.innerHTML = tr;

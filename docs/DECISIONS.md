@@ -1401,3 +1401,23 @@ Com s ha aplicat: la llista surt d una funcio pura, pauseButtons({ airline })
 (app/dispatch.js), amb proves a Node; UI.pause amaga Restart flight quan
 Game.airline hi es. La resta del menu de pausa no es toca en aquesta
 correccio.
+
+## 2026-10-02 - Palanca de gas a terra: reverse a ralenti i limitador de taxi
+Decisio del projecte. Dues regles, a Free Flight, a l escola i a Airline (tots tres passen per Game.step i Input.update d index.html). La fisica de l empenta i del reverse (core/flight-model.js) no canvia: les regles nomes decideixen a quin valor queda `ctl.throttle` i quan canvia `ctl.reverse`. La logica es a `src/core/ground-throttle.js`.
+
+Diagnosi (abans): la palanca es `ctl.throttle` (0 = ralenti, 1 = TOGA o reverse maxim), mogut per `Input.update` (index.html, tecles Shift i menys, 0,38 per segon). La tecla R es a `Game.onKey` (`case 'KeyR'`): nomes a terra, girava `ctl.reverse` i, en activar-lo, retallava la palanca a 0,05, un valor fix. En desactivar-lo no tocava la palanca. `Game.step` posa `ctl.reverse = false` en deixar el terra. Error trobat jugant: a ralenti, reverse, palanca a 90, desactivar-lo: la palanca seguia a 90 i, amb el reverse fora, el 90 era empenta endavant (l avio accelerava endavant a 90).
+
+R1. Desactivar el reverse: la palanca baixa a ralenti (a la velocitat de les tecles), el reverse es desactiva quan hi arriba i l empenta queda a ralenti fins que el jugador mou la palanca.
+R2. Activar-lo amb la palanca per sobre de ralenti: primer baixa a ralenti i el reverse entra a ralenti. A ralenti, entra a l instant.
+R3. El ralenti es el de cada avio: `leverIdle(cfg)` (`cfg.engines.leverIdle`, 0 si l avio no el defineix; avui tots son 0). Cap 0,05 ni altre valor fix.
+R4. Durant la transicio, tornar a prémer R o moure la palanca (tecles de gas o el boto de la cabina) la cancel.la i l estat del reverse queda com estava. En deixar el terra tambe es cancel.la.
+
+T1. Limitador de taxi: la tecla `1` (`Digit1`, `CONTROL_KEYS.taxiLimiter`) l activa i el desactiva, nomes a terra. Triada entre les lliures (totes les lletres estaven agafades).
+T2. Activat, l empenta que va a la fisica es retalla perque la velocitat sobre el terra no passi de `TAXI_LIMIT_KT` = 30 kt, el gas on el posi el jugador. La palanca del jugador no es toca (la cabina i el HUD la mostren on la te) i, en desactivar-lo, l avio torna a accelerar. Amb el reverse activat el limitador no retalla.
+T3. El retall escala la palanca fins a ralenti en els darrers `TAXI_BAND_KT` (5) abans de `TAXI_LIMIT_KT - TAXI_MARGIN_KT` (2) i mira la velocitat prevista a `TAXI_LEAD_S` (12) segons, amb l acceleracio filtrada: sense aixo els motors, que triguen a respondre, deixaven passar de 30 als avions grans (fins a 36 kt). Mesurat amb el gas a fons, 90 s, tots els avions: maxima < 30 kt, tambe amb 10 m/s de vent de cua. Els valors son constants amb nom a ground-throttle.js.
+T4. Indicador "TAXI 30" (text `hud.taxiLimit`, el 30 surt de la constant) mentre es actiu: casella del HUD, mode del head-up i bandes de la pantalla de cabina (PFD).
+T5. Si es actiu, l avio es sobre una pista (entre llindars i a mig ample de l eix, `onRunwayAt` de world/airports.js) i el gas es a fons (>= 0,98) durant mes de `TAXI_WARN_S` = 3 s: avis visible (`warn.taxiLimitRunway`, l avis vermell intermitent de la cabina i el HUD). No es desactiva sol; l avis desapareix si el gas baixa de 0,98 o l avio surt de la pista.
+T6. En deixar el terra (rebot, enlairament) el limitador es deixa anar, com el reverse: a l aire no te cap efecte i no ha de quedar encesa un cop l avio torna a terra.
+T7. Guia de consulta (`guide.key.taxiLimiter`, seccio de configuracio) i tip a la llico de taxi (`school.tip.taxiLimiter`), a en i ca. La llico no canvia de criteris.
+
+Snapshot: `test/snapshot.json` no canvia (no s ha regenerat). Proves: `test/ground-throttle.test.js`.
