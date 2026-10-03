@@ -3,12 +3,14 @@
  * fines, accents ambre i verd. Nomes fonts del sistema: cap font externa.
  * NOU: tasca C5+D1 d ENGINEERING.md (docs/DECISIONS.md, 30/09/2026, E8).
  *
- * EXPORTA: el ensureStyles
+ * EXPORTA: el fill ensureStyles
  *
  * INTERFICIE (no la canviis, la resta de ui/ en depen):
  *   el(tag, props, ...children) -> Element. props: class, style (cssText),
  *     on<event> (addEventListener), la resta com a atributs (true = buit,
  *     null/false = cap). Els fills de text entren com a text, mai com a HTML.
+ *   fill(node, ...children)   substitueix els fills de node amb les mateixes
+ *     regles que el (null, undefined i false no es pinten). D3+D4.
  *   ensureStyles()   afegeix el <style> de ui/ un sol cop.
  */
 
@@ -25,6 +27,11 @@ export function el(tag, props = {}, ...children) {
     if (c === null || c === undefined || c === false) continue;
     node.append(c instanceof Node ? c : String(c));
   }
+  return node;
+}
+
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat(Infinity).filter(c => c !== null && c !== undefined && c !== false));
   return node;
 }
 
@@ -157,6 +164,23 @@ const CSS = `
 .pa-ui .pa-filter button{padding:.35em .8em}
 .pa-ui .pa-filter button[aria-pressed=true]{border-color:var(--pa-amber);color:var(--pa-amber)}
 @media (max-width:640px){.pa-ui .pa-fleet .pa-row,.pa-ui .pa-market .pa-row{grid-template-columns:1fr}.pa-ui .pa-price,.pa-ui .pa-status{text-align:left}.pa-ui.pa-side{padding:20px 16px}.pa-ui .pa-lessons .pa-head,.pa-ui .pa-lessons .pa-row{grid-template-columns:1.6rem 1fr 5.4rem}.pa-ui .pa-lessons .pa-status{display:none}}
+.pa-topbar .pa-delta{font-family:var(--pa-mono);font-size:.72rem;margin-top:.15rem}
+.pa-topbar .pa-neg{background:rgba(255,107,107,.08)}
+.pa-ui .pa-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.8rem;margin:.4rem 0 .8rem}
+.pa-ui .pa-field{display:block;margin:.4rem 0}
+.pa-ui .pa-select{width:100%;font:inherit;font-size:.95rem;background:var(--pa-slate2);color:var(--pa-text);border:1px solid var(--pa-line);padding:.45rem .5rem}
+.pa-ui .pa-range{width:100%;accent-color:var(--pa-amber)}
+.pa-ui .pa-contracts .pa-row{grid-template-columns:3.6rem 1fr 8.5rem;align-items:start}
+.pa-ui .pa-section{margin:1rem 0}
+.pa-ui .pa-section h4{margin:.9rem 0 .3rem;font-size:.75rem;letter-spacing:.18em;text-transform:uppercase;color:var(--pa-dim);font-weight:600}
+.pa-ui .pa-wx{width:100%;border-collapse:collapse;font-size:.9rem}
+.pa-ui .pa-wx th,.pa-ui .pa-wx td{padding:.35rem .4rem;border-bottom:1px solid var(--pa-line);text-align:left}
+.pa-ui .pa-wx th{color:var(--pa-dim);font-weight:400}
+.pa-ui .pa-wx td{font-family:var(--pa-mono)}
+.pa-ui .pa-kv.pa-total b{font-size:1.3rem}
+.pa-ui .pa-kv b.pa-bad{color:var(--pa-red)}
+.pa-ui .pa-kv b.pa-dim{color:var(--pa-dim)}
+@media (max-width:640px){.pa-ui .pa-contracts .pa-row{grid-template-columns:1fr}}
 `;
 
 let injected = false;

@@ -191,3 +191,26 @@ test('i18n no importa res de fora de src/i18n/', () => {
     }
   }
 });
+
+describe('i18n: claus duplicades al codi font', () => {
+  /** claus d un objecte de text llegides del codi font: un objecte JS amb la clau dues vegades es queda amb la segona */
+  const keysInSource = file => [...readFileSync(new URL('../src/i18n/' + file, import.meta.url), 'utf8')
+    .matchAll(/^\s*'((?:[^'\\]|\\.)+)'\s*:/gm)].map(m => m[1]);
+
+  for (const file of ['en.js', 'ca.js']) {
+    test(file + ' no te cap clau repetida', () => {
+      const keys = keysInSource(file), seen = new Set(), dup = [];
+      for (const k of keys) { if (seen.has(k)) dup.push(k); seen.add(k); }
+      assert.ok(keys.length > 100, 'llegeix les claus del fitxer');
+      assert.deepEqual(dup, []);
+    });
+  }
+
+  test('el debrief de la lliço (debrief.title) i el d Airline (debrief.airline.title) son claus diferents', () => {
+    for (const d of [en, ca]) {
+      assert.ok(!d['debrief.title'].includes('{from}'));
+      assert.ok(d['debrief.airline.title'].includes('{from}'));
+    }
+  });
+});
+

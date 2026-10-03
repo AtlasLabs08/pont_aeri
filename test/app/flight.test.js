@@ -115,4 +115,12 @@ describe('flight', () => {
     cancelFlight();
     assert.equal(isFlightInProgress(), false);
   });
+
+  test('D3D4-7: un record sense landedAt (opcional) es resol igualment', async () => {
+    setFlightLauncher(() => {});
+    const p = launchFlight({});
+    const r = makeRecord(); delete r.landedAt;
+    assert.equal(onFlightFinished(r), true);
+    assert.equal(await p, r);
+  });
 });

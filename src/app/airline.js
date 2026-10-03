@@ -61,8 +61,10 @@
  *   discardAirline() -> boolean   DEV (E10): com startOver.
  *   topBarModel(state) -> camps de la barra superior (E6), pura:
  *     { name, rankKey, xp, xpFloor, xpNext, xpProgress, atMaxRank, cash,
- *       reputation, fleetReady, fleetTotal, base }
+ *       reputation, fleetReady, fleetTotal, base, negative, lastFlightDelta }
  *     xpNext null i xpProgress 1 al rang maxim; base = bases[0] o null.
+ *     D3+D4: negative = cash < 0 (D3D4-10: saldo en vermell i avis);
+ *     lastFlightDelta = cashDelta de l ultima linia del logbook, o null.
  *   updateCareer(state) -> boolean   substitueix la partida en memoria,
  *     emet 'career:changed' i la desa (saveCareer). Per a les operacions
  *     d altres moduls d app/ (market.js: comprar, vendre, boto DEV).
@@ -209,6 +211,12 @@ export function ensureMarket() {
   return true;
 }
 
+/** variacio de cash de l ultim vol liquidat (D3+D4), o null */
+function lastDelta(logbook) {
+  const last = logbook.length > 0 ? logbook[logbook.length - 1] : null;
+  return last && Number.isInteger(last.cashDelta) ? last.cashDelta : null;
+}
+
 export function topBarModel(state) {
   const { pilot, company, fleet } = state;
   const rankKey = rankForXp(pilot.xp);
@@ -226,6 +234,8 @@ export function topBarModel(state) {
     reputation: Math.round(company.reputation),
     fleetReady: fleet.filter(a => a.status === 'ready').length,
     fleetTotal: fleet.length,
-    base: company.bases.length > 0 ? company.bases[0] : null
+    base: company.bases.length > 0 ? company.bases[0] : null,
+    negative: company.cash < 0,
+    lastFlightDelta: lastDelta(pilot.logbook)
   };
 }

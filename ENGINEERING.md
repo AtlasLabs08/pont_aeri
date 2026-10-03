@@ -62,15 +62,18 @@ src/career/           Lògica del mode Airline. Funcions pures, a Node sense moc
   landing.js  demand.js  economy.js  wear.js  damage.js
   progression.js  crew.js  finance.js  market.js
   lessons.js  school.js
+  flightplan.js  orders.js  contracts.js   D3+D4: pla de vol, ordres i liquidacio, contractes
   index.js
 src/app/              Orquestració: partida, vol, escola, mercat. Parla amb ui/ pel bus
   bus.js  flight.js  save.js  airline.js
   lesson-run.js  lesson-session.js  debrief.js  guide.js
   market.js  aircraft-images.js
+  dispatch.js         D3+D4: Dispatch, briefing, llancament, liquidacio i debrief
   index.js
 src/ui/               Pantalles del mode Airline. Només pinta i crida app/
   dom.js  screens.js  top-bar.js  airline-ui.js
   fleet.js  market.js  guide.js  silhouettes.js
+  dispatch.js  briefing.js  debrief.js
   index.js
 src/i18n/             t() i formatadors; textos a en.js (font) i ca.js
   index.js  en.js  ca.js
@@ -207,9 +210,25 @@ Qualsevol altre import de `core/` cap a `world/` és una violació.
 `Game` viu a `index.html` fins al bloc M. Per no crear imports circulars:
 
 - `app/` exporta `setFlightLauncher(fn)`. `index.html` hi injecta una funció
-  que rep un `opts`, el copia a `Game.opts` i crida `Game.spawn()`.
+  que rep un `opts`, el copia a `Game.opts` i crida `Game.spawn()`. Un vol
+  d'Airline (D3+D4) porta `opts.airline` (`orderId reg departMinute
+  plannedArrivalMin tripFuelKg fuelKg paxOnBoard massKg`): el launcher el treu
+  d'`opts` i el deixa a `Game.airline`, de manera que `Game.opts` no hi guanya
+  cap camp. Free Flight i les lliçons hi passen sense `airline`.
 - En acabar un vol, `index.html` crida `app.onFlightFinished(record)` amb el
-  `FlightRecord` de §4.
+  `FlightRecord` de §4. Un vol d'Airline es tanca segons `airlineClosing`
+  (`app/dispatch.js`, revisió del PR #36): aturat (`AIRLINE_STOP_KT`) sobre el
+  paviment de qualsevol aeroport (`airportAt`), a aquell aeroport; un cop ha
+  tocat terra, si s'atura fora de paviment o el pilot surt del vol, a
+  l'aeroport més proper al primer contacte si és a menys d'`AIRLINE_CONTACT_KM`
+  (5 km, `nearestAirport`), amb `stoppedOffPavement` si és fora de paviment, o
+  com un accident (`terrain`) si és més lluny. Abans de tocar terra, sortir
+  l'abandona sense cost (`cancelFlight`).
+- `app/dispatch.js` escolta `flight:finished` (`initDispatch`) i liquida el vol
+  d'Airline en marxa: `settleFlight`, desa, `rank:up` si puja de rang i
+  `dispatch:resolved`.
+- `setArrivalPlanner(fn)`: `index.html` hi injecta `Game.routePlan` perquè el
+  briefing triï la mateixa pista d'arribada que el joc (H16, H17).
 - `app/bus.js`: `on(topic, fn)`, `off(topic, fn)`, `emit(topic, payload)`.
   `ui/` s'hi subscriu. Temes: `career:changed`, `flight:finished`,
   `dispatch:resolved`, `rank:up`, `save:error`.
@@ -235,9 +254,9 @@ export class FlightRecorder {
   setTimeAccel(k)  cruiseSkip(fuelKg?)  event(type)  tailStrike()  rollout(metres)
   touchdown(report, score) // Game.report + Game.scoreReport(report)
   crash(cause)             // un de CRASH_CAUSES; si no ho és, queda 'fuselage'
-  finish({ arrivalMin }) -> FlightRecord   // objecte pla i nou a cada crida
+  finish({ arrivalMin, landedAt, stoppedOffPavement }) -> FlightRecord   // objecte pla i nou a cada crida
 }
-export const CRASH_CAUSES, EVENT_TYPES, RECORD_KEYS
+export const CRASH_CAUSES, EVENT_TYPES, RECORD_KEYS, OPTIONAL_RECORD_KEYS
 ```
 
 Tres regles per a qui l'enganxi a `Game` (A4):
@@ -276,6 +295,9 @@ Tres regles per a qui l'enganxi a `Game` (A4):
  * @property {boolean} tailStrike
  * @property {string|null} crashCause   CRASH_CAUSES o null
  * @property {Array<{type:string, atSecond:number}>} events
+ * @property {string|null} [landedAt]  D3+D4 (D3D4-7): ICAO de l'aeroport on s'ha tancat el vol; to és el planificat
+ * @property {boolean} [stoppedOffPavement]  revisió del PR #36: el vol s'ha tancat amb l'avió a terra fora de paviment.
+ *           Amb touchdown.onRunway, damage.js hi afegeix excursion (ha tocat la pista i n'ha sortit); fals per defecte
  */
 
 /**
@@ -290,6 +312,17 @@ Tres regles per a qui l'enganxi a `Game` (A4):
  * @property {{sink:number, g:number, zone:number, center:number, attitude:number}} pts
  */
 ```
+
+Als vols d'Airline, `Recorder.start` rep els valors reals del pla
+(`recorderMeta` d'`app/dispatch.js`): `fuelPlannedKg` = combustible previst del
+trajecte (no el carregat), `paxOnBoard` i `plannedArrivalMin`; `finish` rep
+`arrivalMin` = sortida + bloc (`arrivalMinute`) i `landedAt`. Free Flight i les
+lliçons continuen amb `fuelPlannedKg` = combustible del dipòsit, 0, `null`.
+`landedAt` i `stoppedOffPavement` són a `RECORD_KEYS` (el recorder sempre els
+posa: `null` i `false` per defecte), però també a `OPTIONAL_RECORD_KEYS`:
+`onFlightFinished` no els exigeix. `stoppedOffPavement` el passa `index.html`
+(`finishExtras`) quan tanca el vol d'Airline amb l'avió a terra fora de
+paviment.
 
 `events[].type`: `engineFailure gearFault hydraulicFault avionicsFault
 stallWarning overspeed gpws goAround divert`. Només els que el simulador ja
@@ -342,7 +375,8 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
 
 /** @typedef {{cash:number, reputation:number, bases:string[], loans:Loan[],
  *             insurance:Object<string,Insurance>, flightsFlown:number,
- *             lifetimeRevenue:number}} Company */
+ *             lifetimeRevenue:number, crewCount?:number}} Company
+ *   crewCount (D3D4-11): opcional, per defecte 0; la pestanya Crew és el D6 */
 
 /**
  * @typedef {Object} Airframe
@@ -362,7 +396,21 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
  */
 
 /** @typedef {{id:string, reg:string, from:string, to:string, crewId:string,
- *             departMinute:number, ticketPrice:number, rngCounter:number}} DispatchOrder */
+ *             departMinute:number, ticketPrice:number, rngCounter:number,
+ *             typeId?:string, pax?:number, fuelKg?:number, tripFuelKg?:number,
+ *             plannedArrivalMin?:number, arrivalRunway?:string|null,
+ *             alternate?:string|null, weather?:{origin:Object, dest:Object},
+ *             contract?:boolean}} DispatchOrder
+ *   D3D4-11: camps opcionals. crewId 'pilot' als vols que pilota el jugador;
+ *   weather = weatherFor de l'origen i del destí tal com es van mostrar al
+ *   briefing; un contracte (contract true) porta la reg de l'altra companyia,
+ *   que no és a la flota, i el typeId */
+
+/** @typedef {{orderId:string, mode:'own'|'contract', day:number,
+ *             departMinute:number, arrivalMin:number, reg:string, typeId:string,
+ *             from:string, to:string, landedAt:string|null, blockMin:number,
+ *             score:number|null, pax:number, net:number, cashDelta:number,
+ *             xp:number}} LogEntry   una línia del logbook (D3+D4) */
 ```
 
 ### Invariants
@@ -379,6 +427,22 @@ Una sola estructura serialitzable. Res de classes, `Map`, `Set` ni `Date`.
   `app/` crida `refreshMarket`. L'atzar del mercat surt de
   `derivedRng(rngSeed, 'market', epoch)` i no toca `rngCounter`. La categoria
   d'un avió no canvia mai, ni amb el desgast.
+- **Ordres de vol** (D3+D4, `docs/DECISIONS.md` 02/10/2026, D3D4-11): una
+  ordre existeix a `dispatch.queue` mentre el vol és pendent (l'avió propi és
+  `'inFlight'`); en liquidar-se surt de la cua i queda al `logbook`. Una ordre
+  del pilot que queda a la cua sense cap vol en marxa (s'ha tancat el joc a
+  mig vol) es cancel·la en obrir el centre d'operacions (`recoverStaleOrders`).
+  Els camps nous són opcionals i no pugen `schemaVersion` (§8).
+- **Dia de partida fins al rellotge** (D3D4-3): dia = `company.flightsFlown`
+  (vols propis i de contracte), mes = 1 + (floor(dia / 30) mod 12),
+  `departMinute` = dia × 1440 + hora × 60. `clock.minute` no es toca. Un avió
+  amb danys queda `'maintenance'` fins a `groundedUntilMinute` = (dia + dies) ×
+  1440, és a dir, tants vols com dies (`releaseGrounded`).
+- **Saldo negatiu** (D3D4-10): es permet. Amb `cash < 0` no es pot comprar
+  (`reason 'negative'` a `app/market.js`), ni contractar tripulació ni pagar
+  habilitacions (les funcions pures ja ho refusen per `cash`). Es pot volar, les
+  quotes es continuen cobrant sense interessos extra, i els contractes hi són
+  sempre.
 - **Ofertes i regla de venda** (`docs/DECISIONS.md` 01/10/2026, K1-K2): els
   anuncis generats porten `listPrice` i `offerPct` (0 si no hi ha oferta); un
   anunci desat abans no els té i es llegeix com `listPrice = price`,
@@ -554,11 +618,45 @@ export const BALANCE = {
   airportDifficulty: { LESU: 0.50, LELL: 0.30, LEMH: 0.10 },   // la resta, 0
   exclusivityBonus: 0.25,
 
+  // D3+D4 (docs/DECISIONS.md 02/10/2026): pla de vol, preu, meteo, reputacio, desviament i contractes
+  flightPlan: {
+    perf: { commuter: { kmh: 410, kgPerHour: 330 }, tpShort: { kmh: 420, kgPerHour: 600 }, tp: { kmh: 420, kgPerHour: 660 },
+            rj: { kmh: 600, kgPerHour: 1750 }, nbShort: { kmh: 600, kgPerHour: 2350 }, nb: { kmh: 600, kgPerHour: 2500 },
+            nbStretch: { kmh: 600, kgPerHour: 2750 }, wb: { kmh: 620, kgPerHour: 7000 }, wbEr: { kmh: 620, kgPerHour: 6600 },
+            jumbo: { kmh: 620, kgPerHour: 9500 } },
+    fixedMin: { commuter: 18, turboprop: 20, narrowbody: 24, widebody: 30 },
+    reserveMin: 30, contingencyPct: 0.05,
+    kgPerPax: 95
+  },
+  ticketPriceRange: [0.5, 2],
+  weatherBonus: { min: 0.15, max: 0.60 },
+  reputationChange: {
+    landing: [{ min: 90, delta: 1 }, { min: 72, delta: 0.5 }, { min: 45, delta: 0 }, { min: 15, delta: -1 }, { min: 0, delta: -2 }],
+    crash: -6
+  },
+  divert: { revenueMult: 0.5, reputation: -2 },
+  contracts: { offers: 3, maxKm: 600, loadFactor: [0.6, 0.95], hours: [6, 22] },
+
   cruiseSkipFuelPenalty: 0.08,
   xpMultipliers: { turbulence: 1.3, hardWeather: 1.4 },
   school: { passScore: 45, mercyScore: 30, mercyAttempt: 3, graduationXp: 250 }
 };
 ```
+
+D3+D4 (`career/flightplan.js`, `career/orders.js`, `career/contracts.js`):
+`flightPlan.perf` és la velocitat de bloc i el consum mitjà de bloc de cada
+tipus, mesurats amb el model de vol al creuer del vol cronometrat; la durada
+prevista és `fixedMin[cls] + km / kmh`, el combustible del trajecte
+`kgPerHour × durada`, el mínim trajecte + `contingencyPct` + `reserveMin`, i el
+màxim el dipòsit o el que deixa la MTOW amb `kgPerPax` per passatger.
+`ticketPriceRange` és el lliscador sobre el preu recomanat (`pRef`).
+`weatherBonus` és el bonus de `m_ruta` amb meteo dura (de `HARD_SEVERITY` a 1).
+`reputationChange` són els punts de reputació per vol segons la nota (el primer
+tram amb `score >= min`; accident, `crash`), i `divert` el factor dels
+ingressos i la penalització de reputació d'un desviament. `contracts`: ofertes
+per dia, distància màxima, ocupació i hores de sortida. Sense pujar `version`.
+El harness no els fa servir: `npm run balance -- --seeds 50` dona la mateixa
+sortida que abans.
 
 `market.offers` (K1): a cada llista, entre `count[0]` i `count[1]` anuncis
 (qualsevol, garantits inclosos) surten amb una rebaixa uniforme dins de
@@ -588,7 +686,16 @@ export function draw(state) {
 - La meteo es genera amb `hash2`, a partir de l'aeroport, el mes, l'hora, el
   dia i la llavor (`weatherFor`, contracte de sota): ha de sortir igual encara
   que el jugador tanqui i obri el joc.
-- Cada `DispatchOrder` desa el seu `rngCounter` en crear-se.
+- Cada `DispatchOrder` desa el seu `rngCounter` en crear-se. **Tirades de cada
+  vol** (D3+D4): `createOrder` reserva `SETTLE_DRAWS.length` tirades
+  (`order.rngCounter` = el comptador i la partida l'avança), i `settleFlight` les
+  fa sobre `{ rngSeed, rngCounter: order.rngCounter }` en l'ordre fix de
+  `SETTLE_DRAWS = ['crashSeverity']`, totes i sempre (també sense accident).
+  Així la liquidació només depèn de la partida desada i del record. Una tirada
+  nova (E2: avaries) s'afegeix al final de la llista.
+- Els vols de contracte surten de `derivedRng(rngSeed, 'contracts', dia)`: no
+  toquen `rngCounter`. Els passatgers del vol propi surten de `demandPax`, sense
+  atzar.
 
 ### Contracte de la meteo (`src/world/weather.js`, F3)
 
@@ -814,7 +921,7 @@ tipus/descripcio  ──PR──▶  dev  ──PR──▶  main
 ## 12. Etapes
 
 Estat real de cada tasca. El detall de cada decisió és a `docs/DECISIONS.md`;
-aquí només hi ha què existeix i què falta. **Total de proves vigent: 1862 proves**
+aquí només hi ha què existeix i què falta. **Total de proves vigent: 1964 proves**
 (`npm test`); no s'apunten comptes per tasca perquè es queden vells.
 
 ### Ordre de feina (26/09)
@@ -863,8 +970,8 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 | --- | --- | --- | --- |
 | D1 | Menú principal Free Flight / Airline, `src/ui/`, barra superior, exportar i importar, panell DEV | C5 | **Fet**. Les pestanyes sense contingut mostren "Available soon" |
 | D2 | Fleet | D1, B3 | **Fet** amb D5 (`app/market.js`, `ui/fleet.js`, venda amb `sellQuote`/`sellAircraft`) |
-| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol | D2, B2 | **Pendent**. En liquidar cada vol, ha de passar a `computeFlightResult` el `revenueMult` de la categoria de l'avió i a `applyFlightWear` el seu `wearMult`. El lloguer (G1) va amb D3+D4 |
-| D4 | Briefing i debrief amb compte de resultats | D3, A4 | **Pendent** |
+| D3 | Dispatch: taulell de sortides, produeix l'`opts` del vol | D2, B2 | **Fet** amb D4 (D3D4-1 a D3D4-12): `career/flightplan.js`, `orders.js`, `contracts.js`, `app/dispatch.js`, `ui/dispatch.js`. La liquidació passa el `revenueMult` i el `wearMult` de la categoria. **Pendent**: el lloguer (G1), que no era a l'encàrrec |
+| D4 | Briefing i debrief amb compte de resultats | D3, A4 | **Fet** (`ui/briefing.js`, `ui/debrief.js`, `debriefModel`). Desviament (`landedAt`) i vols de contracte inclosos |
 | D5 | Market: mercat d'ocasió amb categories | D2 | **Fet** (`career/market.js`, `purchaseRule`/`buyAircraft`, `ui/market.js`, `--tier` i `--tiers` al harness). Sense lloguer |
 | D5b | Market en targetes, ofertes i imatges | D5 | **Fet** (K1–K5) |
 | D6 | Pilot, Finance, Crew, Map | D1 | **Pendent** |
@@ -874,11 +981,11 @@ Dependències estrictes. Cada tasca és un PR contra `dev` amb `npm test` en ver
 
 | Id | Tasca | Depèn de | Estat i nota |
 | --- | --- | --- | --- |
-| E1 | `career/clock.js` i posició de la flota | D4 | **Pendent**. L'avió queda on aterra. `clock.minute` només existeix com a camp de l'estat |
+| E1 | `career/clock.js` i posició de la flota | D4 | **Pendent**. L'avió ja queda on aterra (D3+D4). `clock.minute` només existeix com a camp de l'estat; fins aleshores el dia de partida és `company.flightsFlown` (D3D4-3) |
 | E2 | Manteniment, revisions i avaries en vol | B3, E1 | **Pendent**. Les avaries són esdeveniments nous del `FlightModel`; tira les avaries amb `failureChance` de `wear.js` i `draw(state)`. Desgast extra de motors per TOGA prolongat: cal una dada nova al `FlightRecord` |
 | E3 | Detector de creuer estable i ×32 | A4 | **Pendent**. Estén `Game.cycleAccel` (ara fins a ×16), no el substitueix; el bucle de `Game` limita a `16 * 12` passos per frame |
 | E4 | Salt de creuer | E3 | **Pendent**. El recorder (`cruiseSkip`) i `economy.js` (penalització del 8 %) ja ho preveuen |
-| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | **Pendent**. Resolució en aterrar, llavor desada; cada vol despatxat aplica `applyFlightWear`. El bus ja té els temes `rank:up` i `dispatch:resolved`, sense emissors |
+| E5 | `career/dispatch.js`, vols automàtics | E1, B4 | **Pendent**. Resolució en aterrar, llavor desada; cada vol despatxat aplica `applyFlightWear`. `rank:up` i `dispatch:resolved` ja els emet la liquidació dels vols pilotats (D3+D4); les tirades del vol van a `SETTLE_DRAWS` |
 
 ### Bloc F — Contingut (paral·lel, delegable)
 

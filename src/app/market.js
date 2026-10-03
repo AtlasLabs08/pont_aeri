@@ -19,7 +19,8 @@
  *     tier = el tram de BALANCE.market.tiers (revenueMult, wearMult);
  *     toA / toC = hores que falten per a l A-check i el C-check; cash i
  *     financed = purchaseRule de cada modalitat, amb reason 'rating' si el
- *     pilot no te l habilitacio (G7, passa per davant); financed porta a
+ *     pilot no te l habilitacio (G7, passa per davant) i, despres, 'negative'
+ *     si el saldo es negatiu (D3D4-10: no es pot comprar); financed porta a
  *     mes totalCost = instalment * termFlights (cost total del prestec).
  *   cardModel(offer) -> { reg, typeId, name, tier, year, isOffer, offerPct,
  *     price, listPrice, hours, condition, revenueMult, image, silhouette,
@@ -40,8 +41,9 @@
  *     loan = { id, instalment, flightsLeft, balance } o null (al comptat o
  *     ja tornat); quote = sellQuote (G9).
  *   buyListing(reg, mode) -> { ok, reason?, airframe?, saved? }
- *     reason 'none' (sense partida), 'unknown' (l anunci no hi es) o el de
- *     buyAircraft ('rating', 'base', 'cash', 'reserve').
+ *     reason 'none' (sense partida), 'unknown' (l anunci no hi es),
+ *     'negative' (saldo negatiu, D3D4-10) o el de buyAircraft ('rating',
+ *     'base', 'cash', 'reserve').
  *   sellAirframe(reg) -> { ok, reason?, quote?, loanBalance?, net?, saved? }
  *   devNewMarket() -> boolean   DEV: llista de l epoch seguent al desat
  *     (o al del rellotge, si no n hi ha), i la desa. false sense partida.
@@ -65,7 +67,8 @@ export function listingOffer(state, listing) {
   const co = state.company;
   const rule = mode => {
     const r = purchaseRule({ cash: co.cash, loans: co.loans, price: listing.price, mode });
-    return hasRating ? r : { ...r, ok: false, reason: 'rating' };
+    if (!hasRating) return { ...r, ok: false, reason: 'rating' };
+    return co.cash < 0 ? { ...r, ok: false, reason: 'negative' } : r;   // D3D4-10
   };
   const financed = rule('financed');
   return {
@@ -123,6 +126,7 @@ export function buyListing(reg, mode) {
   if (!state) return { ok: false, reason: 'none' };
   const listing = state.market ? state.market.listings.find(l => l.reg === reg) : null;
   if (!listing) return { ok: false, reason: 'unknown' };
+  if (state.company.cash < 0) return { ok: false, reason: 'negative' };   // D3D4-10
   const r = buyAircraft(state, listing, mode);
   if (!r.ok) return r;
   return { ok: true, airframe: r.airframe, saved: updateCareer(r.state) };

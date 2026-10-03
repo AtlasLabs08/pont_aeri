@@ -18,7 +18,10 @@
  *       a l enlairament d un vol que no aterra);
  *       offRunway si hi ha touchdown i touchdown.onRunway es fals;
  *       excursion si touchdown.onRunway i record.rolloutMetres >
- *       touchdown.remaining (estricte; mai si remaining es null).
+ *       touchdown.remaining (estricte; mai si remaining es null), o si
+ *       touchdown.onRunway i record.stoppedOffPavement es cert (ha tocat la
+ *       pista i n ha sortit: el vol s ha tancat amb l avio fora de paviment;
+ *       revisio del PR #36). Amb contacte fora de pista, nomes offRunway.
  *     cost de cada item = round(pctOfValue * airframeValue); cost = suma;
  *     groundedDays = el maxim dels items (0 si no n hi ha); xpLoss = 0 si no
  *     hi ha accident.
@@ -57,7 +60,9 @@ function contactDamageIds(record) {
   }
   if (record.tailStrike) ids.push('tailStrike');
   if (td && !td.onRunway) ids.push('offRunway');
-  if (td && td.onRunway && td.remaining != null && record.rolloutMetres > td.remaining) ids.push('excursion');
+  const pastEnd = td && td.onRunway && td.remaining != null && record.rolloutMetres > td.remaining;
+  const leftRunway = td && td.onRunway && record.stoppedOffPavement === true;
+  if (pastEnd || leftRunway) ids.push('excursion');
   return ids;
 }
 

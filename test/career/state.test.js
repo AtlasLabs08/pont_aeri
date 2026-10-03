@@ -377,3 +377,52 @@ describe('validate: mercat i categoria (D2+D5, G11)', () => {
     }
   });
 });
+
+describe('validate: camps nous del D3+D4 (D3D4-11)', () => {
+  const W = { windDirDeg: 250, windKt: 8, gustKt: 10, visibilityM: 10000, ceilingFt: null, turbulence: 0.1, pattern: 'general', severity: 0.2, hard: false };
+  const fullOrder = extra => ({ id: 'O1', reg: 'EC-AAB', from: 'LEBL', to: 'LERS', crewId: 'pilot',
+    departMinute: 600, ticketPrice: 120, rngCounter: 3, typeId: 'tp', pax: 50, fuelKg: 900, tripFuelKg: 600,
+    plannedArrivalMin: 640, arrivalRunway: '25', alternate: null, weather: { origin: W, dest: W }, contract: false, ...extra });
+
+  test('una partida antiga (sense els camps) continua sent valida', () => {
+    assert.deepEqual(validate(fullCareer()), { ok: true, errors: [] });
+  });
+
+  test('una ordre amb tots els camps nous i crewCount es valida, i passa per importJson', () => {
+    const s = fullCareer();
+    s.dispatch.queue = [fullOrder()];
+    s.company.crewCount = 2;
+    assert.deepEqual(validate(s), { ok: true, errors: [] });
+    assert.deepEqual(importJson(exportJson(s)), s);
+  });
+
+  test('un contracte pot portar una reg que no es de la flota; un vol propi no', () => {
+    const s = fullCareer();
+    s.dispatch.queue = [fullOrder({ reg: 'EC-XYZ', contract: true, ticketPrice: 0 })];
+    assert.equal(validate(s).ok, true);
+    s.dispatch.queue[0].contract = false;
+    assert.match(errorsOf(s), /reg: EC-XYZ no existeix a la flota/);
+  });
+
+  test('valors invalids dels camps nous', () => {
+    const cases = [
+      [o => { o.pax = 1.5; }, /\.pax/],
+      [o => { o.fuelKg = -1; }, /\.fuelKg/],
+      [o => { o.tripFuelKg = 'x'; }, /\.tripFuelKg/],
+      [o => { o.plannedArrivalMin = -3; }, /\.plannedArrivalMin/],
+      [o => { o.arrivalRunway = ''; }, /\.arrivalRunway/],
+      [o => { o.alternate = 'lers'; }, /\.alternate/],
+      [o => { o.weather = { origin: W }; }, /\.weather/],
+      [o => { o.contract = 'yes'; }, /\.contract/],
+      [o => { o.typeId = 'zeppelin'; }, /\.typeId/]
+    ];
+    for (const [mutate, re] of cases) {
+      const s = fullCareer();
+      s.dispatch.queue = [fullOrder()];
+      mutate(s.dispatch.queue[0]);
+      assert.match(errorsOf(s), re, re.source);
+    }
+    const s = fullCareer(); s.company.crewCount = -1;
+    assert.match(errorsOf(s), /company\.crewCount/);
+  });
+});

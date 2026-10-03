@@ -326,7 +326,15 @@ describe('topBarModel (E6)', () => {
     const m = topBarModel(graduate(ready));
     assert.deepEqual(m, { name: 'Marta', rankKey: 'student', xp: 250, xpFloor: 0, xpNext: 600,
       xpProgress: 250 / 600, atMaxRank: false, cash: BALANCE.startingCash, reputation: BALANCE.reputation.start,
-      fleetReady: 0, fleetTotal: 0, base: BALANCE.startingBase });
+      fleetReady: 0, fleetTotal: 0, base: BALANCE.startingBase, negative: false, lastFlightDelta: null });
+  });
+
+  test('D3+D4: saldo negatiu i variacio de l ultim vol (logbook)', () => {
+    const s = base();
+    const m = topBarModel({ ...s, company: { ...s.company, cash: -5 },
+      pilot: { ...s.pilot, logbook: [{ cashDelta: 900 }, { cashDelta: -1200 }] } });
+    assert.equal(m.negative, true);
+    assert.equal(m.lastFlightDelta, -1200);
   });
 
   test('barra d XP a mig rang', () => {

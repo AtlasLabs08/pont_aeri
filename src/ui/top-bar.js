@@ -1,8 +1,9 @@
 /* Barra superior permanent d Airline (DESIGN.md, "Barra superior permanent";
  * docs/DECISIONS.md, 30/09/2026, E6). Nomes pinta el model de topBarModel
  * (app/airline.js): cap calcul aqui. Nomes es mostra al centre d operacions,
- * amb el pilot graduat. Data i hora, xip d avis, variacio de l ultim vol i
- * tendencia de la reputacio no hi son (E1, E2, D4): cap casella buida.
+ * amb el pilot graduat. Data i hora, xip d avis i tendencia de la reputacio
+ * no hi son (E1, E2): cap casella buida. D3+D4: la variacio de l ultim vol
+ * sota el saldo, i el saldo negatiu en vermell amb un avis curt (D3D4-10).
  * NOU: tasca D1 d ENGINEERING.md.
  *
  * EXPORTA: topBar
@@ -28,7 +29,14 @@ export function topBar(m) {
       el('b', {}, xpText),
       el('div', { class: 'pa-xpbar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct },
         el('span', { style: 'width:' + pct + '%' }))),
-    cell('', t('topbar.cash'), fmtMoney(m.cash)),
+    el('div', { class: 'pa-cell' + (m.negative ? ' pa-neg' : '') },
+      el('i', {}, t('topbar.cash')),
+      el('b', { class: m.negative ? 'pa-bad' : null }, fmtMoney(m.cash)),
+      m.lastFlightDelta !== null && m.lastFlightDelta !== undefined
+        ? el('span', { class: 'pa-delta ' + (m.lastFlightDelta < 0 ? 'pa-bad' : 'pa-ok') },
+          t('topbar.lastFlight', { delta: (m.lastFlightDelta > 0 ? '+' : '') + fmtMoney(m.lastFlightDelta) }))
+        : null,
+      m.negative ? el('span', { class: 'pa-delta pa-bad', role: 'alert' }, t('topbar.negative')) : null),
     cell('', t('topbar.reputation'), t('topbar.reputationValue', { value: fmtNumber(m.reputation) })),
     cell('', t('topbar.fleet'), t('topbar.fleetValue', { ready: fmtNumber(m.fleetReady), total: fmtNumber(m.fleetTotal) })),
     cell('', t('topbar.base'), m.base ?? t('topbar.noBase')));
