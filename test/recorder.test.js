@@ -243,4 +243,13 @@ describe('FlightRecorder: casos puntuals', () => {
     const a = rec.finish(); a.events.push({ type: 'x', atSecond: 0 });
     assert.equal(rec.finish().events.length, 1);
   });
+
+  test('D3D4-7: landedAt es el que passa finish, o null; to no canvia', () => {
+    const rec = new FlightRecorder(); rec.start(META);
+    assert.equal(rec.finish().landedAt, null);
+    assert.equal(rec.finish({ arrivalMin: 10 }).landedAt, null);
+    const r = rec.finish({ arrivalMin: 10, landedAt: 'LEGE' });
+    assert.equal(r.landedAt, 'LEGE');
+    assert.equal(r.to, META.to);
+  });
 });

@@ -21,6 +21,10 @@
  * 30/09/2026, G11): market ({ epoch, listings }, el genera refreshMarket de
  * market.js en carregar la partida si falta) i Airframe.tier (sense, es
  * tracta com 'standard'). Si hi son, es validen.
+ * D3+D4 (D3D4-11, mateixa regla): Company.crewCount (enter, per defecte 0) i,
+ * a DispatchOrder, pax, fuelKg, tripFuelKg, plannedArrivalMin, arrivalRunway,
+ * alternate, weather ({ origin, dest }, copia del briefing), contract i typeId.
+ * Una ordre amb contract: true no ha de tenir la reg a la flota.
  *
  * Per afegir una versio d esquema: puja SCHEMA_VERSION i afegeix a MIGRATIONS
  * la funcio que passa de la versio anterior a la nova. migrate() les encadena.
@@ -153,6 +157,8 @@ function checkState(s, err) {
     need(err, 'company.insurance', c.insurance, v => isObject(v) && Object.values(v).every(isObject));
     need(err, 'company.flightsFlown', c.flightsFlown, isNatural);
     need(err, 'company.lifetimeRevenue', c.lifetimeRevenue, Number.isInteger, 'ha de ser un enter d euros');
+    // D3D4-11: opcional, per defecte 0 (la pestanya de tripulacio es el D6)
+    if (c.crewCount !== undefined) need(err, 'company.crewCount', c.crewCount, isNatural);
   }
 
   const seen = new Set();
@@ -255,7 +261,17 @@ function checkOrder(o, at, err, regs) {
   if (!isObject(o)) { err.push(at + ': no es un objecte'); return; }
   need(err, at + '.id', o.id, isNonEmptyString);
   need(err, at + '.reg', o.reg, isNonEmptyString);
-  if (isNonEmptyString(o.reg) && !regs.has(o.reg)) err.push(at + '.reg: ' + o.reg + ' no existeix a la flota');
+  // D3D4-11: opcionals. Un vol de contracte es fa amb l avio d una altra companyia: la reg no es de la flota
+  if (o.contract !== undefined) need(err, at + '.contract', o.contract, isBoolean);
+  if (isNonEmptyString(o.reg) && o.contract !== true && !regs.has(o.reg)) err.push(at + '.reg: ' + o.reg + ' no existeix a la flota');
+  if (o.typeId !== undefined) need(err, at + '.typeId', o.typeId, v => typeof v === 'string' && Object.hasOwn(BALANCE.fleetTypes, v));
+  if (o.pax !== undefined) need(err, at + '.pax', o.pax, isNatural);
+  if (o.fuelKg !== undefined) need(err, at + '.fuelKg', o.fuelKg, isNonNegative);
+  if (o.tripFuelKg !== undefined) need(err, at + '.tripFuelKg', o.tripFuelKg, isNonNegative);
+  if (o.plannedArrivalMin !== undefined) need(err, at + '.plannedArrivalMin', o.plannedArrivalMin, isNatural);
+  if (o.arrivalRunway !== undefined) need(err, at + '.arrivalRunway', o.arrivalRunway, v => v === null || isNonEmptyString(v));
+  if (o.alternate !== undefined) need(err, at + '.alternate', o.alternate, v => v === null || isIcao(v));
+  if (o.weather !== undefined) need(err, at + '.weather', o.weather, v => isObject(v) && isObject(v.origin) && isObject(v.dest));
   need(err, at + '.from', o.from, isIcao);
   need(err, at + '.to', o.to, isIcao);
   need(err, at + '.crewId', o.crewId, isNonEmptyString);

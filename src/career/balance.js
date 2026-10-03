@@ -178,6 +178,36 @@ export const BALANCE = deepFreeze({
   airportDifficulty: { LESU: 0.50, LELL: 0.30, LEMH: 0.10 },   // la resta, 0
   exclusivityBonus: 0.25,
 
+  // D3+D4 (D3D4-4): pla de vol del briefing. Per tipus: velocitat de bloc en creuer (km/h) i consum mitja
+  // de bloc (kg/h, inclou pujada i rodatge), mesurats amb el model de vol (core/) al creuer del vol
+  // cronometrat; fixedMin = minuts de rodatge, pujada i aproximacio per classe. Reserva en minuts al
+  // consum de bloc i contingencia en % del combustible del trajecte.
+  flightPlan: {
+    perf: {
+      commuter:  { kmh: 410, kgPerHour: 330 },
+      tpShort:   { kmh: 420, kgPerHour: 600 },
+      tp:        { kmh: 420, kgPerHour: 660 },
+      rj:        { kmh: 600, kgPerHour: 1750 },
+      nbShort:   { kmh: 600, kgPerHour: 2350 },
+      nb:        { kmh: 600, kgPerHour: 2500 },
+      nbStretch: { kmh: 600, kgPerHour: 2750 },
+      wb:        { kmh: 620, kgPerHour: 7000 },
+      wbEr:      { kmh: 620, kgPerHour: 6600 },
+      jumbo:     { kmh: 620, kgPerHour: 9500 }
+    },
+    fixedMin: { commuter: 18, turboprop: 20, narrowbody: 24, widebody: 30 },
+    reserveMin: 30, contingencyPct: 0.05,
+    kgPerPax: 95                            // passatger amb equipatge (massa de la carrega)
+  },
+  ticketPriceRange: [0.5, 2],               // D3D4-1: lliscador del preu, sobre el preu recomanat (pRef)
+  weatherBonus: { min: 0.15, max: 0.60 },   // D3D4-8: m_ruta amb meteo dura (DESIGN.md), de HARD_SEVERITY a 1
+  reputationChange: {                       // D3D4-8: punts per vol (escala 0..100); guanya el primer amb score >= min
+    landing: [{ min: 90, delta: 1 }, { min: 72, delta: 0.5 }, { min: 45, delta: 0 }, { min: 15, delta: -1 }, { min: 0, delta: -2 }],
+    crash: -6
+  },
+  divert: { revenueMult: 0.5, reputation: -2 },   // D3D4-7: vol que acaba en un altre aeroport
+  contracts: { offers: 3, maxKm: 600, loadFactor: [0.6, 0.95], hours: [6, 22] },   // hours: sortida [inici, fi)   // D3D4-9: ofertes del Dispatch
+
   cruiseSkipFuelPenalty: 0.08,
   xpMultipliers: { turbulence: 1.3, hardWeather: 1.4 },
   school: { passScore: 45, mercyScore: 30, mercyAttempt: 3, graduationXp: 250 }

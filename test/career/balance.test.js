@@ -261,4 +261,26 @@ describe('BALANCE: mercat d ocasio i categories (D2+D5)', () => {
     const r = BALANCE.financing.reserveFlights;
     assert.ok(Number.isInteger(r) && r >= 0, 'financing.reserveFlights');
   });
+
+  test('D3+D4: flightPlan te un tipus per a cada fleetType i una classe per a cada classe', () => {
+    const P = BALANCE.flightPlan;
+    assert.deepEqual(Object.keys(P.perf).sort(), Object.keys(BALANCE.fleetTypes).sort());
+    for (const [id, p] of Object.entries(P.perf)) assert.ok(p.kmh > 0 && p.kgPerHour > 0, 'flightPlan.perf.' + id);
+    assert.deepEqual(Object.keys(P.fixedMin).sort(), Object.keys(BALANCE.rotation.cap).sort());
+    assert.ok(P.reserveMin > 0 && P.contingencyPct >= 0 && P.contingencyPct < 1 && P.kgPerPax > 0);
+  });
+
+  test('D3+D4: preu, meteo, reputacio, desviament i contractes coherents', () => {
+    const [lo, hi] = BALANCE.ticketPriceRange;
+    assert.ok(lo > 0 && lo < 1 && hi > 1);
+    assert.ok(BALANCE.weatherBonus.min >= 0 && BALANCE.weatherBonus.min < BALANCE.weatherBonus.max);
+    const L = BALANCE.reputationChange.landing;
+    pairs(L, (a, b) => { assert.ok(a.min > b.min); assert.ok(a.delta >= b.delta); });
+    assert.equal(L[L.length - 1].min, 0);
+    assert.ok(BALANCE.reputationChange.crash < 0 && BALANCE.divert.reputation < 0);
+    assert.ok(BALANCE.divert.revenueMult >= 0 && BALANCE.divert.revenueMult < 1);
+    const C = BALANCE.contracts;
+    assert.ok(Number.isInteger(C.offers) && C.offers > 0 && C.maxKm > 0 && C.loadFactor[0] < C.loadFactor[1]);
+    assert.ok(C.hours[0] >= 0 && C.hours[0] < C.hours[1] && C.hours[1] <= 24);
+  });
 });

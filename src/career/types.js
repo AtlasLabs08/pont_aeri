@@ -54,7 +54,8 @@
 
 /** @typedef {{cash:number, reputation:number, bases:string[], loans:Loan[],
  *             insurance:Object<string,Insurance>, flightsFlown:number,
- *             lifetimeRevenue:number}} Company */
+ *             lifetimeRevenue:number, crewCount?:number}} Company
+ *   crewCount (D3D4-11): opcional, per defecte 0 */
 
 /**
  * @typedef {Object} Airframe
@@ -73,14 +74,45 @@
  * @property {'basic'|'standard'|'premium'|'deluxe'} [tier]   opcional: sense, 'standard'
  */
 
-/** @typedef {{id:string, reg:string, from:string, to:string, crewId:string,
- *             departMinute:number, ticketPrice:number, rngCounter:number}} DispatchOrder */
+/**
+ * Un vol pendent (seccio 5). Existeix mentre el vol es pendent: en liquidar-se
+ * surt de la cua i queda al logbook. Camps opcionals del D3+D4 (D3D4-11).
+ * @typedef {Object} DispatchOrder
+ * @property {string} id
+ * @property {string} reg              avio de la flota; en un contracte, el de l altra companyia
+ * @property {string} from
+ * @property {string} to               desti planificat
+ * @property {string} crewId           'pilot' als vols que pilota el jugador
+ * @property {number} departMinute     dia * MINUTES_PER_DAY + hora * 60 (D3D4-3)
+ * @property {number} ticketPrice      euros enters (0 als contractes)
+ * @property {number} rngCounter       primera tirada reservada per a la liquidacio (SETTLE_DRAWS)
+ * @property {string} [typeId]         tipus d avio (cal als contractes)
+ * @property {number} [pax]
+ * @property {number} [fuelKg]         combustible carregat
+ * @property {number} [tripFuelKg]     combustible previst del trajecte (FlightRecord.fuelPlannedKg)
+ * @property {number} [plannedArrivalMin]
+ * @property {string|null} [arrivalRunway]
+ * @property {string|null} [alternate]  aeroport alternatiu proposat pel briefing (D3D4-5)
+ * @property {{origin:Object, dest:Object}} [weather]   weatherFor de l origen i del desti, tal com es van mostrar
+ * @property {boolean} [contract]
+ */
 
 /* La seccio 5 encara no defineix aquests tres. Els tancaran les tasques
  * que els facin servir (B2 economia, B4 progressio). Fins llavors validate()
  * nomes exigeix que siguin objectes. */
 
-/** @typedef {Object} LogEntry   una linia del quadern de vol, append-only */
+/**
+ * Una linia del quadern de vol, append-only (D3+D4, settleFlight d orders.js).
+ * @typedef {Object} LogEntry
+ * @property {string} orderId   @property {'own'|'contract'} mode
+ * @property {number} day       @property {number} departMinute   @property {number} arrivalMin
+ * @property {string} reg       @property {string} typeId
+ * @property {string} from      @property {string} to   @property {string|null} landedAt
+ * @property {number} blockMin  @property {number|null} score   @property {number} pax
+ * @property {number} net       resultat del vol (computeFlightResult.net)
+ * @property {number} cashDelta variacio total de cash (net, cicles, danys, quotes)
+ * @property {number} xp        XP guanyada (pot ser negativa)
+ */
 /** @typedef {{id:string, principal:number, balance:number, ratePerFlight:number,
  *             termFlights:number, instalment:number, flightsPaid:number}} Loan
  *   prestec de la companyia o d un avio; es crea amb makeLoan (finance.js, B5),

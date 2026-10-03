@@ -2,7 +2,7 @@
  * NOU. Tasca C2 d ENGINEERING.md, ampliat a C3+C4 i C5+D1.
  *
  * EXPORTA: tot bus.js, flight.js, save.js, lesson-run.js, lesson-session.js,
- *          debrief.js, airline.js, guide.js i market.js
+ *          debrief.js, airline.js, guide.js, market.js, aircraft-images.js i dispatch.js
  */
 
 export * from './bus.js';
@@ -15,3 +15,4 @@ export * from './airline.js';
 export * from './guide.js';
 export * from './market.js';
 export * from './aircraft-images.js';
+export * from './dispatch.js';

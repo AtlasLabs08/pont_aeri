@@ -2,7 +2,7 @@
  * objecte que el simulador passa al mode Airline.
  * NOU: no ve de l original. Tasca A3 d ENGINEERING.md.
  *
- * EXPORTA: FlightRecorder CRASH_CAUSES EVENT_TYPES RECORD_KEYS
+ * EXPORTA: FlightRecorder CRASH_CAUSES EVENT_TYPES RECORD_KEYS OPTIONAL_RECORD_KEYS
  *
  * IMPORTA: res. Nomes llegeix f.out, f.wow i ctl: no toca la fisica.
  *
@@ -26,7 +26,14 @@
  *   r.rollout(metres)
  *   r.tailStrike()
  *   r.crash(cause)              un de CRASH_CAUSES; si no ho es, queda 'fuselage'
- *   r.finish({ arrivalMin }) -> FlightRecord (objecte pla i nou a cada crida)
+ *   r.finish({ arrivalMin, landedAt, stoppedOffPavement }) -> FlightRecord
+ *                               (objecte pla i nou a cada crida). landedAt
+ *                               (D3+D4, D3D4-7): ICAO de l aeroport on s ha
+ *                               tancat el vol, o null (per defecte). to
+ *                               continua sent el desti planificat.
+ *                               stoppedOffPavement: cert si el vol s ha tancat
+ *                               amb l avio a terra fora de paviment; fals per
+ *                               defecte (revisio del PR #36)
  *
  * Per que el combustible s integra i no es resta: si l estat del model es
  * restaura (fdmRestore) o es reinicia, la resta de f.fuel queda falsejada.
@@ -44,7 +51,10 @@ export const RECORD_KEYS = ['aircraftTypeId', 'from', 'to', 'blockSeconds',
   'airborneSeconds', 'fuelBurntKg', 'fuelPlannedKg', 'paxOnBoard', 'maxAltFt',
   'maxG', 'maxBankDeg', 'abruptInputs', 'timeAccelMax', 'usedCruiseSkip',
   'skippedCruiseFuelKg', 'arrivalDeltaMin', 'touchdown', 'rolloutMetres',
-  'tailStrike', 'crashCause', 'events'];
+  'tailStrike', 'crashCause', 'events', 'landedAt', 'stoppedOffPavement'];
+
+/** claus de RECORD_KEYS que un record pot no portar (D3D4-7): onFlightFinished no les exigeix */
+export const OPTIONAL_RECORD_KEYS = ['landedAt', 'stoppedOffPavement'];
 
 const STARTED_GS_KT = 3;        // com Game.flight: el bloc compta des que l avio es mou
 const ABRUPT_RATE = 4;          // canvi de comandament (fraccio de recorregut per segon)
@@ -117,7 +127,9 @@ export class FlightRecorder {
       skippedCruiseFuelKg: this.skippedFuel, arrivalDeltaMin: arrival,
       touchdown: this.td ? { ...this.td, pts: { ...this.td.pts } } : null,
       rolloutMetres: this.rollM, tailStrike: this.tail, crashCause: this.crashCause,
-      events: this.events.map(e => ({ ...e }))
+      events: this.events.map(e => ({ ...e })),
+      landedAt: typeof extra.landedAt === 'string' ? extra.landedAt : null,
+      stoppedOffPavement: extra.stoppedOffPavement === true
     };
   }
 }

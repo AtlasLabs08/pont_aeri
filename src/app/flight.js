@@ -4,7 +4,7 @@
  * EXPORTA: setFlightLauncher launchFlight onFlightFinished cancelFlight
  *          isFlightInProgress _resetFlight
  *
- * IMPORTA: RECORD_KEYS de core/, emit de ./bus.js.
+ * IMPORTA: RECORD_KEYS i OPTIONAL_RECORD_KEYS de core/, emit de ./bus.js.
  *
  * INTERFICIE (no la canviis, index.html i els tests en depenen):
  *   setFlightLauncher(fn)   index.html hi injecta una funcio que rep opts,
@@ -18,7 +18,8 @@
  *                           Si hi ha un vol en marxa: resol la promesa amb
  *                           record, deixa l estat lliure i emet
  *                           'flight:finished' amb record; retorna true. Si al
- *                           record li falta alguna clau de RECORD_KEYS,
+ *                           record li falta alguna clau de RECORD_KEYS (menys
+ *                           les d OPTIONAL_RECORD_KEYS, com landedAt),
  *                           rebutja la promesa en comptes de resoldre-la, no
  *                           emet, pero tambe deixa l estat lliure i retorna
  *                           true. Sense vol en marxa (Free Flight, o una
@@ -30,7 +31,7 @@
  *   _resetFlight()          nomes per a les proves
  */
 
-import { RECORD_KEYS } from '../core/index.js';
+import { RECORD_KEYS, OPTIONAL_RECORD_KEYS } from '../core/index.js';
 import { emit } from './bus.js';
 
 let launcher = null;
@@ -57,9 +58,10 @@ export function onFlightFinished(record) {
   if (current === null) return false;
   const { resolve, reject } = current;
   current = null;
+  const required = RECORD_KEYS.filter(k => !OPTIONAL_RECORD_KEYS.includes(k));
   const missing = !record || typeof record !== 'object'
-    ? RECORD_KEYS.slice()
-    : RECORD_KEYS.filter(k => !(k in record));
+    ? required
+    : required.filter(k => !(k in record));
   if (missing.length > 0) {
     reject(new Error('FlightRecord incomplet: falta ' + missing.join(', ')));
     return true;

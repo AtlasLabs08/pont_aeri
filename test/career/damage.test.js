@@ -109,6 +109,19 @@ describe('assessDamage: sortida de pista (excursion)', () => {
     assert.deepEqual(ids(rollout(1500, 3000, { onRunway: false })), ['offRunway']);
   });
 
+  test('stoppedOffPavement amb onRunway cert (ha tocat la pista i n ha sortit): excursion', () => {
+    assert.deepEqual(ids(record({ remaining: 1500 }, { rolloutMetres: 900, stoppedOffPavement: true })), ['excursion']);
+    assert.deepEqual(ids(record({ remaining: 1500 }, { rolloutMetres: 900, stoppedOffPavement: false })), []);
+  });
+
+  test('stoppedOffPavement amb onRunway fals: nomes offRunway', () => {
+    assert.deepEqual(ids(record({ onRunway: false, remaining: null }, { rolloutMetres: 900, stoppedOffPavement: true })), ['offRunway']);
+  });
+
+  test('stoppedOffPavement i rodatge mes llarg que la pista: una sola excursion', () => {
+    assert.deepEqual(ids(record({ remaining: 800 }, { rolloutMetres: 900, stoppedOffPavement: true })), ['excursion']);
+  });
+
   test('remaining null: no s avalua', () => {
     assert.deepEqual(ids(rollout(null, 3000)), []);
   });

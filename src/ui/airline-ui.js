@@ -19,7 +19,9 @@
  *   showMainMenu()     les dues portes: Free Flight i Airline
  *   enterAirline()     openAirline() i la resposta a cada estat de loadCareer
  *   showAirlineHome()  la pantalla que toca amb la partida en memoria
- *     (tornar d una llico, boto DEV): nom, escola, graduacio o centre
+ *     (tornar d una llico o d un vol, boto DEV): nom, escola, graduacio o
+ *     centre; si hi ha un vol d Airline liquidat sense veure, el debrief
+ *     (D3D4-12)
  *   hideAirlineUi()    amaga la capa (desa si hi ha partida)
  *   isAirlineUiOpen() -> boolean
  *   refreshAirlineUi()   si el centre d operacions es obert, el torna a
@@ -36,13 +38,17 @@ import {
   on, openAirline, currentCareer, pendingCareer, entryScreen, createAirline,
   acceptBalanceMismatch, startOver, graduateCareer, exportCareer, importCareer,
   saveAirline, topBarModel, NAME_MAX_LENGTH, ensureMarket, marketModel, fleetModel,
-  buyListing, sellAirframe
+  buyListing, sellAirframe, initDispatch, recoverStaleOrders, dispatchModel, planOwnFlight, planContract,
+  startFlight, pendingDebrief, clearDebrief, debriefModel
 } from '../app/index.js';
 import { el, ensureStyles } from './dom.js';
 import { mainMenuScreen, nameScreen, schoolScreen, graduationScreen, opsScreen, noticeScreen, creditsScreen } from './screens.js';
 import { guideScreen } from './guide.js';
 import { fleetPanel } from './fleet.js';
 import { marketPanel } from './market.js';
+import { dispatchPanel } from './dispatch.js';
+import { briefingScreen } from './briefing.js';
+import { debriefScreen } from './debrief.js';
 
 let root = null, hooks = {}, bannerTimer = 0, screen = null, opsTab = null;
 
@@ -52,6 +58,7 @@ export function initAirlineUi(h) {
   root = el('div', { id: 'airlineUi', class: 'pa-ui pa-side', hidden: true });
   document.body.append(root);
   on('save:error', () => banner(t('save.error')));
+  initDispatch();
 }
 
 export function isAirlineUiOpen() { return !!root && !root.hidden; }
@@ -147,6 +154,8 @@ function doStartOver() {
 
 export function showAirlineHome() {
   const state = currentCareer(), screen = entryScreen(state);
+  // D3D4-12: en tornar d un vol d Airline liquidat, primer el debrief
+  if (screen === 'ops' && pendingDebrief()) return showDebrief();
   if (screen === 'name') return showName();
   if (screen === 'graduation') return showGraduation();
   if (screen === 'ops') return showOps();
@@ -190,17 +199,53 @@ function showGraduation() {
  *  vendre), la barra superior s actualitza i la posicio de scroll es queda. */
 function showOps(tab = null) {
   ensureMarket();
+  recoverStaleOrders();
   const state = currentCareer();
   const again = screen === 'ops' && isAirlineUiOpen(), scroll = root.scrollTop;
   mount(opsScreen(state, topBarModel(state), {
     onSchool: showSchool, onBack: showMainMenu, ...saveActions(),
     tab: tab ?? opsTab, onTab: id => { opsTab = id; },
     panels: {
+      dispatch: () => dispatchPanel(dispatchModel(currentCareer()), {
+        planOf: sel => planOwnFlight(currentCareer(), sel),
+        onBriefing: plan => showBriefing(plan),
+        onContract: id => showBriefing(planContract(currentCareer(), id))
+      }),
       fleet: () => fleetPanel(fleetModel(currentCareer()), { onSell: sell, onMarket: () => showOps('market') }),
       market: () => marketPanel(marketModel(currentCareer()), { onBuy: buy })
     }
   }), true, false, 'ops');
   if (again) root.scrollTop = scroll;
+}
+
+function showDebrief() {
+  const st = pendingDebrief();
+  mount(debriefScreen(debriefModel(st), { onContinue: () => { clearDebrief(); showOps('dispatch'); } }), false, false, 'debrief');
+}
+
+/** torna a fer el pla amb canvis (combustible, desti alternatiu), del mateix tipus */
+function replanOf(plan, changes) {
+  const state = currentCareer();
+  if (plan.contract) return planContract(state, plan.offerId, { fuelKg: changes.fuelKg ?? plan.fuelKg });
+  return planOwnFlight(state, { reg: plan.reg, to: changes.to ?? plan.to, hour: plan.hour,
+    price: changes.to ? null : plan.price, fuelKg: changes.to ? null : changes.fuelKg ?? plan.fuelKg });
+}
+
+/** briefing (D3D4-4): pla, meteo, combustible i, si cal, l alternatiu (D3D4-5) */
+function showBriefing(plan) {
+  if (!plan || (!plan.ok && !plan.from)) { banner(t('dispatch.reason.' + (plan ? plan.reason : 'unknown'))); return showOps('dispatch'); }
+  mount(briefingScreen(plan, {
+    replan: changes => replanOf(plan, changes),
+    onAlternate: icao => showBriefing(replanOf(plan, { to: icao })),
+    onFly: p => fly(p),
+    onBack: () => showOps('dispatch')
+  }), false, false, 'briefing');
+}
+
+/** llanca el vol del pla (D3D4-6): la capa es tanca quan el launcher arrenca el vol */
+function fly(plan) {
+  const r = startFlight(plan);
+  if (!r.ok) { banner(t('dispatch.reason.' + r.reason)); showOps('dispatch'); }
 }
 
 function buy(reg, mode) {
