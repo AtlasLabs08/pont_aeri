@@ -21,7 +21,7 @@ import { currentCareer, updateCareer, _resetAirline } from '../../src/app/airlin
 import {
   planOwnFlight, dispatchModel, departureRunwayIndex, orderOpts, recorderMeta, arrivalMinute, finishExtras,
   airportAt, startOwnFlight, activeAirlineFlight, setArrivalPlanner, initDispatch, pendingDebrief, clearDebrief,
-  recoverStaleOrders, planContract, startContract, debriefModel, airlineClosing, AIRLINE_CONTACT_KM, reportButtons, _resetDispatch
+  recoverStaleOrders, planContract, startContract, debriefModel, airlineClosing, AIRLINE_CONTACT_KM, reportButtons, pauseButtons, _resetDispatch
 } from '../../src/app/dispatch.js';
 
 class FakeStorage {
@@ -421,5 +421,14 @@ describe('botons de l informe d aterratge (revisio del PR #36)', () => {
   });
   test('a Free Flight i a l escola, els quatre de sempre', () => {
     assert.deepEqual(reportButtons({ airline: false }), ['continue', 'replay', 'restart', 'menu']);
+  });
+});
+
+describe('botons del menu de pausa (revisio del PR #36)', () => {
+  test('en un vol d Airline, sense Restart flight', () => {
+    assert.deepEqual(pauseButtons({ airline: true }), ['resume', 'menu']);
+  });
+  test('a Free Flight i a l escola, Resume, Restart flight i Main menu', () => {
+    assert.deepEqual(pauseButtons({ airline: false }), ['resume', 'restart', 'menu']);
   });
 });
