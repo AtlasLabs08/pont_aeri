@@ -163,4 +163,10 @@ describe('cablejat a index.html', () => {
     assert.equal((html.match(/t\('hud\.taxiLimit'|i18nT\('hud\.taxiLimit'/g) || []).length, 3);
     assert.match(html, /S\.taxi\.warn\) w\.push\(t\('warn\.taxiLimitRunway'/);
   });
+  test('Game.snapshot porta el limitador: la UI llegeix S.taxi a cada frame', () => {
+    // sense el camp, S.taxi.on llancava a UI.frame i el HUD es quedava buit
+    const snap = html.match(/^ {2}snapshot\(\) \{ return \{.*\}; \}$/m);
+    assert.ok(snap, 'Game.snapshot() no trobat');
+    assert.match(snap[0], /\btaxi: this\.taxi\b/);
+  });
 });
